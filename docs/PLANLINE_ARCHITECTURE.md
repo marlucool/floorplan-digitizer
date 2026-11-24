@@ -23,6 +23,7 @@ The current web integration is intentionally a detection-and-review slice:
 - Raster image dimensions are preflighted from the image header before OpenCV decodes the full image; the pixel limit is enforced again after decode. PDF page dimensions are checked before rasterisation.
 - OCR, dimension association, calibration, topology reconstruction and measured DXF export are not part of this web workflow.
 - A manual `/api/validate-dimension-chain` endpoint checks explicitly supplied values with decimal arithmetic and verification flags. It does not perform OCR, unit conversion, geometry association or DXF export.
+- The UI can export candidate detections as a versioned JSON review artifact containing source pixel dimensions, model metadata and detector boxes. It excludes the source image and does not represent verified measurements.
 
 ### Detection resolution risk
 
