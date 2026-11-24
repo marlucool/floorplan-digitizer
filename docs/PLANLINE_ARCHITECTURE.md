@@ -122,6 +122,50 @@ Reference: https://www.mdpi.com/2075-5309/16/5/1043
 
 The paper's use of modular regularisation is not adopted as an automatic Planline rule: a drawing-specific module or grid assumption could incorrectly alter a real measurement. Any such prior must be optional, visible and independently validated.
 
+### Dimension-aware text-to-geometry matching
+
+Liang, Fukuda and Yabuki, *Automated dimension-aware BIM reconstruction from annotated floorplans through optimization-based text–geometry matching*, Automation in Construction 191 (2026), article 107204, DOI: 10.1016/j.autcon.2026.107204.
+
+This 2026 work is especially relevant to Planline's core problem: it treats OCR-derived dimensions as **localized metric constraints** and explicitly links them to candidate geometric entities through an optimization-based matching stage. It argues that image-level metrics (IoU, mAP, F1) alone do not establish engineering-level correctness; component dimensions, placement and relationships need their own evaluation. It also discusses oblique/non-Manhattan geometry rather than assuming every plan is an orthogonal grid.
+
+Design implications:
+
+- Store OCR observations and geometric candidates independently before attempting association.
+- Represent a dimension as a constraint attached to a candidate span/entity, not as a free-floating number or a global scale label.
+- Keep multiple candidate text-to-geometry matches when evidence is ambiguous; require review instead of silently selecting the nearest wall.
+- Evaluate final geometry using dimension residuals, endpoint/placement error and topology/relationship correctness, not only detector accuracy.
+- Keep metric dimensions local. A drawing-wide scale may be a diagnostic, but must not override a verified written dimension or hide local distortion.
+
+Reference: https://doi.org/10.1016/j.autcon.2026.107204 (open-access author manuscript: https://research.chalmers.se/publication/554882/file/554882_Fulltext.pdf)
+
+### 2024 floor-plan OCR benchmark
+
+Schönfelder et al. (2024) compare text-region detection and OCR approaches on architectural floor plans, including printed and handwritten challenges. Their paper notes that text is spatially scattered, small, rotated and sometimes occluded, and that generic OCR performance remains a limitation for this domain. The paper provides annotated floor-plan text data and a synthetic text-generation approach.
+
+Planline should therefore benchmark candidate recognizers on **complete dimension strings**, not only isolated digits. Test sets must include rotation, low resolution, faded scans, line/text overlap, handwritten values, decimal separators and units. A high detector score cannot compensate for an OCR transcription error.
+
+Reference: https://doi.org/10.1016/j.autcon.2023.105156
+
+### Audit of the repository's existing digit OCR
+
+The legacy main.py pipeline is not ready to be called from the web API as-is:
+
+- It executes image loading, model loading, inference, file writes and DXF generation at module import time. Importing it from FastAPI would trigger the entire legacy workflow.
+- Its ResNet18 classifier has ten outputs (0–9), so it is a **digit classifier**, not a full-string OCR recognizer.
+- It thresholds the red channel at a fixed value and assumes the dimension marks are red. That is not a safe assumption for arbitrary archival scans or black/blue annotations.
+- It concatenates predicted digits into an integer. Decimal marks, commas, units, prefixes, suffixes and tolerances are not represented.
+- Low-confidence digits are printed as warnings, but their predicted classes are still appended to the final number. The pipeline therefore does not enforce an uncertainty gate.
+- The original segmentation code and preprocessing have not been validated against representative old scans in the Planline web workflow.
+
+The existing model can be retained as an **experimental candidate recognizer** for the narrow drawing style it was trained on, but it must not become the authoritative dimension parser. Before integration, extract pure functions into an import-safe module, return per-character alternatives and confidence, preserve raw crops and preprocessing provenance, and require human confirmation of the complete string. Do not feed its output directly into geometry or DXF export.
+
+### OCR engine selection: practical direction
+
+PaddleOCR is a reasonable local baseline to evaluate because it provides text detection and sequence recognition components and is used in recent architectural-drawing research. It is not a guaranteed solution: floor-plan text detection, vertical orientation, small text and overlap with dimension graphics remain domain-specific failure modes. A second baseline should be evaluated against the same held-out scans rather than selecting an engine from generic document benchmarks.
+
+Reference implementation: https://github.com/PaddlePaddle/PaddleOCR
+
+
 ### Floor-plan parsing challenges
 
 The open-access paper *Automatic structural scene digitalization* (2017) describes common issues in raster floor-plan parsing: dimension leaders being confused with walls, backgrounds containing grids/patterns, variable text fonts and orientations, text touching graphics, and vectorisation failures at junctions.
@@ -168,6 +212,10 @@ Split training/validation/test by original drawing and writer, not by cropped di
 - [x] Add candidate region review, class filtering and selected-box highlighting.
 - [x] Document API setup and the current capability boundary.
 - [ ] Run a real-weight smoke test with `yolo_floorplan.pt` and representative old scans.
+- [ ] Audit the legacy digit classifier on held-out scans; do not integrate its current integer output as dimension OCR.
+- [ ] Benchmark at least two OCR baselines on complete dimension strings, including rotated, faded and handwritten samples.
+- [ ] Add text-to-dimension-line and dimension-line-to-span association records with multiple candidates and human review.
+- [ ] Evaluate metric correctness (dimension residuals and placement/topology errors), not only detection mAP or OCR character accuracy.
 - [ ] Visually verify overlay alignment at desktop and mobile sizes, including resize and PDF preview.
 - [ ] Add persistent project state only after defining privacy, retention and recovery requirements.
 - [ ] Introduce a typed intermediate representation for detections, OCR observations, dimension associations and constraints.
