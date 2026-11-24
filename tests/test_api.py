@@ -63,6 +63,24 @@ def test_analyse_returns_regions_without_fabricating_ocr(monkeypatch) -> None:
     assert any("OCR has not run" in note for note in payload["notes"])
 
 
+def test_detector_load_and_prediction_are_serialized(monkeypatch) -> None:
+    class LockCheckingDetector(FakeDetector):
+        def predict(self, **kwargs):
+            assert api._model_lock.locked()
+            return super().predict(**kwargs)
+
+    def load_detector():
+        assert api._model_lock.locked()
+        return LockCheckingDetector()
+
+    monkeypatch.setattr(api, "get_detector", load_detector)
+    response = TestClient(api.app).post(
+        "/api/analyze",
+        files={"file": ("plan.png", image_bytes(), "image/png")},
+    )
+    assert response.status_code == 200
+
+
 def test_rejects_unsupported_file_type() -> None:
     response = TestClient(api.app).post(
         "/api/analyze",
