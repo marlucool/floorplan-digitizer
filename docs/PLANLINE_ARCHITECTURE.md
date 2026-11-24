@@ -18,7 +18,7 @@ The current web integration is intentionally a detection-and-review slice:
 - PNG/JPG/WEBP/TIFF and PDF uploads are accepted within the configured limits.
 - PDF handling rasterises page one only.
 - The existing YOLO weights detect candidate `wall`, `dimension_line`, and `dimension_value` regions.
-- The UI displays the preview, candidate boxes, class counts, detector scores, filtering, selected-box highlighting, zoom/fit controls and a scrollable zoomed view.
+- The UI displays the preview, candidate boxes, class counts, detector scores, a configurable confidence threshold, filtering, selected-box highlighting, zoom/fit controls and a scrollable zoomed view.
 - A candidate-review JSON export preserves source pixel dimensions, detector metadata, bounding boxes and scores under a versioned schema; it excludes the source image and is not a measurement record.
 - The application does not intentionally save source drawings as project files; multipart parsing may spool larger uploads to temporary storage. No measured DXF is emitted.
 - Raster image dimensions are preflighted from the image header before OpenCV decodes the full image; the pixel limit is enforced again after decode. PDF page dimensions are checked before rasterisation.
@@ -240,6 +240,7 @@ Split training/validation/test by original drawing and writer, not by cropped di
 
 - [x] Connect the browser UI to the existing detector API.
 - [x] Add candidate region review, class filtering and selected-box highlighting.
+- [x] Add a user-adjustable detector confidence threshold; detector scores remain uncalibrated and are not measurement confidence.
 - [x] Document API setup and the current capability boundary.
 - [ ] Run a real-weight smoke test with `yolo_floorplan.pt` and representative old scans.
 - [ ] Compare full-frame YOLO inference with overlapping multi-scale tiles on held-out scans before changing the default detector path.
