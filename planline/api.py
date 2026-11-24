@@ -20,6 +20,8 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from .constraints import DimensionChainRequest, validate_dimension_chain
+
 ROOT_DIR = Path(__file__).resolve().parents[1]
 WEB_DIR = ROOT_DIR / "web"
 DETECTOR_PATH = ROOT_DIR / "yolo_floorplan.pt"
@@ -209,6 +211,14 @@ def health() -> dict[str, Any]:
         "ocr_available": False,
         "geometry_available": False,
     }
+
+
+@app.post("/api/validate-dimension-chain")
+def validate_dimension_chain_endpoint(
+    request: DimensionChainRequest,
+) -> dict[str, object]:
+    """Check a manually supplied dimension chain; this route does not run OCR."""
+    return validate_dimension_chain(request)
 
 
 @app.post("/api/analyze")
