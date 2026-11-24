@@ -39,7 +39,7 @@ The **Export JSON** button is enabled after an analysis result is returned. It d
 - Per-class counts and candidate IDs, classes, confidence scores, bounding boxes and centres.
 - Explicit limitations stating that OCR, dimension association, scale calibration and measured DXF generation have not occurred.
 
-The export intentionally excludes the uploaded image and does not include manual dimension-chain entries. It is a review/interchange artifact, not a CAD file or verified measurement record. The version 1 contract is defined in [the JSON Schema](../schemas/planline-detection-review-v1.schema.json).
+The export intentionally excludes the uploaded image and crop pixels. It includes user-entered dimension-text transcriptions with source detection IDs and verification flags, but not manual dimension-chain entries. It is a review/interchange artifact, not a CAD file or verified measurement record. The version 1 contract is defined in [the JSON Schema](../schemas/planline-detection-review-v1.schema.json).
 
 ### Manual dimension-chain validation
 
@@ -63,7 +63,7 @@ The response status is one of:
 - `needs_review` — values are present, but one or more are not verified;
 - `unresolved` — a segment or overall value is missing.
 
-Values use decimal arithmetic. The endpoint does not parse OCR text, convert units, infer missing values, associate dimensions with geometry, or enable DXF export. The caller must supply one consistent unit for the entire chain; the API does not verify that the drawing actually uses that unit.
+Values use decimal arithmetic. The endpoint does not parse OCR text, convert units, infer missing values, associate dimensions with geometry, or enable DXF export. The caller must supply one consistent unit for the entire chain; the API does not verify that the drawing actually uses that unit. The dimension-value crop panel is for manual transcription only; entries are user-entered text and are not OCR output.
 
 ## What is and is not implemented
 
