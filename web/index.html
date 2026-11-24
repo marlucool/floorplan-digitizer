@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f2ec">
+  <title>Planline — Floor-plan digitiser</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Planline home"><span class="brand-mark">P</span><span>planline<span class="brand-dot">.</span></span></a>
+    <div class="top-meta"><span class="local-dot"></span> Local processing <span class="divider">/</span> 2D workspace</div>
+    <a class="repo-link" href="https://github.com/marlucool/floorplan-digitizer" target="_blank" rel="noreferrer">Source repository ↗</a>
+  </header>
+  <main>
+    <section class="intro">
+      <div><p class="eyebrow">SCAN TO CAD · EARLY INTEGRATION</p><h1>Turn a scanned plan<br><em>into editable geometry.</em></h1></div>
+      <p class="intro-copy">Import a drawing to detect candidate walls and dimension annotations. Measurements are never guessed from pixel proportions: written dimensions must be read and verified first.</p>
+    </section>
+
+    <section class="workspace">
+      <aside class="sidebar">
+        <div class="panel-heading"><span>01 / SOURCE DRAWING</span><span class="step-state" id="sourceState">Waiting</span></div>
+        <label class="dropzone" id="dropzone" for="fileInput">
+          <input id="fileInput" type="file" accept=".png,.jpg,.jpeg,.webp,.tif,.tiff,.pdf,image/*,application/pdf">
+          <span class="upload-icon">↑</span>
+          <strong>Drop a drawing here</strong>
+          <span>or <u>browse files</u></span>
+          <small>PNG · JPG · WEBP · TIFF · PDF<br>Maximum file size: 25 MB</small>
+        </label>
+        <div class="file-card hidden" id="fileCard"><div class="file-icon">▧</div><div class="file-info"><strong id="fileName">—</strong><small id="fileMeta">—</small></div><button id="removeFile" class="icon-button" type="button" aria-label="Remove drawing">×</button></div>
+        <button id="analyzeButton" class="primary-button" type="button" disabled>Analyse drawing <span>→</span></button>
+        <div class="privacy-note"><span class="lock">▣</span><span><strong>Local-first processing</strong><br>The API processes uploads in memory. This version does not save source drawings.</span></div>
+        <div class="panel-heading section-gap"><span>02 / PIPELINE STATUS</span></div>
+        <ol class="pipeline">
+          <li class="complete"><span class="pipeline-num">01</span><span><b>Image import</b><small>Ready when a file is selected</small></span><i>●</i></li>
+          <li id="detectStep"><span class="pipeline-num">02</span><span><b>Object detection</b><small>YOLO candidate regions</small></span><i>○</i></li>
+          <li class="locked"><span class="pipeline-num">03</span><span><b>Dimension OCR</b><small>Not integrated yet</small></span><i>—</i></li>
+          <li class="locked"><span class="pipeline-num">04</span><span><b>Measured geometry</b><small>Requires verified dimensions</small></span><i>—</i></li>
+          <li class="locked"><span class="pipeline-num">05</span><span><b>DXF export</b><small>Disabled until geometry is valid</small></span><i>—</i></li>
+        </ol>
+      </aside>
+
+      <section class="drawing-panel">
+        <div class="drawing-toolbar"><div><span class="eyebrow">DRAWING VIEW</span><strong id="drawingTitle">No drawing loaded</strong></div><span class="view-tag" id="viewTag">EMPTY CANVAS</span></div>
+        <div class="canvas-wrap" id="canvasWrap">
+          <div class="empty-state" id="emptyState"><div class="paper-icon">▤</div><strong>Your drawing will appear here</strong><p>Upload a scan or PDF to begin detection.</p></div>
+          <img id="previewImage" alt="Uploaded floor plan preview" class="hidden">
+          <canvas id="overlay" class="hidden"></canvas>
+          <div class="canvas-loader hidden" id="loader"><span></span>Analysing drawing…</div>
+        </div>
+        <div class="drawing-footer"><span id="imageDimensions">No source dimensions</span><span id="detectionCount">0 detected regions</span></div>
+      </section>
+    </section>
+
+    <section class="results">
+      <div class="results-head"><div><p class="eyebrow">03 / REVIEW DETECTIONS</p><h2>Candidate regions</h2></div><span class="result-status" id="resultStatus">NOT ANALYSED</span></div>
+      <div class="notice" id="notice"><b>Awaiting a drawing.</b><span>Once analysed, candidate regions will be listed here. Detector confidence is not OCR confidence.</span></div>
+      <div class="summary hidden" id="summary"></div>
+      <div class="detection-list" id="detectionList"></div>
+      <div class="limitations"><div class="limitation-mark">i</div><div><strong>Important: detection is not measurement.</strong><p>This integration uses the repository’s existing YOLO model to locate candidate regions. It does not recognise dimension values, associate them with walls, establish drawing scale, or reconstruct a floor plan. Every value and geometric relationship must be verified before CAD export is enabled.</p></div></div>
+    </section>
+    <footer><span>PLANLINE · 2D FLOOR-PLAN DIGITISATION</span><span>Early integration · no measured DXF output</span></footer>
+  </main>
+</body>
+</html>
