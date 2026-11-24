@@ -231,6 +231,7 @@ def test_health_does_not_load_models() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["ocr_available"] is False
+    assert payload["dimension_chain_validation_available"] is True
     assert payload["geometry_available"] is False
 
 
