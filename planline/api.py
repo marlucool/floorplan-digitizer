@@ -212,6 +212,10 @@ async def analyze_drawing(file: UploadFile = File(...)) -> dict[str, Any]:
     if Path(filename).suffix.lower() not in ALLOWED_SUFFIXES:
         raise HTTPException(status_code=415, detail="Use PNG, JPG, WEBP, TIFF or PDF.")
 
+    if file.size is not None and file.size > MAX_UPLOAD_BYTES:
+        await file.close()
+        raise HTTPException(status_code=413, detail="Upload limit is 25 MB.")
+
     data = await file.read(MAX_UPLOAD_BYTES + 1)
     await file.close()
     if len(data) > MAX_UPLOAD_BYTES:
