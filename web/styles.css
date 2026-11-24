@@ -17,7 +17,7 @@
 
 /* Explicit, user-entered dimension-chain checker */
 .chain-checker{margin:26px 0 18px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
-.chain-checker>summary{list-style:none;cursor:pointer;padding:18px 20px;display:flex;flex-direction:column;gap:5px}
+.chain-checker>summary{position:relative;list-style:none;cursor:pointer;padding:18px 20px;display:flex;flex-direction:column;gap:5px}
 .chain-checker>summary::-webkit-details-marker{display:none}
 .chain-checker>summary:after{content:"＋";position:absolute;right:24px;color:var(--muted);font-size:18px}
 .chain-checker[open]>summary:after{content:"−"}
