@@ -12,7 +12,8 @@
     "analysis",
     "counts",
     "detections",
-    "limitations"
+    "limitations",
+    "manual_dimension_text_review"
   ],
   "properties": {
     "schema_version": {
@@ -188,6 +189,121 @@
       "items": {
         "type": "string",
         "minLength": 1
+      }
+    },
+    "manual_dimension_text_review": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "detection_id",
+          "raw_text",
+          "verified",
+          "detector_confidence",
+          "bbox",
+          "crop_bbox"
+        ],
+        "properties": {
+          "detection_id": {
+            "type": "string",
+            "pattern": "^det-[0-9]{3,}$"
+          },
+          "raw_text": {
+            "type": "string"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "detector_confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "bbox": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "x1",
+              "y1",
+              "x2",
+              "y2",
+              "width",
+              "height"
+            ],
+            "properties": {
+              "x1": {
+                "type": "number",
+                "minimum": 0
+              },
+              "y1": {
+                "type": "number",
+                "minimum": 0
+              },
+              "x2": {
+                "type": "number",
+                "minimum": 0
+              },
+              "y2": {
+                "type": "number",
+                "minimum": 0
+              },
+              "width": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "height": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          },
+          "crop_bbox": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "x1",
+                  "y1",
+                  "x2",
+                  "y2",
+                  "width",
+                  "height"
+                ],
+                "properties": {
+                  "x1": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "y1": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "x2": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "y2": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "width": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "height": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       }
     }
   }
