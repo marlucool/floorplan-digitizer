@@ -30,3 +30,19 @@ def test_dataset_creator_keeps_final_row_and_right_edge_digit(tmp_path) -> None:
         sample = cv2.imread(str(sample_path), cv2.IMREAD_GRAYSCALE)
         assert sample is not None
         assert sample.shape == (64, 64)
+
+
+
+def test_dataset_creator_skips_unreadable_sheet(tmp_path) -> None:
+    source_dir = tmp_path / "sketches"
+    output_dir = tmp_path / "my_dataset"
+    source_dir.mkdir()
+    (source_dir / "0.jpg").write_bytes(b"not a valid image")
+
+    create_dataset_from_sketches(
+        input_folder=str(source_dir),
+        output_folder=str(output_dir),
+    )
+
+    assert (output_dir / "0").is_dir()
+    assert list((output_dir / "0").glob("*.png")) == []
