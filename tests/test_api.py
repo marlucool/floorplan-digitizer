@@ -154,6 +154,9 @@ def test_web_ui_assets_and_architecture_notes_are_served() -> None:
     script = client.get("/app.js")
     assert script.status_code == 200
     assert "renderDetectionRows" in script.text
+    assert "applyImageScale" in script.text
+    assert 'id="zoomIn"' in page.text
+    assert 'id="fitView"' in page.text
 
     notes = client.get("/architecture")
     assert notes.status_code == 200
