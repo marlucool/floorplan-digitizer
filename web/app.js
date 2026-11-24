@@ -19,6 +19,7 @@ function resetWorkspace() {
   $("#fileCard").classList.add("hidden");
   $("#dropzone").classList.remove("hidden");
   $("#analyzeButton").disabled = true;
+  $("#exportReview").disabled = true;
   $("#analyzeButton").innerHTML = 'Analyse drawing <span>→</span>';
   $("#detectStep").classList.remove("complete");
   $("#sourceState").textContent = "Waiting";
@@ -76,6 +77,7 @@ function setFile(file) {
   state.detections = [];
   state.overlayVisible = true;
   state.zoom = 1;
+  $("#exportReview").disabled = true;
   $("#overlayToggle").textContent = "Hide boxes";
   $("#zoomLevel").textContent = "100%";
   $("#canvasWrap").classList.remove("zoomed");
@@ -188,6 +190,7 @@ function drawDetections(previewUrl, detections, imageSize) {
 }
 function renderResults(payload) {
   const detections = payload.detections || [];
+  $("#exportReview").disabled = false;
   $("#sourceState").textContent = "Analysed";
   $("#viewTag").textContent = "DETECTION OVERLAY";
   $("#imageDimensions").textContent = payload.image.width + " × " + payload.image.height + " px";
@@ -282,6 +285,7 @@ async function analyse() {
   button.textContent = "Analysing…";
   // Do not leave results from an earlier run visible if this run fails.
   state.result = null; state.previewUrl = null; state.detections = []; state.selectedId = null;
+  $("#exportReview").disabled = true;
   $("#overlay").classList.add("hidden");
   $("#summary").classList.add("hidden");
   $("#detectionList").innerHTML = "";
@@ -315,6 +319,55 @@ async function analyse() {
     }
   }
 }
+
+function exportReviewJson() {
+  if (!state.result) return;
+  const safeStem = (state.file?.name || "drawing")
+    .replace(/\\.[^.]+$/, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .slice(0, 60) || "drawing";
+  const result = state.result;
+  const review = {
+    schema_version: "planline-detection-review/v1",
+    generated_at: new Date().toISOString(),
+    source: {
+      filename: state.file?.name || null,
+      image_width_px: result.image.width,
+      image_height_px: result.image.height
+    },
+    analysis: {
+      model: "yolo_floorplan.pt",
+      confidence_threshold: 0.25,
+      status: "candidate_detection_only",
+      coordinate_system: "pixel coordinates; origin at top-left; x increases right; y increases down"
+    },
+    counts: result.counts || {},
+    detections: (result.detections || []).map((detection) => ({
+      id: detection.id,
+      class_name: detection.class_name,
+      confidence: detection.confidence,
+      bbox: detection.bbox,
+      centre: detection.centre
+    })),
+    limitations: [
+      "No OCR or dimension transcription has been performed.",
+      "No dimension-to-wall association or scale calibration has been performed.",
+      "Bounding boxes are detector candidates, not measured wall geometry.",
+      "No measured DXF geometry is included."
+    ]
+  };
+  const blob = new Blob([JSON.stringify(review, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = safeStem + "-planline-review.json";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+$("#exportReview").addEventListener("click", exportReviewJson);
 
 function renumberChainRows() {
   const rows = [...$("#chainSegments").querySelectorAll(".chain-segment-row")];
