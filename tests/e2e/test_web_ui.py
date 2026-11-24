@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import struct
 import threading
@@ -59,6 +60,31 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                     }
                 ),
             )
+            sample_png = make_png(400, 300)
+            preview_data_url = "data:image/png;base64," + base64.b64encode(sample_png).decode("ascii")
+
+            def analyse(route) -> None:
+                route.fulfill(
+                    json={
+                        "image": {"width": 400, "height": 300},
+                        "counts": {"wall": 1, "dimension_line": 0, "dimension_value": 0},
+                        "detections": [
+                            {
+                                "id": "det-1",
+                                "class_name": "wall",
+                                "bbox": {
+                                    "x1": 10, "y1": 20, "x2": 110, "y2": 70,
+                                    "width": 100, "height": 50,
+                                },
+                                "confidence": 0.95,
+                            }
+                        ],
+                        "preview_data_url": preview_data_url,
+                        "notes": [],
+                    }
+                )
+
+            page.route("**/api/analyze", analyse)
             submitted: dict[str, object] = {}
 
             def validate_chain(route) -> None:
@@ -85,14 +111,25 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                 {
                     "name": "plan.png",
                     "mimeType": "image/png",
-                    "buffer": make_png(),
+                    "buffer": sample_png,
                 },
             )
             page.wait_for_function(
-                "document.querySelector('#previewImage').naturalWidth === 2"
+                "document.querySelector('#previewImage').naturalWidth === 400"
             )
             page.locator("#zoomIn").click()
             assert page.locator("#zoomLevel").inner_text() == "125%"
+            page.locator("#analyzeButton").click()
+            page.wait_for_function(
+                "document.querySelector('#resultStatus').textContent === 'DETECTION COMPLETE'"
+            )
+            page.wait_for_function(
+                "!document.querySelector('#overlay').classList.contains('hidden')"
+            )
+            alignment = page.evaluate(
+                "() => { const image = document.querySelector('#previewImage').getBoundingClientRect(); const canvas = document.querySelector('#overlay').getBoundingClientRect(); return { left: Math.abs(image.left - canvas.left), top: Math.abs(image.top - canvas.top), width: Math.abs(image.width - canvas.width), height: Math.abs(image.height - canvas.height) }; }"
+            )
+            assert max(alignment.values()) < 2
 
             page.locator("#chainChecker > summary").click()
             page.locator(".segment-value").nth(0).fill("3000")
