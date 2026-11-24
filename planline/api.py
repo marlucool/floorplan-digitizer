@@ -8,6 +8,7 @@ as project files; multipart parsing may spool uploads to temporary storage.
 from __future__ import annotations
 
 import base64
+import math
 from functools import lru_cache
 from pathlib import Path
 from threading import Lock
@@ -142,11 +143,18 @@ def serialise_detections(result: Any, image_shape: tuple[int, ...]) -> list[dict
         class_id = int(boxes.cls[index].item())
         confidence = float(boxes.conf[index].item())
         x1, y1, x2, y2 = (float(value) for value in coords)
+        if not all(math.isfinite(value) for value in (x1, y1, x2, y2, confidence)):
+            continue
         x1, x2 = max(0.0, min(float(width), x1)), max(0.0, min(float(width), x2))
         y1, y2 = max(0.0, min(float(height), y1)), max(0.0, min(float(height), y2))
         if x2 <= x1 or y2 <= y1:
             continue
-        class_name = names.get(class_id, str(class_id)) if isinstance(names, dict) else str(class_id)
+        if isinstance(names, dict):
+            class_name = names.get(class_id, str(class_id))
+        elif isinstance(names, (list, tuple)) and 0 <= class_id < len(names):
+            class_name = names[class_id]
+        else:
+            class_name = str(class_id)
         detections.append({
             "id": f"det-{len(detections) + 1:03d}",
             "class_name": str(class_name),
