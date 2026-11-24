@@ -297,6 +297,7 @@ async function analyse() {
   try {
     const form = new FormData();
     form.append("file", file);
+    form.append("confidence_threshold", $("#confidenceThreshold").value);
     const response = await fetch("/api/analyze", { method: "POST", body: form, signal: controller.signal });
     const payload = await response.json().catch(() => ({}));
     if (state.controller !== controller) return;
@@ -337,7 +338,7 @@ function exportReviewJson() {
     },
     analysis: {
       model: "yolo_floorplan.pt",
-      confidence_threshold: 0.25,
+      confidence_threshold: result.confidence_threshold ?? 0.25,
       status: "candidate_detection_only",
       coordinate_system: "pixel coordinates; origin at top-left; x increases right; y increases down"
     },
@@ -372,6 +373,9 @@ function exportReviewJson() {
 }
 
 $("#exportReview").addEventListener("click", exportReviewJson);
+$("#confidenceThreshold").addEventListener("input", () => {
+  $("#confidenceValue").textContent = Number($("#confidenceThreshold").value).toFixed(2);
+});
 
 function renumberChainRows() {
   const rows = [...$("#chainSegments").querySelectorAll(".chain-segment-row")];
