@@ -45,6 +45,36 @@ def test_serialise_detections_clamps_and_labels_boxes() -> None:
     assert detections[1]["bbox"]["x2"] == 180.0
 
 
+def test_serialise_detections_supports_list_class_names() -> None:
+    class ListNameResult:
+        names = ["wall", "dimension_line", "dimension_value"]
+        boxes = FakeBoxes()
+
+    detections = api.serialise_detections(ListNameResult(), (160, 240, 3))
+    assert [item["class_name"] for item in detections] == [
+        "wall",
+        "dimension_value",
+    ]
+
+
+def test_serialise_detections_skips_non_finite_predictions() -> None:
+    class InvalidBoxes:
+        xyxy = np.array(
+            [[np.nan, 0, 10, 10], [0, 0, 5, 5]], dtype=float
+        )
+        cls = np.array([0, 0], dtype=float)
+        conf = np.array([0.9, np.nan], dtype=float)
+
+        def __len__(self) -> int:
+            return len(self.xyxy)
+
+    class InvalidResult:
+        names = {0: "wall"}
+        boxes = InvalidBoxes()
+
+    assert api.serialise_detections(InvalidResult(), (100, 100, 3)) == []
+
+
 def test_analyse_returns_regions_without_fabricating_ocr(monkeypatch) -> None:
     monkeypatch.setattr(api, "get_detector", lambda: FakeDetector())
     client = TestClient(api.app)
