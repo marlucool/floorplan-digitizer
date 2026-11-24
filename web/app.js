@@ -7,11 +7,52 @@ function formatBytes(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 
+function resetWorkspace() {
+  if (state.controller) { state.controller.abort(); state.controller = null; }
+  if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+  if (state.resizeObserver) state.resizeObserver.disconnect();
+  if (state.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
+  state.file = null; state.objectUrl = null; state.result = null; state.previewUrl = null;
+  state.detections = []; state.selectedId = null; state.activeFilter = "all";
+  state.overlayVisible = true; state.resizeObserver = null; state.resizeHandler = null;
+  $("#fileInput").value = "";
+  $("#fileCard").classList.add("hidden");
+  $("#dropzone").classList.remove("hidden");
+  $("#analyzeButton").disabled = true;
+  $("#analyzeButton").innerHTML = 'Analyse drawing <span>→</span>';
+  $("#detectStep").classList.remove("complete");
+  $("#sourceState").textContent = "Waiting";
+  $("#drawingTitle").textContent = "No drawing loaded";
+  $("#viewTag").textContent = "EMPTY CANVAS";
+  $("#previewImage").onload = null;
+  $("#previewImage").onerror = null;
+  $("#previewImage").classList.add("hidden");
+  $("#previewImage").removeAttribute("src");
+  $("#loader").classList.add("hidden");
+  $("#overlay").classList.add("hidden");
+  $("#overlayToggle").textContent = "Hide boxes";
+  $("#classFilter").value = "all";
+  $("#emptyState").classList.remove("hidden");
+  $("#emptyState").querySelector("strong").textContent = "Your drawing will appear here";
+  $("#emptyState").querySelector("p").textContent = "Upload a scan or PDF to begin detection.";
+  $("#imageDimensions").textContent = "No source dimensions";
+  $("#detectionCount").textContent = "0 detected regions";
+  $("#summary").classList.add("hidden");
+  $("#detectionList").innerHTML = "";
+  $("#resultStatus").textContent = "NOT ANALYSED";
+}
+
 function setFile(file) {
   if (!file) return;
   const allowed = /\.(png|jpe?g|webp|tiff?)$/i.test(file.name) || /\.pdf$/i.test(file.name);
-  if (!allowed) return showNotice("Unsupported file type", "Choose a PNG, JPG, WEBP, TIFF or PDF drawing.");
-  if (file.size > 25 * 1024 * 1024) return showNotice("File is too large", "The maximum upload size is 25 MB.");
+  if (!allowed) {
+    resetWorkspace();
+    return showNotice("Unsupported file type", "Choose a PNG, JPG, WEBP, TIFF or PDF drawing.");
+  }
+  if (file.size > 25 * 1024 * 1024) {
+    resetWorkspace();
+    return showNotice("File is too large", "The maximum upload size is 25 MB.");
+  }
   if (state.controller) { state.controller.abort(); state.controller = null; }
   $("#loader").classList.add("hidden");
   $("#analyzeButton").innerHTML = 'Analyse drawing <span>→</span>';
@@ -193,6 +234,14 @@ async function analyse() {
   const button = $("#analyzeButton");
   button.disabled = true;
   button.textContent = "Analysing…";
+  // Do not leave results from an earlier run visible if this run fails.
+  state.result = null; state.previewUrl = null; state.detections = []; state.selectedId = null;
+  $("#overlay").classList.add("hidden");
+  $("#summary").classList.add("hidden");
+  $("#detectionList").innerHTML = "";
+  $("#resultStatus").textContent = "ANALYSING";
+  $("#detectionCount").textContent = "Analysis in progress";
+  showNotice("Analysis in progress", "The previous result has been cleared. Candidate detections will appear when this run finishes.");
   $("#loader").classList.remove("hidden");
   $("#detectStep").classList.remove("complete");
   try {
@@ -224,32 +273,7 @@ async function analyse() {
 $("#fileInput").addEventListener("change", (event) => setFile(event.target.files[0]));
 $("#analyzeButton").addEventListener("click", analyse);
 $("#removeFile").addEventListener("click", () => {
-  if (state.controller) { state.controller.abort(); state.controller = null; }
-  if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
-  if (state.resizeObserver) state.resizeObserver.disconnect();
-  if (state.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
-  state.resizeObserver = null; state.resizeHandler = null;
-  state.file = null; state.objectUrl = null; state.result = null; state.detections = []; state.previewUrl = null; state.selectedId = null;
-  $("#fileInput").value = "";
-  $("#fileCard").classList.add("hidden");
-  $("#dropzone").classList.remove("hidden");
-  $("#analyzeButton").disabled = true;
-  $("#analyzeButton").innerHTML = "Analyse drawing <span>→</span>";
-  $("#detectStep").classList.remove("complete");
-  $("#sourceState").textContent = "Waiting";
-  $("#drawingTitle").textContent = "No drawing loaded";
-  $("#viewTag").textContent = "EMPTY CANVAS";
-  $("#previewImage").classList.add("hidden");
-  $("#previewImage").onload = null;
-  $("#previewImage").removeAttribute("src");
-  $("#loader").classList.add("hidden");
-  $("#overlay").classList.add("hidden");
-  $("#emptyState").classList.remove("hidden");
-  $("#imageDimensions").textContent = "No source dimensions";
-  $("#detectionCount").textContent = "0 detected regions";
-  $("#summary").classList.add("hidden");
-  $("#detectionList").innerHTML = "";
-  $("#resultStatus").textContent = "NOT ANALYSED";
+  resetWorkspace();
   showNotice("Awaiting a drawing", "Once analysed, candidate regions will be listed here. Detector confidence is not OCR confidence.");
 });
 const dropzone = $("#dropzone");
