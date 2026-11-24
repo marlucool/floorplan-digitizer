@@ -25,8 +25,34 @@ The application does not intentionally save an uploaded drawing as a project fil
 
 - `GET /api/health` — lightweight service/model readiness status; does not load the detector.
 - `POST /api/analyze` — candidate-region detection for one uploaded file.
+- `POST /api/validate-dimension-chain` — arithmetic check for explicitly supplied dimension values and verification flags. This does not run OCR or associate dimensions with walls.
 - `GET /docs` — interactive FastAPI/OpenAPI documentation.
 - `GET /architecture` — the project architecture, research findings and implementation roadmap.
+
+
+### Manual dimension-chain validation
+
+The API accepts already-read values so a future review interface can check a dimension chain without guessing. Example request:
+
+```json
+{
+  "segment_values": ["3000", "4500", "2500"],
+  "segment_verified": [true, true, true],
+  "overall_value": "10000",
+  "overall_verified": true,
+  "unit": "mm",
+  "tolerance": "0"
+}
+```
+
+The response status is one of:
+
+- `matches` — every value is verified and the sum matches within the explicit tolerance;
+- `mismatch` — every value is verified, but the sum differs beyond tolerance;
+- `needs_review` — values are present, but one or more are not verified;
+- `unresolved` — a segment or overall value is missing.
+
+Values use decimal arithmetic. The endpoint does not parse OCR text, convert units, infer missing values, associate dimensions with geometry, or enable DXF export. The caller must supply one consistent unit for the entire chain; the API does not verify that the drawing actually uses that unit.
 
 ## What is and is not implemented
 
