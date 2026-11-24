@@ -26,6 +26,7 @@ Uploads are not intentionally persisted by this application. The API currently r
 - `GET /api/health` — lightweight service/model readiness status; does not load the detector.
 - `POST /api/analyze` — candidate-region detection for one uploaded file.
 - `GET /docs` — interactive FastAPI/OpenAPI documentation.
+- `GET /architecture` — the project architecture, research findings and implementation roadmap.
 
 ## What is and is not implemented
 
