@@ -161,6 +161,8 @@ The legacy main.py pipeline is not ready to be called from the web API as-is:
 - It concatenates predicted digits into an integer. Decimal marks, commas, units, prefixes, suffixes and tolerances are not represented.
 - Low-confidence digits are printed as warnings, but their predicted classes are still appended to the final number. The pipeline therefore does not enforce an uncertainty gate.
 - The original segmentation code and preprocessing have not been validated against representative old scans in the Planline web workflow.
+- The legacy trainer randomly splits cropped samples from the same small source collection into train and test subsets. This does not provide a writer- or drawing-independent test set, so reported validation accuracy may overstate generalisation to a different scan, handwriting style or drafting convention.
+- The legacy dataset creator does not append a final digit segment when a row ends while the segment is still open; samples at the right edge of a row can therefore be omitted. This should be fixed and covered by tests before regenerating training data.
 
 The existing model can be retained as an **experimental candidate recognizer** for the narrow drawing style it was trained on, but it must not become the authoritative dimension parser. Before integration, extract pure functions into an import-safe module, return per-character alternatives and confidence, preserve raw crops and preprocessing provenance, and require human confirmation of the complete string. Do not feed its output directly into geometry or DXF export.
 
@@ -218,6 +220,8 @@ Split training/validation/test by original drawing and writer, not by cropped di
 - [x] Document API setup and the current capability boundary.
 - [ ] Run a real-weight smoke test with `yolo_floorplan.pt` and representative old scans.
 - [ ] Audit the legacy digit classifier on held-out scans; do not integrate its current integer output as dimension OCR.
+- [ ] Fix and test end-of-row digit segmentation in `dataset_creator.py` before generating any replacement dataset.
+- [ ] Replace random crop-level validation with drawing-/writer-grouped held-out evaluation before trusting OCR accuracy.
 - [ ] Benchmark at least two OCR baselines on complete dimension strings, including rotated, faded and handwritten samples.
 - [ ] Add text-to-dimension-line and dimension-line-to-span association records with multiple candidates and human review.
 - [ ] Evaluate metric correctness (dimension residuals and placement/topology errors), not only detection mAP or OCR character accuracy.
