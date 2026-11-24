@@ -36,3 +36,8 @@ rzut.dxf
 predykcje_raw.json
 wynikowy_rzut.dxf
 converter.py
+
+# Planline development
+.pytest_cache/
+.coverage
+htmlcov/
