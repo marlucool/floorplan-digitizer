@@ -9,13 +9,12 @@ function formatBytes(bytes) {
 
 function setFile(file) {
   if (!file) return;
-  if (state.controller) { state.controller.abort(); state.controller = null; }
-  $("#loader").classList.add("hidden");
-  $("#analyzeButton").innerHTML = 'Analyse drawing <span>→</span>';
   const allowed = /\.(png|jpe?g|webp|tiff?)$/i.test(file.name) || /\.pdf$/i.test(file.name);
   if (!allowed) return showNotice("Unsupported file type", "Choose a PNG, JPG, WEBP, TIFF or PDF drawing.");
   if (file.size > 25 * 1024 * 1024) return showNotice("File is too large", "The maximum upload size is 25 MB.");
   if (state.controller) { state.controller.abort(); state.controller = null; }
+  $("#loader").classList.add("hidden");
+  $("#analyzeButton").innerHTML = 'Analyse drawing <span>→</span>';
   if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
   if (state.resizeObserver) state.resizeObserver.disconnect();
   if (state.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
