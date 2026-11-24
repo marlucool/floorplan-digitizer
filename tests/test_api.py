@@ -107,6 +107,6 @@ def test_web_ui_assets_and_architecture_notes_are_served() -> None:
     assert script.status_code == 200
     assert "renderDetectionRows" in script.text
 
-    notes = client.get("/docs/PLANLINE_ARCHITECTURE.md")
+    notes = client.get("/architecture")
     assert notes.status_code == 200
     assert "dimension-chain" in notes.text
