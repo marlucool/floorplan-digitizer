@@ -81,6 +81,31 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                                     "width": 100, "height": 50,
                                 },
                                 "confidence": 0.95,
+                            },
+                            {
+                                "id": "det-002",
+                                "class_name": "dimension_value",
+                                "bbox": {
+                                    "x1": 120, "y1": 80, "x2": 180, "y2": 110,
+                                    "width": 60, "height": 30,
+                                },
+                                "confidence": 0.77,
+                            }
+                        ],
+                        "dimension_regions": [
+                            {
+                                "id": "det-002",
+                                "class_name": "dimension_value",
+                                "bbox": {
+                                    "x1": 120, "y1": 80, "x2": 180, "y2": 110,
+                                    "width": 60, "height": 30,
+                                },
+                                "confidence": 0.77,
+                                "crop_bbox": {
+                                    "x1": 111, "y1": 72, "x2": 189, "y2": 118,
+                                    "width": 78, "height": 46,
+                                },
+                                "crop_data_url": preview_data_url,
                             }
                         ],
                         "preview_data_url": preview_data_url,
@@ -153,7 +178,14 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert exported["source"]["filename"] == "plan.png"
             assert exported["analysis"]["confidence_threshold"] == 0.4
             assert exported["detections"][0]["bbox"]["x1"] == 10
+            assert exported["manual_dimension_text_review"][0]["detection_id"] == "det-002"
+            assert exported["manual_dimension_text_review"][0]["raw_text"] == "4200"
+            assert exported["manual_dimension_text_review"][0]["verified"] is True
             assert "preview_data_url" not in exported
+
+            page.locator("#dimensionTextReview > summary").click()
+            page.locator(".dimension-text-value").fill("4200")
+            page.locator(".dimension-text-verified-input").check()
 
             page.locator("#chainChecker > summary").click()
             page.locator(".segment-value").nth(0).fill("3000")
