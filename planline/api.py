@@ -205,7 +205,7 @@ def health() -> dict[str, Any]:
 
 @app.post("/api/analyze")
 async def analyze_drawing(file: UploadFile = File(...)) -> dict[str, Any]:
-    """Detect candidate regions. Upload bytes are processed in memory only."""
+    """Detect candidate regions after multipart parsing and bounded in-memory decoding."""
     filename = (file.filename or "").strip()
     if not filename:
         raise HTTPException(status_code=400, detail="The upload has no filename.")
