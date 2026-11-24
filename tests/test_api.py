@@ -94,3 +94,19 @@ def test_health_does_not_load_models() -> None:
     payload = response.json()
     assert payload["ocr_available"] is False
     assert payload["geometry_available"] is False
+
+
+def test_web_ui_assets_and_architecture_notes_are_served() -> None:
+    client = TestClient(api.app)
+    page = client.get("/")
+    assert page.status_code == 200
+    assert 'id="classFilter"' in page.text
+    assert 'id="overlayToggle"' in page.text
+
+    script = client.get("/app.js")
+    assert script.status_code == 200
+    assert "renderDetectionRows" in script.text
+
+    notes = client.get("/docs/PLANLINE_ARCHITECTURE.md")
+    assert notes.status_code == 200
+    assert "dimension-chain" in notes.text
