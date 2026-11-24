@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", overlayVisible: true, resizeObserver: null };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", overlayVisible: true, resizeObserver: null, resizeHandler: null };
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -99,7 +99,9 @@ function drawDetections(previewUrl, detections, imageSize) {
   if (state.resizeObserver) state.resizeObserver.disconnect();
   state.resizeObserver = new ResizeObserver(paint);
   state.resizeObserver.observe(img);
-  window.addEventListener("resize", paint, { passive: true });
+  if (state.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
+  state.resizeHandler = paint;
+  window.addEventListener("resize", state.resizeHandler, { passive: true });
 }
 function renderResults(payload) {
   const detections = payload.detections || [];
@@ -236,5 +238,16 @@ const dropzone = $("#dropzone");
 }));
 dropzone.addEventListener("drop", (event) => setFile(event.dataTransfer.files[0]));
 fetch("/api/health").then((r) => r.json()).then((health) => {
-  if (!health.detector_weights_present) showNotice("Detector model missing", "The UI is available, but yolo_floorplan.pt must be present in the repository root before analysis can run.");
-}).catch(() => showNotice("API unavailable", "Start the local Planline API to enable drawing analysis."));
+  const meta = $(".top-meta");
+  if (health.status === "ok") {
+    $("#apiStatus").textContent = health.detector_weights_present ? "API ready · detector weights found" : "API ready · detector missing";
+    if (!health.detector_weights_present) showNotice("Detector model missing", "The UI and API are available, but yolo_floorplan.pt must be present in the repository root before analysis can run.");
+  } else {
+    meta.classList.add("api-error");
+    $("#apiStatus").textContent = "API not ready";
+  }
+}).catch(() => {
+  $(".top-meta").classList.add("api-error");
+  $("#apiStatus").textContent = "API unavailable";
+  showNotice("API unavailable", "Start the local Planline API to enable drawing analysis.");
+});
