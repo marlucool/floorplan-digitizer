@@ -21,6 +21,7 @@ The current web integration is intentionally a detection-and-review slice:
 - The UI displays the preview, candidate boxes, class counts, detector scores, filtering, and selected-box highlighting.
 - The application does not intentionally save source drawings as project files; multipart parsing may spool larger uploads to temporary storage. No measured DXF is emitted.
 - OCR, dimension association, calibration, topology reconstruction and measured DXF export are not part of this web workflow.
+- A manual `/api/validate-dimension-chain` endpoint checks explicitly supplied values with decimal arithmetic and verification flags. It does not perform OCR, unit conversion, geometry association or DXF export.
 
 ### Detection resolution risk
 
@@ -247,6 +248,7 @@ Split training/validation/test by original drawing and writer, not by cropped di
 - [ ] Add persistent project state only after defining privacy, retention and recovery requirements.
 - [ ] Introduce a typed intermediate representation for detections, OCR observations, dimension associations and constraints.
 - [ ] Add OCR as a reviewable stage; do not wire it directly to geometry generation.
-- [ ] Add dimension association and constraint validation.
+- [x] Add a standalone manual dimension-chain arithmetic validator with explicit verification and tolerance states.
+- [ ] Add dimension-to-line and line-to-span association; the current validator does not perform either task.
 - [ ] Add manual geometry correction and measured DXF export only after validation gates exist.
 - [ ] Revisit training only after rights-cleared data, annotation guidelines and a grouped evaluation split are ready.
