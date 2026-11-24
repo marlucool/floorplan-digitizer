@@ -438,9 +438,7 @@ function exportReviewJson() {
       })),
     limitations: [
       "No OCR has been performed; manual transcription entries are user-entered and not machine-verified.",
-      "Manual transcriptions have not been associated with walls, dimension lines or scale.",
-
-      "No dimension-to-wall association or scale calibration has been performed.",
+      "No dimension-to-wall association, scale calibration or geometric reconstruction has been performed.",
       "Bounding boxes are detector candidates, not measured wall geometry.",
       "No measured DXF geometry is included."
     ]
