@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], dimensionTextReview: {}, selectedId: null, activeFilter: "all", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1 };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1 };
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -13,7 +13,7 @@ function resetWorkspace() {
   if (state.resizeObserver) state.resizeObserver.disconnect();
   if (state.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
   state.file = null; state.objectUrl = null; state.result = null; state.previewUrl = null;
-  state.detections = []; state.dimensionTextReview = {}; state.selectedId = null; state.activeFilter = "all";
+  state.detections = []; state.selectedId = null; state.activeFilter = "all";
   state.overlayVisible = true; state.resizeObserver = null; state.resizeHandler = null; state.zoom = 1;
   $("#fileInput").value = "";
   $("#fileCard").classList.add("hidden");
@@ -46,6 +46,7 @@ function resetWorkspace() {
   $("#detectionCount").textContent = "0 detected regions";
   $("#summary").classList.add("hidden");
   $("#detectionList").innerHTML = "";
+  clearDimensionTextReview();
   $("#resultStatus").textContent = "NOT ANALYSED";
 }
 
@@ -75,7 +76,6 @@ function setFile(file) {
   state.previewUrl = null;
   state.selectedId = null;
   state.detections = [];
-  state.dimensionTextReview = {};
   state.overlayVisible = true;
   state.zoom = 1;
   $("#exportReview").disabled = true;
@@ -102,6 +102,7 @@ function setFile(file) {
   $("#resultStatus").textContent = "NOT ANALYSED";
   $("#summary").classList.add("hidden");
   $("#detectionList").innerHTML = "";
+  clearDimensionTextReview();
   showNotice("Drawing ready", "Run local detection to locate candidate walls and dimension annotations. No measurements will be inferred.");
   if (file.type.startsWith("image/")) {
     const img = $("#previewImage");
@@ -246,6 +247,13 @@ function renderResults(payload) {
   if (payload.preview_data_url) drawDetections(payload.preview_data_url, detections, payload.image);
 }
 
+function clearDimensionTextReview() {
+  const panel = $("#dimensionTextReview");
+  panel.classList.add("hidden");
+  panel.open = false;
+  $("#dimensionTextItems").replaceChildren();
+}
+
 function renderDimensionTextReview(regions) {
   const panel = $("#dimensionTextReview");
   const container = $("#dimensionTextItems");
@@ -256,8 +264,6 @@ function renderDimensionTextReview(regions) {
   }
   panel.classList.remove("hidden");
   regions.forEach((region, index) => {
-    const entry = { raw_text: "", verified: false };
-    state.dimensionTextReview[region.id] = entry;
     const row = document.createElement("article");
     row.className = "dimension-text-item";
     row.dataset.detectionId = region.id;
@@ -290,9 +296,6 @@ function renderDimensionTextReview(regions) {
     textInput.autocomplete = "off";
     textInput.spellcheck = false;
     textInput.placeholder = "Enter the visible text";
-    textInput.addEventListener("input", () => {
-      entry.raw_text = textInput.value;
-    });
     textLabel.append(textInput);
 
     const verifiedLabel = document.createElement("label");
@@ -300,9 +303,6 @@ function renderDimensionTextReview(regions) {
     const verifiedInput = document.createElement("input");
     verifiedInput.className = "dimension-text-verified-input";
     verifiedInput.type = "checkbox";
-    verifiedInput.addEventListener("change", () => {
-      entry.verified = verifiedInput.checked;
-    });
     verifiedLabel.append(verifiedInput, document.createTextNode(" I checked this transcription"));
 
     fields.append(meta, textLabel, verifiedLabel);
@@ -357,6 +357,7 @@ async function analyse() {
   $("#overlay").classList.add("hidden");
   $("#summary").classList.add("hidden");
   $("#detectionList").innerHTML = "";
+  clearDimensionTextReview();
   $("#resultStatus").textContent = "ANALYSING";
   $("#detectionCount").textContent = "Analysis in progress";
   showNotice("Analysis in progress", "The previous result has been cleared. Candidate detections will appear when this run finishes.");
@@ -423,11 +424,12 @@ function exportReviewJson() {
       centre: detection.centre
     })),
     manual_dimension_text_review: (result.dimension_regions || []).map((region) => {
-      const entry = state.dimensionTextReview[region.id] || { raw_text: "", verified: false };
+      const row = [...document.querySelectorAll(".dimension-text-item")]
+        .find((item) => item.dataset.detectionId === region.id);
       return {
         detection_id: region.id,
-        raw_text: entry.raw_text,
-        verified: entry.verified,
+        raw_text: row?.querySelector(".dimension-text-value")?.value || "",
+        verified: row?.querySelector(".dimension-text-verified-input")?.checked || false,
         detector_confidence: region.confidence,
         bbox: region.bbox,
         crop_bbox: region.crop_bbox || null
