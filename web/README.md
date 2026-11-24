@@ -73,6 +73,7 @@ Values use decimal arithmetic. The endpoint does not parse OCR text, convert uni
 | First-page PDF rasterisation | Implemented; multi-page selection is not |
 | YOLO candidate detection | Implemented when the tracked weights are present |
 | Detection list, class filter, box selection | Implemented in the UI |
+| Manual transcription of dimension-value crops | Implemented; user-entered text only, not OCR |
 | OCR of printed/handwritten dimensions | Not implemented in this web workflow |
 | Dimension-to-wall association | Not implemented |
 | Dimension-chain constraint solving | Not implemented |
