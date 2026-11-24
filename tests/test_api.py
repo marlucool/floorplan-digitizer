@@ -136,8 +136,13 @@ def test_serialise_detections_clamps_boxes_to_source_bounds() -> None:
     }
 
 
-def test_rejects_decoded_image_over_pixel_limit(monkeypatch) -> None:
+def test_rejects_decoded_image_over_pixel_limit_before_opencv_decode(monkeypatch) -> None:
     monkeypatch.setattr(api, "MAX_IMAGE_PIXELS", 100)
+    monkeypatch.setattr(
+        api.cv2,
+        "imdecode",
+        lambda *_args: pytest.fail("OpenCV must not decode an oversized raster"),
+    )
     response = TestClient(api.app).post(
         "/api/analyze",
         files={"file": ("plan.png", image_bytes(), "image/png")},
