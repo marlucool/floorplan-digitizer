@@ -61,11 +61,15 @@ function setFile(file) {
   if (state.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
   state.resizeObserver = null; state.resizeHandler = null;
   $("#previewImage").onload = null;
+  $("#previewImage").onerror = null;
   state.file = file;
   state.objectUrl = URL.createObjectURL(file);
   state.result = null;
+  state.previewUrl = null;
   state.selectedId = null;
   state.detections = [];
+  state.overlayVisible = true;
+  $("#overlayToggle").textContent = "Hide boxes";
   $("#fileName").textContent = file.name;
   $("#fileMeta").textContent = formatBytes(file.size) + " · selected locally";
   $("#fileCard").classList.remove("hidden");
