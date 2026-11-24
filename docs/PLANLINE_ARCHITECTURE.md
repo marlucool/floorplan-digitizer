@@ -18,7 +18,8 @@ The current web integration is intentionally a detection-and-review slice:
 - PNG/JPG/WEBP/TIFF and PDF uploads are accepted within the configured limits.
 - PDF handling rasterises page one only.
 - The existing YOLO weights detect candidate `wall`, `dimension_line`, and `dimension_value` regions.
-- The UI displays the preview, candidate boxes, class counts, detector scores, filtering, and selected-box highlighting.
+- The UI displays the preview, candidate boxes, class counts, detector scores, filtering, selected-box highlighting, zoom/fit controls and a scrollable zoomed view.
+- A candidate-review JSON export preserves source pixel dimensions, detector metadata, bounding boxes and scores under a versioned schema; it excludes the source image and is not a measurement record.
 - The application does not intentionally save source drawings as project files; multipart parsing may spool larger uploads to temporary storage. No measured DXF is emitted.
 - Raster image dimensions are preflighted from the image header before OpenCV decodes the full image; the pixel limit is enforced again after decode. PDF page dimensions are checked before rasterisation.
 - OCR, dimension association, calibration, topology reconstruction and measured DXF export are not part of this web workflow.
@@ -41,7 +42,9 @@ Planned approach:
 
 Do not enable tiled inference by assumption alone: the current detector was trained on a small simplified-plan dataset, and higher-resolution crops cannot compensate for a domain mismatch.
 
-The API tests use a fake detector. They do not establish the real model's accuracy or prove that it works on representative scans. The real-weight smoke test and browser visual test remain separate acceptance tasks.
+The API tests use a fake detector. They do not establish the real model's accuracy or prove that it works on representative scans. The real-weight smoke test remains outstanding.
+
+A Playwright browser smoke test covers image preview, zoom, zoomed overlay alignment, candidate JSON export/schema validation, manual dimension-chain entry and a narrow mobile viewport. Manual visual inspection and PDF-preview verification remain outstanding.
 
 ## Recommended processing architecture
 
@@ -182,7 +185,7 @@ The legacy main.py pipeline is not ready to be called from the web API as-is:
 - Low-confidence digits are printed as warnings, but their predicted classes are still appended to the final number. The pipeline therefore does not enforce an uncertainty gate.
 - The original segmentation code and preprocessing have not been validated against representative old scans in the Planline web workflow.
 - The legacy trainer randomly splits cropped samples from the same small source collection into train and test subsets. This does not provide a writer- or drawing-independent test set, so reported validation accuracy may overstate generalisation to a different scan, handwriting style or drafting convention.
-- The legacy dataset creator does not append a final digit segment when a row ends while the segment is still open; samples at the right edge of a row can therefore be omitted. This should be fixed and covered by tests before regenerating training data.
+- The legacy dataset creator previously failed to append a final digit segment when a row ended while the segment was still open, omitting samples at the right edge of a row. This was fixed in the current branch and is covered by regression tests. Unreadable source sheets are also skipped cleanly.
 
 The existing model can be retained as an **experimental candidate recognizer** for the narrow drawing style it was trained on, but it must not become the authoritative dimension parser. Before integration, extract pure functions into an import-safe module, return per-character alternatives and confidence, preserve raw crops and preprocessing provenance, and require human confirmation of the complete string. Do not feed its output directly into geometry or DXF export.
 
@@ -246,11 +249,13 @@ Split training/validation/test by original drawing and writer, not by cropped di
 - [ ] Benchmark at least two OCR baselines on complete dimension strings, including rotated, faded and handwritten samples.
 - [ ] Add text-to-dimension-line and dimension-line-to-span association records with multiple candidates and human review.
 - [ ] Evaluate metric correctness (dimension residuals and placement/topology errors), not only detection mAP or OCR character accuracy.
-- [ ] Visually verify overlay alignment at desktop and mobile sizes, including resize and PDF preview.
+- [x] Add a Playwright browser smoke test for zoomed overlay alignment and a 390-pixel mobile viewport.
+- [ ] Manually inspect the interface at desktop/mobile sizes and verify PDF preview behaviour.
 - [ ] Add persistent project state only after defining privacy, retention and recovery requirements.
 - [ ] Introduce a typed intermediate representation for detections, OCR observations, dimension associations and constraints.
 - [ ] Add OCR as a reviewable stage; do not wire it directly to geometry generation.
 - [x] Add a standalone manual dimension-chain arithmetic validator with explicit verification and tolerance states.
+- [x] Add versioned candidate-review JSON export and a JSON Schema contract.
 - [ ] Add dimension-to-line and line-to-span association; the current validator does not perform either task.
 - [ ] Add manual geometry correction and measured DXF export only after validation gates exist.
 - [ ] Revisit training only after rights-cleared data, annotation guidelines and a grouped evaluation split are ready.
