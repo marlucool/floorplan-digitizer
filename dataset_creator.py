@@ -73,6 +73,9 @@ def create_dataset_from_sketches(input_folder='sketches', output_folder='my_data
 
         print(f"[*] Przetwarzam arkusz dla cyfry {digit}...")
         img = cv2.imread(img_path)
+        if img is None:
+            print(f"[!] Pominąłem: {filename} (nie można odczytać obrazu)")
+            continue
 
         red_channel = img[:, :, 2]
         _, thresh = cv2.threshold(red_channel, 60, 255, cv2.THRESH_BINARY)
