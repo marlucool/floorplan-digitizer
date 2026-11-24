@@ -22,7 +22,25 @@ def create_dataset_from_sketches(input_folder='sketches', output_folder='my_data
                 in_row = False
                 rows.append(thresh_roi[start_y:y, :])
 
+        # The final row may reach the bottom edge without a blank row to
+        # close it, so explicitly flush the active row.
+        if in_row:
+            rows.append(thresh_roi[start_y:, :])
+
         digits_images = []
+
+        def append_digit(digit_crop):
+            if digit_crop.shape[0] <= 5 or digit_crop.shape[1] <= 5:
+                return
+            h, w = digit_crop.shape
+            side = max(h, w) + 40
+            square = np.zeros((side, side), dtype=np.uint8)
+            y_off = (side - h) // 2
+            x_off = (side - w) // 2
+            square[y_off:y_off+h, x_off:x_off+w] = digit_crop
+            final_img = cv2.resize(square, (64, 64), interpolation=cv2.INTER_AREA)
+            digits_images.append(final_img)
+
         for row in rows:
             column_sums = cv2.reduce(row, 0, cv2.REDUCE_SUM, dtype=cv2.CV_32S)[0]
             in_digit = False
@@ -34,19 +52,12 @@ def create_dataset_from_sketches(input_folder='sketches', output_folder='my_data
                     start_x = x
                 elif val <= 50 and in_digit:
                     in_digit = False
-                    digit_crop = row[:, start_x:x]
+                    append_digit(row[:, start_x:x])
 
-                    if digit_crop.shape[0] > 5 and digit_crop.shape[1] > 5:
-                        h, w = digit_crop.shape
-                        side = max(h, w) + 40
-                        square = np.zeros((side, side), dtype=np.uint8)
+            # Likewise, flush the last digit if it touches the right edge.
+            if in_digit:
+                append_digit(row[:, start_x:])
 
-                        y_off = (side - h) // 2
-                        x_off = (side - w) // 2
-                        square[y_off:y_off+h, x_off:x_off+w] = digit_crop
-
-                        final_img = cv2.resize(square, (64, 64), interpolation=cv2.INTER_AREA)
-                        digits_images.append(final_img)
         return digits_images
 
     if not os.path.exists(output_folder):
