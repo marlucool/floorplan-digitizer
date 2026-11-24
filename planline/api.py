@@ -8,7 +8,9 @@ as project files; multipart parsing may spool uploads to temporary storage.
 from __future__ import annotations
 
 import base64
+import io
 import math
+import warnings
 from functools import lru_cache
 from pathlib import Path
 from threading import Lock
@@ -16,6 +18,7 @@ from typing import Any
 
 import cv2
 import numpy as np
+from PIL import Image, UnidentifiedImageError
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -54,18 +57,38 @@ def get_detector() -> Any:
     return YOLO(str(DETECTOR_PATH))
 
 
-def _check_image_size(image: np.ndarray) -> None:
-    height, width = image.shape[:2]
+def _check_dimensions(width: int, height: int) -> None:
     if height <= 0 or width <= 0:
         raise ValueError("The drawing has invalid image dimensions.")
     if height * width > MAX_IMAGE_PIXELS:
         raise OverflowError(
-            f"Decoded image is {width} × {height}px; the limit is "
+            f"Image is {width} × {height}px; the limit is "
             f"{MAX_IMAGE_PIXELS:,} pixels."
         )
 
 
+def _check_image_size(image: np.ndarray) -> None:
+    height, width = image.shape[:2]
+    _check_dimensions(width, height)
+
+
 def _decode_raster(data: bytes) -> np.ndarray:
+    # Read dimensions from the image header before OpenCV allocates the full
+    # decoded raster. The application limit is lower than Pillow's default
+    # decompression-bomb threshold, so enforce our own limit here.
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(io.BytesIO(data)) as probe:
+                width, height = probe.size
+                _check_dimensions(width, height)
+    except OverflowError:
+        raise
+    except (Image.DecompressionBombWarning, Image.DecompressionBombError) as exc:
+        raise OverflowError("The uploaded image exceeds the pixel limit.") from exc
+    except (UnidentifiedImageError, OSError, SyntaxError) as exc:
+        raise ValueError("The uploaded file is not a readable supported image.") from exc
+
     encoded = np.frombuffer(data, dtype=np.uint8)
     image = cv2.imdecode(encoded, cv2.IMREAD_COLOR)
     if image is None:
