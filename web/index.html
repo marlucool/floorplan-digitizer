@@ -32,6 +32,11 @@
         </label>
         <div class="file-card hidden" id="fileCard"><div class="file-icon">▧</div><div class="file-info"><strong id="fileName">—</strong><small id="fileMeta">—</small></div><button id="removeFile" class="icon-button" type="button" aria-label="Remove drawing">×</button></div>
         <button id="analyzeButton" class="primary-button" type="button" disabled>Analyse drawing <span>→</span></button>
+        <div class="confidence-control">
+          <label for="confidenceThreshold">Detector threshold <output id="confidenceValue">0.25</output></label>
+          <input id="confidenceThreshold" type="range" min="0.05" max="0.80" step="0.05" value="0.25">
+          <small>Lower values show more candidate boxes. Scores are not calibrated measurement confidence.</small>
+        </div>
         <div class="privacy-note"><span class="lock">▣</span><span><strong>Local-first processing</strong><br>No project copy is saved. Multipart uploads may use temporary storage during receipt; request files are closed after processing.</span></div>
         <div class="panel-heading section-gap"><span>02 / PIPELINE STATUS</span></div>
         <ol class="pipeline">
