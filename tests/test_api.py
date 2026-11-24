@@ -111,6 +111,48 @@ def test_detector_load_and_prediction_are_serialized(monkeypatch) -> None:
     assert response.status_code == 200
 
 
+def test_serialise_detections_clamps_boxes_to_source_bounds() -> None:
+    class OutsideBoxes:
+        xyxy = np.array([[-10, -5, 150, 160]], dtype=float)
+        cls = np.array([0], dtype=float)
+        conf = np.array([0.8], dtype=float)
+
+        def __len__(self) -> int:
+            return len(self.xyxy)
+
+    class OutsideResult:
+        names = {0: "wall"}
+        boxes = OutsideBoxes()
+
+    detections = api.serialise_detections(OutsideResult(), (100, 100, 3))
+    assert len(detections) == 1
+    assert detections[0]["bbox"] == {
+        "x1": 0.0,
+        "y1": 0.0,
+        "x2": 100.0,
+        "y2": 100.0,
+        "width": 100.0,
+        "height": 100.0,
+    }
+
+
+def test_rejects_decoded_image_over_pixel_limit(monkeypatch) -> None:
+    monkeypatch.setattr(api, "MAX_IMAGE_PIXELS", 100)
+    response = TestClient(api.app).post(
+        "/api/analyze",
+        files={"file": ("plan.png", image_bytes(), "image/png")},
+    )
+    assert response.status_code == 413
+
+
+def test_rejects_empty_upload() -> None:
+    response = TestClient(api.app).post(
+        "/api/analyze",
+        files={"file": ("empty.png", b"", "image/png")},
+    )
+    assert response.status_code == 400
+
+
 def test_rejects_unsupported_file_type() -> None:
     response = TestClient(api.app).post(
         "/api/analyze",
