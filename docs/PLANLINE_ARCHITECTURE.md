@@ -128,11 +128,16 @@ Liang, Fukuda and Yabuki, *Automated dimension-aware BIM reconstruction from ann
 
 This 2026 work is especially relevant to Planline's core problem: it treats OCR-derived dimensions as **localized metric constraints** and explicitly links them to candidate geometric entities through an optimization-based matching stage. It argues that image-level metrics (IoU, mAP, F1) alone do not establish engineering-level correctness; component dimensions, placement and relationships need their own evaluation. It also discusses oblique/non-Manhattan geometry rather than assuming every plan is an orthogonal grid.
 
+The paper's matching stage uses spatial position, orientation, perpendicular offset, projected position, line relationships, expected length and annotation-band context to score candidate text/segment pairs. It then uses joint decoding with a duplicate-use penalty so one OCR string is not casually assigned to several unrelated segments. The authors also explicitly report that ambiguous OCR or weak geometric compatibility can still lead to rejection, fallback to a global estimate, or a plausible but incorrect match.
+
 Design implications:
 
 - Store OCR observations and geometric candidates independently before attempting association.
 - Represent a dimension as a constraint attached to a candidate span/entity, not as a free-floating number or a global scale label.
+- Use direction, alignment, offset, endpoint/extension-line evidence, projected position and chain context to rank candidate associations; nearest-neighbour distance alone is inadequate.
+- Prevent duplicate use of one OCR observation across unrelated spans, while allowing an explicit reviewer override.
 - Keep multiple candidate text-to-geometry matches when evidence is ambiguous; require review instead of silently selecting the nearest wall.
+- Do **not** copy the paper's global-scale fallback as a silent recovery path. If a written dimension cannot be associated confidently, preserve it as unresolved. A scale estimate may be shown separately as a diagnostic only.
 - Evaluate final geometry using dimension residuals, endpoint/placement error and topology/relationship correctness, not only detector accuracy.
 - Keep metric dimensions local. A drawing-wide scale may be a diagnostic, but must not override a verified written dimension or hide local distortion.
 
