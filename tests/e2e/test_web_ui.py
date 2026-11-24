@@ -134,6 +134,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             with page.expect_download() as download_info:
                 page.locator("#exportReview").click()
             download = download_info.value
+            assert download.suggested_filename == "plan-planline-review.json"
             exported = json.loads(Path(download.path()).read_text())
             assert exported["schema_version"] == "planline-detection-review/v1"
             assert exported["source"]["filename"] == "plan.png"
