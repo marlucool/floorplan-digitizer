@@ -199,6 +199,8 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.locator("#overallVerified").check()
             page.locator("#checkChain").click()
             page.wait_for_selector('#chainResult[data-status="matches"]')
+            assert page.locator(".dimension-text-value").input_value() == "4200"
+            assert page.locator(".dimension-text-verified-input").is_checked()
 
             assert submitted["segment_values"] == ["3000", "4500"]
             assert submitted["segment_verified"] == [True, True]
