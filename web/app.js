@@ -239,7 +239,6 @@ function renderResults(payload) {
     $("#detectionList").append(row);
   });
   renderDetectionRows(detections);
-  state.dimensionTextReview = {};
   renderDimensionTextReview(payload.dimension_regions || []);
   const notes = (payload.notes || []).join(" ");
   showNotice(detections.length ? "Detection finished — OCR has not run" : "No candidate regions detected", detections.length ? notes : "The model returned no boxes at its current confidence threshold. This does not prove that the drawing contains no walls or dimensions. " + notes);
