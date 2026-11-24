@@ -83,8 +83,18 @@ A detection score is the model's confidence for a class prediction. It is not OC
 
 ```bash
 python -m pip install -r requirements-dev.txt
-PYTHONPATH=. python -m pytest -q
+PYTHONPATH=. python -m pytest -q tests/test_*.py
 node --check web/app.js
 ```
+
+Optional browser smoke test (requires a local Chromium installation):
+
+```bash
+python -m pip install -r requirements-e2e.txt
+python -m playwright install chromium
+python -m pytest -q tests/e2e
+```
+
+The browser test exercises local image preview, zoom controls and the manual dimension-chain checker with API responses stubbed. It does not validate YOLO accuracy or OCR.
 
 The automated tests use a fake detector. Passing them verifies API behaviour and serialization, not the accuracy of the real model. A separate smoke test with the actual weights and representative scans is still required.
