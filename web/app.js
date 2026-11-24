@@ -341,7 +341,11 @@ function exportReviewJson() {
       status: "candidate_detection_only",
       coordinate_system: "pixel coordinates; origin at top-left; x increases right; y increases down"
     },
-    counts: result.counts || {},
+    counts: {
+      wall: result.counts?.wall || 0,
+      dimension_line: result.counts?.dimension_line || 0,
+      dimension_value: result.counts?.dimension_value || 0
+    },
     detections: (result.detections || []).map((detection) => ({
       id: detection.id,
       class_name: detection.class_name,
