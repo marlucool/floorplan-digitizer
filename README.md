@@ -241,4 +241,4 @@ reconstructed.
 
 ## Planline web workflow and engineering notes
 
-The browser interface is served by the local FastAPI application. See [the web guide](web/README.md) for setup, API routes, current capability boundaries and development checks. The implementation roadmap and technical decisions are documented in [PLANLINE_ARCHITECTURE.md](docs/PLANLINE_ARCHITECTURE.md). The web workflow is detection/review only: it does not yet read dimensions or generate measured DXF geometry.
+The browser interface is served by the local FastAPI application. See [the web guide](web/README.md) for setup, API routes, current capability boundaries and development checks. The implementation roadmap and technical decisions are documented in [PLANLINE_ARCHITECTURE.md](docs/PLANLINE_ARCHITECTURE.md). The web workflow detects candidate regions and can validate a manually supplied dimension chain, but it does not yet read dimensions from the drawing, associate them with walls, or generate measured DXF geometry.
