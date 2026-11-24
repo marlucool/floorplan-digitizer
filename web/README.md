@@ -30,6 +30,17 @@ The application does not intentionally save an uploaded drawing as a project fil
 - `GET /architecture` — the project architecture, research findings and implementation roadmap.
 
 
+### Candidate review JSON
+
+The **Export JSON** button is enabled after an analysis result is returned. It downloads a `planline-detection-review/v1` document containing:
+
+- Original source filename and source pixel dimensions.
+- Detector name, confidence threshold and pixel-coordinate convention.
+- Per-class counts and candidate IDs, classes, confidence scores, bounding boxes and centres.
+- Explicit limitations stating that OCR, dimension association, scale calibration and measured DXF generation have not occurred.
+
+The export intentionally excludes the uploaded image and does not include manual dimension-chain entries. It is a review/interchange artifact, not a CAD file or verified measurement record.
+
 ### Manual dimension-chain validation
 
 The API accepts already-read values so the manual review panel can check a dimension chain without guessing. Example request:
