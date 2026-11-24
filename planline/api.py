@@ -6,6 +6,7 @@ measured geometry. No upload is persisted to disk.
 """
 from __future__ import annotations
 
+import base64
 from functools import lru_cache
 from pathlib import Path
 from threading import Lock
@@ -162,6 +163,22 @@ def serialise_detections(result: Any, image_shape: tuple[int, ...]) -> list[dict
     return detections
 
 
+def make_preview_data_url(image: np.ndarray, max_edge: int = 1600) -> str:
+    """Create a bounded JPEG preview for the browser without saving the upload."""
+    height, width = image.shape[:2]
+    scale = min(1.0, max_edge / max(height, width))
+    if scale < 1.0:
+        image = cv2.resize(
+            image,
+            (max(1, round(width * scale)), max(1, round(height * scale))),
+            interpolation=cv2.INTER_AREA,
+        )
+    ok, encoded = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 82])
+    if not ok:
+        raise RuntimeError("Could not generate a preview of the uploaded drawing.")
+    return "data:image/jpeg;base64," + base64.b64encode(encoded.tobytes()).decode("ascii")
+
+
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     """Report readiness without loading model weights."""
@@ -240,6 +257,7 @@ async def analyze_drawing(file: UploadFile = File(...)) -> dict[str, Any]:
         "filename": Path(filename).name,
         "source": source_info,
         "image": {"width": width, "height": height},
+        "preview_data_url": make_preview_data_url(image),
         "counts": counts,
         "detections": detections,
         "dimension_regions": dimension_regions,
