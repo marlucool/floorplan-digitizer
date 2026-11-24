@@ -56,6 +56,20 @@ def test_unverified_values_require_review_even_if_the_sum_matches() -> None:
     assert result["unverified_indices"] == [1]
 
 
+def test_missing_overall_dimension_is_reported_separately() -> None:
+    result = validate_dimension_chain(
+        request(overall_value=None, overall_verified=False)
+    )
+    assert result["status"] == "unresolved"
+    assert result["overall_unresolved"] is True
+
+
+def test_unverified_overall_dimension_requires_review() -> None:
+    result = validate_dimension_chain(request(overall_verified=False))
+    assert result["status"] == "needs_review"
+    assert result["overall_verified"] is False
+
+
 def test_missing_values_remain_unresolved() -> None:
     result = validate_dimension_chain(
         request(segment_values=["3000", None, "2500"])
