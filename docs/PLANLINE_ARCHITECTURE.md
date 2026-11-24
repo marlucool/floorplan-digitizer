@@ -28,7 +28,7 @@ The current web integration is intentionally a detection-and-review slice:
 
 ### Detection resolution risk
 
-The current API sends the complete source image to YOLO with `imgsz=640`. On a large scanned sheet, small dimension text and thin annotation features can be reduced to only a few pixels before detection. The bounded 1600-pixel browser preview does not change the inference input; it is only for display.
+The current API sends the complete source image to YOLO with `imgsz=640` and exposes a configurable confidence threshold (default `0.25`). On a large scanned sheet, small dimension text and thin annotation features can be reduced to only a few pixels before detection. The bounded 1600-pixel browser preview does not change the inference input; it is only for display.
 
 The 2026 *Buildings* study uses density-adaptive overlapping crops because a single fixed resize can lose small targets in large drawings. Its reported crop sizes and performance are specific to its own dataset and model and must not be copied as Planline defaults without testing.
 
