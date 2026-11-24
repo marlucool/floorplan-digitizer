@@ -248,6 +248,10 @@ def test_web_ui_assets_and_architecture_notes_are_served() -> None:
     assert "applyImageScale" in script.text
     assert 'id="zoomIn"' in page.text
     assert 'id="fitView"' in page.text
+    assert 'id="chainChecker"' in page.text
+    assert 'id="addSegment"' in page.text
+    assert 'id="checkChain"' in page.text
+    assert "checkDimensionChain" in script.text
 
     notes = client.get("/architecture")
     assert notes.status_code == 200
