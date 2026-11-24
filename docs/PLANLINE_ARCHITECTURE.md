@@ -19,7 +19,7 @@ The current web integration is intentionally a detection-and-review slice:
 - PDF handling rasterises page one only.
 - The existing YOLO weights detect candidate `wall`, `dimension_line`, and `dimension_value` regions.
 - The UI displays the preview, candidate boxes, class counts, detector scores, filtering, and selected-box highlighting.
-- Uploads are processed in memory by the application; no measured DXF is emitted.
+- The application does not intentionally save source drawings as project files; multipart parsing may spool larger uploads to temporary storage. No measured DXF is emitted.
 - OCR, dimension association, calibration, topology reconstruction and measured DXF export are not part of this web workflow.
 
 The API tests use a fake detector. They do not establish the real model's accuracy or prove that it works on representative scans. The real-weight smoke test and browser visual test remain separate acceptance tasks.
