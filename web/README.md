@@ -63,7 +63,7 @@ The response status is one of:
 - `needs_review` — values are present, but one or more are not verified;
 - `unresolved` — a segment or overall value is missing.
 
-Values use decimal arithmetic. The endpoint does not parse OCR text, convert units, infer missing values, associate dimensions with geometry, or enable DXF export. The caller must supply one consistent unit for the entire chain; the API does not verify that the drawing actually uses that unit. The dimension-value crop panel is for manual transcription only; entries are user-entered text and are not OCR output. Crops are taken from the original raster with padding and bounded to a maximum 512-pixel edge; at most 50 candidates receive crops per analysis. Crop pixels are not embedded in the review JSON export.
+Values use decimal arithmetic. The endpoint does not parse OCR text, convert units, infer missing values, associate dimensions with geometry, or enable DXF export. The caller must supply one consistent unit for the entire chain; the API does not verify that the drawing actually uses that unit. The dimension-value crop panel is for manual transcription only; entries are user-entered text and are not OCR output. Crops are taken from the original raster with padding and bounded to a maximum 384-pixel edge; at most 30 candidates receive crops per analysis. Crop pixels are not embedded in the review JSON export.
 
 ## What is and is not implemented
 
