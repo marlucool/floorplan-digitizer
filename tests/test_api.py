@@ -23,8 +23,11 @@ class FakeResult:
 
 
 class FakeDetector:
+    def __init__(self, expected_conf: float = 0.25) -> None:
+        self.expected_conf = expected_conf
+
     def predict(self, **kwargs):
-        assert kwargs["conf"] == 0.25
+        assert kwargs["conf"] == self.expected_conf
         assert kwargs["imgsz"] == 640
         return [FakeResult()]
 
@@ -76,14 +79,16 @@ def test_serialise_detections_skips_non_finite_predictions() -> None:
 
 
 def test_analyse_returns_regions_without_fabricating_ocr(monkeypatch) -> None:
-    monkeypatch.setattr(api, "get_detector", lambda: FakeDetector())
+    monkeypatch.setattr(api, "get_detector", lambda: FakeDetector(expected_conf=0.4))
     client = TestClient(api.app)
     response = client.post(
         "/api/analyze",
+        data={"confidence_threshold": "0.4"},
         files={"file": ("plan.png", image_bytes(), "image/png")},
     )
     assert response.status_code == 200
     payload = response.json()
+    assert payload["confidence_threshold"] == pytest.approx(0.4)
     assert payload["image"] == {"width": 240, "height": 160}
     assert payload["counts"] == {"wall": 1, "dimension_value": 1}
     assert len(payload["dimension_regions"]) == 1
@@ -202,6 +207,16 @@ def test_dimension_chain_endpoint_rejects_mismatched_verification_flags() -> Non
             "overall_verified": True,
             "unit": "mm",
         },
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize("threshold", ["0", "1.01", "nan", "inf"])
+def test_rejects_invalid_confidence_threshold(threshold: str) -> None:
+    response = TestClient(api.app).post(
+        "/api/analyze",
+        data={"confidence_threshold": threshold},
+        files={"file": ("plan.png", image_bytes(), "image/png")},
     )
     assert response.status_code == 422
 
