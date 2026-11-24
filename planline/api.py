@@ -19,7 +19,7 @@ from typing import Any
 import cv2
 import numpy as np
 from PIL import Image, UnidentifiedImageError
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -246,8 +246,14 @@ def validate_dimension_chain_endpoint(
 
 
 @app.post("/api/analyze")
-async def analyze_drawing(file: UploadFile = File(...)) -> dict[str, Any]:
+async def analyze_drawing(\n    file: UploadFile = File(...),\n    confidence_threshold: float = Form(0.25),\n) -> dict[str, Any]:
     """Detect candidate regions after multipart parsing and bounded in-memory decoding."""
+    if not math.isfinite(confidence_threshold) or not 0.0 < confidence_threshold <= 1.0:
+        raise HTTPException(
+            status_code=422,
+            detail="confidence_threshold must be greater than 0 and at most 1.",
+        )
+
     filename = (file.filename or "").strip()
     if not filename:
         raise HTTPException(status_code=400, detail="The upload has no filename.")
@@ -281,7 +287,7 @@ async def analyze_drawing(file: UploadFile = File(...)) -> dict[str, Any]:
         with _model_lock:
             detector = get_detector()
             predictions = detector.predict(
-                source=image, conf=0.25, imgsz=640, verbose=False
+                source=image, conf=confidence_threshold, imgsz=640, verbose=False
             )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -320,6 +326,7 @@ async def analyze_drawing(file: UploadFile = File(...)) -> dict[str, Any]:
         "image": {"width": width, "height": height},
         "preview_data_url": make_preview_data_url(image),
         "counts": counts,
+        "confidence_threshold": confidence_threshold,
         "detections": detections,
         "dimension_regions": dimension_regions,
         "notes": notes,
