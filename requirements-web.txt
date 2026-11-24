@@ -2,6 +2,7 @@
 
 # Local Planline API and PDF rasterisation
 fastapi>=0.115,<1.0
+pydantic>=2.7,<3.0
 uvicorn[standard]>=0.30,<1.0
 python-multipart>=0.0.9,<1.0
 PyMuPDF>=1.24,<2.0
