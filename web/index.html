@@ -44,7 +44,7 @@
       </aside>
 
       <section class="drawing-panel">
-        <div class="drawing-toolbar"><div><span class="eyebrow">DRAWING VIEW</span><strong id="drawingTitle">No drawing loaded</strong></div><div class="toolbar-actions"><button id="overlayToggle" class="toolbar-button" type="button">Hide boxes</button><span class="view-tag" id="viewTag">EMPTY CANVAS</span></div></div>
+        <div class="drawing-toolbar"><div><span class="eyebrow">DRAWING VIEW</span><strong id="drawingTitle">No drawing loaded</strong></div><div class="toolbar-actions"><div class="zoom-controls" role="group" aria-label="Drawing zoom"><button id="zoomOut" class="toolbar-button zoom-button" type="button" aria-label="Zoom out">−</button><span id="zoomLevel" aria-live="polite">100%</span><button id="zoomIn" class="toolbar-button zoom-button" type="button" aria-label="Zoom in">+</button><button id="fitView" class="toolbar-button" type="button">Fit</button></div><button id="overlayToggle" class="toolbar-button" type="button">Hide boxes</button><span class="view-tag" id="viewTag">EMPTY CANVAS</span></div></div>
         <div class="canvas-wrap" id="canvasWrap">
           <div class="empty-state" id="emptyState"><div class="paper-icon">▤</div><strong>Your drawing will appear here</strong><p>Upload a scan or PDF to begin detection.</p></div>
           <img id="previewImage" alt="Uploaded floor plan preview" class="hidden">
