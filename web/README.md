@@ -39,7 +39,7 @@ The **Export JSON** button is enabled after an analysis result is returned. It d
 - Per-class counts and candidate IDs, classes, confidence scores, bounding boxes and centres.
 - Explicit limitations stating that OCR, dimension association, scale calibration and measured DXF generation have not occurred.
 
-The export intentionally excludes the uploaded image and does not include manual dimension-chain entries. It is a review/interchange artifact, not a CAD file or verified measurement record.
+The export intentionally excludes the uploaded image and does not include manual dimension-chain entries. It is a review/interchange artifact, not a CAD file or verified measurement record. The version 1 contract is defined in [the JSON Schema](../schemas/planline-detection-review-v1.schema.json).
 
 ### Manual dimension-chain validation
 
