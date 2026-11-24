@@ -423,11 +423,12 @@ function exportReviewJson() {
       centre: detection.centre
     })),
     manual_dimension_text_review: (result.dimension_regions || []).map((region, index) => {
-      const row = document.querySelectorAll(".dimension-text-item")[index];
+      const textInputs = document.querySelectorAll(".dimension-text-value");
+      const verifiedInputs = document.querySelectorAll(".dimension-text-verified-input");
       return {
         detection_id: region.id,
-        raw_text: row?.querySelector(".dimension-text-value")?.value || "",
-        verified: row?.querySelector(".dimension-text-verified-input")?.checked || false,
+        raw_text: textInputs[index]?.value || "",
+        verified: verifiedInputs[index]?.checked || false,
         detector_confidence: region.confidence,
         bbox: region.bbox,
         crop_bbox: region.crop_bbox || null
