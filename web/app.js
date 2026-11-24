@@ -295,6 +295,9 @@ function renderDimensionTextReview(regions) {
     textInput.autocomplete = "off";
     textInput.spellcheck = false;
     textInput.placeholder = "Enter the visible text";
+    textInput.addEventListener("input", () => {
+      region.manual_text = textInput.value;
+    });
     textLabel.append(textInput);
 
     const verifiedLabel = document.createElement("label");
@@ -302,6 +305,9 @@ function renderDimensionTextReview(regions) {
     const verifiedInput = document.createElement("input");
     verifiedInput.className = "dimension-text-verified-input";
     verifiedInput.type = "checkbox";
+    verifiedInput.addEventListener("change", () => {
+      region.manual_verified = verifiedInput.checked;
+    });
     verifiedLabel.append(verifiedInput, document.createTextNode(" I checked this transcription"));
 
     fields.append(meta, textLabel, verifiedLabel);
@@ -422,17 +428,14 @@ function exportReviewJson() {
       bbox: detection.bbox,
       centre: detection.centre
     })),
-    manual_dimension_text_review: (result.dimension_regions || []).map((region, index) => {
-      const row = document.querySelectorAll(".dimension-text-item")[index];
-      return {
+    manual_dimension_text_review: (result.dimension_regions || []).map((region) => ({
         detection_id: region.id,
-        raw_text: row?.querySelector(".dimension-text-value")?.value || "",
-        verified: row?.querySelector(".dimension-text-verified-input")?.checked || false,
+        raw_text: region.manual_text || "",
+        verified: Boolean(region.manual_verified),
         detector_confidence: region.confidence,
         bbox: region.bbox,
         crop_bbox: region.crop_bbox || null
-      };
-    }),
+      })),
     limitations: [
       "No OCR has been performed; manual transcription entries are user-entered and not machine-verified.",
       "Manual transcriptions have not been associated with walls, dimension lines or scale.",
