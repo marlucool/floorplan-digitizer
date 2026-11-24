@@ -179,6 +179,15 @@ def make_preview_data_url(image: np.ndarray, max_edge: int = 1600) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(encoded.tobytes()).decode("ascii")
 
 
+@app.get("/architecture", response_class=FileResponse)
+def architecture_notes() -> FileResponse:
+    """Serve the project architecture and research notes from the repository."""
+    notes_path = ROOT_DIR / "docs" / "PLANLINE_ARCHITECTURE.md"
+    if not notes_path.is_file():
+        raise HTTPException(status_code=404, detail="Architecture notes are not installed.")
+    return FileResponse(notes_path, media_type="text/markdown")
+
+
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     """Report readiness without loading model weights."""
