@@ -53,6 +53,7 @@ function setFile(file) {
 
 function showNotice(title, message) {
   $("#notice").innerHTML = "";
+  $("#notice").classList.remove("hidden");
   const strong = document.createElement("b");
   strong.textContent = title;
   const span = document.createElement("span");
@@ -64,9 +65,6 @@ function showNotice(title, message) {
 function drawDetections(previewUrl, detections, imageSize) {
   const img = $("#previewImage");
   const canvas = $("#overlay");
-  img.src = previewUrl;
-  img.classList.remove("hidden");
-  $("#emptyState").classList.add("hidden");
   img.onload = () => {
     const rect = img.getBoundingClientRect();
     const scaleX = img.naturalWidth / imageSize.width;
@@ -89,6 +87,9 @@ function drawDetections(previewUrl, detections, imageSize) {
     });
     canvas.classList.remove("hidden");
   };
+  img.src = previewUrl;
+  img.classList.remove("hidden");
+  $("#emptyState").classList.add("hidden");
 }
 
 function renderResults(payload) {
@@ -114,9 +115,6 @@ function renderResults(payload) {
   });
   $("#summary").classList.remove("hidden");
   $("#detectionList").innerHTML = "";
-  if (!detections.length) {
-    showNotice("No candidate regions detected", "The model returned no boxes at its current confidence threshold. This does not prove that the drawing contains no walls or dimensions.");
-  }
   detections.forEach((d) => {
     const row = document.createElement("div");
     row.className = "detection-row";
@@ -136,7 +134,7 @@ function renderResults(payload) {
     $("#detectionList").append(row);
   });
   const notes = (payload.notes || []).join(" ");
-  showNotice("Detection finished — OCR has not run", notes);
+  showNotice(detections.length ? "Detection finished — OCR has not run" : "No candidate regions detected", detections.length ? notes : "The model returned no boxes at its current confidence threshold. This does not prove that the drawing contains no walls or dimensions. " + notes);
   if (payload.preview_data_url) {
     drawDetections(payload.preview_data_url, detections, payload.image);
   }
