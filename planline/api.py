@@ -224,8 +224,10 @@ async def analyze_drawing(file: UploadFile = File(...)) -> dict[str, Any]:
         await file.close()
         raise HTTPException(status_code=413, detail="Upload limit is 25 MB.")
 
-    data = await file.read(MAX_UPLOAD_BYTES + 1)
-    await file.close()
+    try:
+        data = await file.read(MAX_UPLOAD_BYTES + 1)
+    finally:
+        await file.close()
     if len(data) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="Upload limit is 25 MB.")
 
