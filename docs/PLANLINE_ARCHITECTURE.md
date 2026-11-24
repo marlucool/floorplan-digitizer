@@ -128,6 +128,16 @@ The open-access paper *Automatic structural scene digitalization* (2017) describ
 
 Reference: https://pmc.ncbi.nlm.nih.gov/articles/PMC5693441/
 
+### Upload handling and privacy boundary
+
+FastAPI documents `UploadFile` as a spooled file: data can remain in memory up to a threshold and roll over to disk-backed temporary storage for larger multipart parts. Starlette also documents that uploaded files are spooled to temporary storage. Planline's 25 MB endpoint check happens after multipart parsing, so it bounds the application read/decode step but does not prevent the parser from receiving and temporarily spooling an oversized upload first. The API now checks the parsed `UploadFile.size` before copying it into the application byte buffer, then closes it. This is not equivalent to a strict pre-parser request-body limit.
+
+References:
+- FastAPI, [Request Files](https://fastapi.tiangolo.com/tutorial/request-files/) — describes the spooled upload implementation and disk rollover.
+- Starlette, [Requests](https://www.starlette.dev/requests/) — documents multipart file spooling and parser limits.
+
+For sensitive drawings, configure and monitor the server/container temporary directory, apply a request-body limit at the reverse proxy or ASGI boundary, and review logs and browser caching. Do not describe the current implementation as memory-only.
+
 ## Dataset strategy — research first, no training yet
 
 Do not start another training run until the annotation schema, rights, evaluation split and target failure modes are agreed.
