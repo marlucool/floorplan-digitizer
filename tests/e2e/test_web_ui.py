@@ -185,6 +185,8 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
 
             page.locator("#dimensionTextReview > summary").click()
             page.locator(".dimension-text-value").fill("4200")
+            assert page.locator(".dimension-text-value").input_value() == "4200"
+            assert page.locator(".dimension-text-item").get_attribute("data-detection-id") == "det-002"
             page.locator(".dimension-text-verified-input").check()
 
             page.locator("#chainChecker > summary").click()
