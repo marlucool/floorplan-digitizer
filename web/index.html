@@ -11,7 +11,7 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/" aria-label="Planline home"><span class="brand-mark">P</span><span>planline<span class="brand-dot">.</span></span></a>
-    <div class="top-meta"><span class="local-dot"></span> Local processing <span class="divider">/</span> 2D workspace</div>
+    <div class="top-meta"><span class="local-dot" id="apiDot"></span><span id="apiStatus">Checking local API…</span><span class="divider">/</span> 2D workspace</div>
     <a class="repo-link" href="https://github.com/marlucool/floorplan-digitizer" target="_blank" rel="noreferrer">Source repository ↗</a>
   </header>
   <main>
@@ -44,7 +44,7 @@
       </aside>
 
       <section class="drawing-panel">
-        <div class="drawing-toolbar"><div><span class="eyebrow">DRAWING VIEW</span><strong id="drawingTitle">No drawing loaded</strong></div><span class="view-tag" id="viewTag">EMPTY CANVAS</span></div>
+        <div class="drawing-toolbar"><div><span class="eyebrow">DRAWING VIEW</span><strong id="drawingTitle">No drawing loaded</strong></div><div class="toolbar-actions"><button id="overlayToggle" class="toolbar-button" type="button">Hide boxes</button><span class="view-tag" id="viewTag">EMPTY CANVAS</span></div></div>
         <div class="canvas-wrap" id="canvasWrap">
           <div class="empty-state" id="emptyState"><div class="paper-icon">▤</div><strong>Your drawing will appear here</strong><p>Upload a scan or PDF to begin detection.</p></div>
           <img id="previewImage" alt="Uploaded floor plan preview" class="hidden">
@@ -59,10 +59,10 @@
       <div class="results-head"><div><p class="eyebrow">03 / REVIEW DETECTIONS</p><h2>Candidate regions</h2></div><span class="result-status" id="resultStatus">NOT ANALYSED</span></div>
       <div class="notice" id="notice"><b>Awaiting a drawing.</b><span>Once analysed, candidate regions will be listed here. Detector confidence is not OCR confidence.</span></div>
       <div class="summary hidden" id="summary"></div>
-      <div class="detection-list" id="detectionList"></div>
+      <div class="review-toolbar"><label for="classFilter">Show class</label><select id="classFilter"><option value="all">All detections</option><option value="wall">Walls</option><option value="dimension_line">Dimension lines</option><option value="dimension_value">Dimension values</option></select><span>Choose a row to highlight its box.</span></div><div class="detection-list" id="detectionList"></div>
       <div class="limitations"><div class="limitation-mark">i</div><div><strong>Important: detection is not measurement.</strong><p>This integration uses the repository’s existing YOLO model to locate candidate regions. It does not recognise dimension values, associate them with walls, establish drawing scale, or reconstruct a floor plan. Every value and geometric relationship must be verified before CAD export is enabled.</p></div></div>
     </section>
-    <footer><span>PLANLINE · 2D FLOOR-PLAN DIGITISATION</span><span>Early integration · no measured DXF output</span></footer>
+    <footer><span>PLANLINE · 2D FLOOR-PLAN DIGITISATION</span><span><a href="/docs/PLANLINE_ARCHITECTURE.md">Technical notes</a> · no measured DXF output</span></footer>
   </main>
 </body>
 </html>
