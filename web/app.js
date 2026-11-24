@@ -316,6 +316,138 @@ async function analyse() {
   }
 }
 
+function renumberChainRows() {
+  const rows = [...$("#chainSegments").querySelectorAll(".chain-segment-row")];
+  rows.forEach((row, index) => {
+    const label = row.querySelector(".chain-value-label");
+    label.childNodes[0].textContent = "Segment " + (index + 1) + " ";
+    const remove = row.querySelector(".remove-segment");
+    remove.disabled = rows.length === 1;
+    remove.setAttribute("aria-label", "Remove segment " + (index + 1));
+  });
+}
+
+function addChainSegment() {
+  const row = document.createElement("div");
+  row.className = "chain-segment-row";
+  const valueLabel = document.createElement("label");
+  valueLabel.className = "chain-value-label";
+  valueLabel.append(document.createTextNode("Segment "));
+  const value = document.createElement("input");
+  value.className = "segment-value";
+  value.type = "number";
+  value.min = "0";
+  value.step = "any";
+  value.inputMode = "decimal";
+  value.placeholder = "Enter value";
+  valueLabel.append(value);
+
+  const verifyLabel = document.createElement("label");
+  verifyLabel.className = "chain-verify-label";
+  const verified = document.createElement("input");
+  verified.className = "segment-verified";
+  verified.type = "checkbox";
+  verifyLabel.append(verified, document.createTextNode(" Verified"));
+
+  const remove = document.createElement("button");
+  remove.className = "remove-segment toolbar-button";
+  remove.type = "button";
+  remove.textContent = "×";
+  row.append(valueLabel, verifyLabel, remove);
+  $("#chainSegments").append(row);
+  renumberChainRows();
+  value.focus();
+}
+
+function renderChainResult(result) {
+  const box = $("#chainResult");
+  box.replaceChildren();
+  box.dataset.status = result.status;
+  box.classList.remove("hidden");
+  const titles = {
+    matches: "Chain matches within the specified tolerance",
+    mismatch: "Verified dimensions do not add up",
+    needs_review: "Review is still required",
+    unresolved: "The chain is incomplete"
+  };
+  const heading = document.createElement("strong");
+  heading.textContent = titles[result.status] || "Dimension-chain result";
+  box.append(heading);
+
+  [
+    ["Segment total", result.segment_total],
+    ["Overall value", result.overall_value],
+    ["Difference", result.difference],
+    ["Tolerance", result.tolerance]
+  ].forEach(([label, value]) => {
+    const line = document.createElement("p");
+    line.textContent = label + ": " + (value === null ? "—" : value) + " " + result.unit;
+    box.append(line);
+  });
+
+  if (result.unresolved_indices.length) {
+    const line = document.createElement("p");
+    line.textContent = "Missing segments: " + result.unresolved_indices.map((index) => index + 1).join(", ");
+    box.append(line);
+  }
+  if (result.overall_unresolved) {
+    const line = document.createElement("p");
+    line.textContent = "Overall dimension is missing.";
+    box.append(line);
+  }
+  if (result.unverified_indices.length || !result.overall_verified) {
+    const line = document.createElement("p");
+    const segments = result.unverified_indices.map((index) => index + 1);
+    line.textContent = "Unverified: " + (segments.length ? "segments " + segments.join(", ") : "") +
+      (!result.overall_verified ? (segments.length ? "; " : "") + "overall dimension" : "");
+    box.append(line);
+  }
+}
+
+async function checkDimensionChain() {
+  const rows = [...$("#chainSegments").querySelectorAll(".chain-segment-row")];
+  const payload = {
+    segment_values: rows.map((row) => row.querySelector(".segment-value").value.trim() || null),
+    segment_verified: rows.map((row) => row.querySelector(".segment-verified").checked),
+    overall_value: $("#overallValue").value.trim() || null,
+    overall_verified: $("#overallVerified").checked,
+    unit: $("#chainUnit").value,
+    tolerance: $("#chainTolerance").value.trim() || "0"
+  };
+  const box = $("#chainResult");
+  box.classList.remove("hidden");
+  box.removeAttribute("data-status");
+  box.textContent = "Checking the supplied values…";
+  try {
+    const response = await fetch("/api/validate-dimension-chain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = Array.isArray(result.detail)
+        ? result.detail.map((item) => item.msg).join("; ")
+        : result.detail || "The dimension chain could not be checked.";
+      throw new Error(detail);
+    }
+    renderChainResult(result);
+  } catch (error) {
+    box.dataset.status = "unresolved";
+    box.textContent = "Could not check the dimension chain: " + (error.message || "API unavailable");
+  }
+}
+
+$("#addSegment").addEventListener("click", addChainSegment);
+$("#chainSegments").addEventListener("click", (event) => {
+  const button = event.target.closest(".remove-segment");
+  if (!button || button.disabled) return;
+  button.closest(".chain-segment-row").remove();
+  renumberChainRows();
+});
+$("#checkChain").addEventListener("click", checkDimensionChain);
+renumberChainRows();
+
 $("#fileInput").addEventListener("change", (event) => setFile(event.target.files[0]));
 $("#analyzeButton").addEventListener("click", analyse);
 $("#removeFile").addEventListener("click", () => {
