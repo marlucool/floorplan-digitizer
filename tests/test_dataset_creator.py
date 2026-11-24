@@ -44,5 +44,4 @@ def test_dataset_creator_skips_unreadable_sheet(tmp_path) -> None:
         output_folder=str(output_dir),
     )
 
-    assert (output_dir / "0").is_dir()
-    assert list((output_dir / "0").glob("*.png")) == []
+    assert not (output_dir / "0").exists()
