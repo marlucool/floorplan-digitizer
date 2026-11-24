@@ -32,7 +32,7 @@
         </label>
         <div class="file-card hidden" id="fileCard"><div class="file-icon">▧</div><div class="file-info"><strong id="fileName">—</strong><small id="fileMeta">—</small></div><button id="removeFile" class="icon-button" type="button" aria-label="Remove drawing">×</button></div>
         <button id="analyzeButton" class="primary-button" type="button" disabled>Analyse drawing <span>→</span></button>
-        <div class="privacy-note"><span class="lock">▣</span><span><strong>Local-first processing</strong><br>The API processes uploads in memory. This version does not save source drawings.</span></div>
+        <div class="privacy-note"><span class="lock">▣</span><span><strong>Local-first processing</strong><br>No project copy is saved. Multipart uploads may use temporary storage during receipt; request files are closed after processing.</span></div>
         <div class="panel-heading section-gap"><span>02 / PIPELINE STATUS</span></div>
         <ol class="pipeline">
           <li class="complete"><span class="pipeline-num">01</span><span><b>Image import</b><small>Ready when a file is selected</small></span><i>●</i></li>
