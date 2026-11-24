@@ -109,6 +109,15 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert submitted["segment_verified"] == [True, True]
             assert submitted["overall_value"] == "7500"
             assert "Chain matches" in page.locator("#chainResult").inner_text()
+
+            page.locator("#fitView").click()
+            assert page.locator("#zoomLevel").inner_text() == "100%"
+            page.set_viewport_size({"width": 390, "height": 844})
+            assert page.locator("#zoomIn").is_visible()
+            assert page.locator("#checkChain").is_visible()
+            assert page.evaluate(
+                "document.documentElement.scrollWidth <= window.innerWidth"
+            )
             browser.close()
     finally:
         server.shutdown()
