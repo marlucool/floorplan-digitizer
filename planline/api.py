@@ -197,6 +197,44 @@ def serialise_detections(result: Any, image_shape: tuple[int, ...]) -> list[dict
     return detections
 
 
+MAX_DIMENSION_CROPS = 50
+
+
+def make_region_crop(image: np.ndarray, bbox: dict[str, float]) -> dict[str, Any] | None:
+    """Create a bounded, padded crop from the original-resolution source image."""
+    height, width = image.shape[:2]
+    pad_x = max(6, int(round(bbox["width"] * 0.15)))
+    pad_y = max(6, int(round(bbox["height"] * 0.25)))
+    x1 = max(0, int(math.floor(bbox["x1"])) - pad_x)
+    y1 = max(0, int(math.floor(bbox["y1"])) - pad_y)
+    x2 = min(width, int(math.ceil(bbox["x2"])) + pad_x)
+    y2 = min(height, int(math.ceil(bbox["y2"])) + pad_y)
+    if x2 <= x1 or y2 <= y1:
+        return None
+    crop = image[y1:y2, x1:x2]
+    if crop.size == 0:
+        return None
+    edge = max(crop.shape[:2])
+    scale = min(4.0, 512.0 / edge) if edge < 512 else 512.0 / edge
+    if abs(scale - 1.0) > 0.01:
+        interpolation = cv2.INTER_CUBIC if scale > 1 else cv2.INTER_AREA
+        crop = cv2.resize(
+            crop,
+            (max(1, int(round(crop.shape[1] * scale))), max(1, int(round(crop.shape[0] * scale)))),
+            interpolation=interpolation,
+        )
+    ok, encoded = cv2.imencode(".png", crop, [cv2.IMWRITE_PNG_COMPRESSION, 3])
+    if not ok:
+        return None
+    return {
+        "crop_bbox": {
+            "x1": x1, "y1": y1, "x2": x2, "y2": y2,
+            "width": x2 - x1, "height": y2 - y1,
+        },
+        "crop_data_url": "data:image/png;base64," + base64.b64encode(encoded).decode("ascii"),
+    }
+
+
 def make_preview_data_url(image: np.ndarray, max_edge: int = 1600) -> str:
     """Create a bounded JPEG preview for the browser without saving the upload."""
     height, width = image.shape[:2]
@@ -309,9 +347,17 @@ async def analyze_drawing(
         label = detection["class_name"]
         counts[label] = counts.get(label, 0) + 1
 
-    dimension_regions = [
+    dimension_candidates = [
         item for item in detections if item["class_name"] == "dimension_value"
     ]
+    dimension_regions = []
+    for index, item in enumerate(dimension_candidates):
+        region = dict(item)
+        if index < MAX_DIMENSION_CROPS:
+            crop = make_region_crop(image, item["bbox"])
+            if crop is not None:
+                region.update(crop)
+        dimension_regions.append(region)
     height, width = image.shape[:2]
     notes = [
         "Detected boxes are candidate regions, not recognised measurements.",
@@ -320,6 +366,10 @@ async def analyze_drawing(
         "DXF export is disabled until dimensions and geometry are verified.",
         "The bundled detector was trained on a small dataset of simplified plans; review all detections.",
     ]
+    if len(dimension_candidates) > MAX_DIMENSION_CROPS:
+        notes.append(
+            f"Only the first {MAX_DIMENSION_CROPS} dimension-value candidates include review crops."
+        )
     if source_info["source_type"] == "pdf":
         notes.append(source_info["note"])
 
