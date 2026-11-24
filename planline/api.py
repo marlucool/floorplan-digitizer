@@ -231,8 +231,11 @@ async def analyze_drawing(file: UploadFile = File(...)) -> dict[str, Any]:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     try:
-        detector = get_detector()
+        # Serialize lazy model construction as well as inference. lru_cache
+        # protects its cache bookkeeping, but concurrent first calls can still
+        # execute the wrapped loader more than once.
         with _model_lock:
+            detector = get_detector()
             predictions = detector.predict(
                 source=image, conf=0.25, imgsz=640, verbose=False
             )
