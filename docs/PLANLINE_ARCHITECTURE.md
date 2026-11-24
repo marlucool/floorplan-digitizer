@@ -22,6 +22,22 @@ The current web integration is intentionally a detection-and-review slice:
 - The application does not intentionally save source drawings as project files; multipart parsing may spool larger uploads to temporary storage. No measured DXF is emitted.
 - OCR, dimension association, calibration, topology reconstruction and measured DXF export are not part of this web workflow.
 
+### Detection resolution risk
+
+The current API sends the complete source image to YOLO with `imgsz=640`. On a large scanned sheet, small dimension text and thin annotation features can be reduced to only a few pixels before detection. The bounded 1600-pixel browser preview does not change the inference input; it is only for display.
+
+The 2026 *Buildings* study uses density-adaptive overlapping crops because a single fixed resize can lose small targets in large drawings. Its reported crop sizes and performance are specific to its own dataset and model and must not be copied as Planline defaults without testing.
+
+Planned approach:
+
+- Benchmark full-frame inference against overlapping tile inference on the same held-out source drawings.
+- Preserve each crop's offset and map every detection back to original source-image coordinates.
+- Merge overlapping detections with class-aware NMS, and measure duplicate and missed detections at tile boundaries.
+- Compare several crop sizes and overlap ratios, including crowded dimension bands and sparse plan regions.
+- Keep the original full-resolution scan as the source of truth; never use the resized preview as the measurement coordinate system.
+
+Do not enable tiled inference by assumption alone: the current detector was trained on a small simplified-plan dataset, and higher-resolution crops cannot compensate for a domain mismatch.
+
 The API tests use a fake detector. They do not establish the real model's accuracy or prove that it works on representative scans. The real-weight smoke test and browser visual test remain separate acceptance tasks.
 
 ## Recommended processing architecture
@@ -219,6 +235,7 @@ Split training/validation/test by original drawing and writer, not by cropped di
 - [x] Add candidate region review, class filtering and selected-box highlighting.
 - [x] Document API setup and the current capability boundary.
 - [ ] Run a real-weight smoke test with `yolo_floorplan.pt` and representative old scans.
+- [ ] Compare full-frame YOLO inference with overlapping multi-scale tiles on held-out scans before changing the default detector path.
 - [ ] Audit the legacy digit classifier on held-out scans; do not integrate its current integer output as dimension OCR.
 - [x] Fix and test end-of-row digit segmentation in `dataset_creator.py` before generating any replacement dataset.
 - [ ] Replace random crop-level validation with drawing-/writer-grouped held-out evaluation before trusting OCR accuracy.
