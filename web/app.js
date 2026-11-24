@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", overlayVisible: true, resizeObserver: null, resizeHandler: null };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null };
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -9,13 +9,18 @@ function formatBytes(bytes) {
 
 function setFile(file) {
   if (!file) return;
+  if (state.controller) { state.controller.abort(); state.controller = null; }
+  $("#loader").classList.add("hidden");
+  $("#analyzeButton").innerHTML = 'Analyse drawing <span>→</span>';
   const allowed = /\.(png|jpe?g|webp|tiff?)$/i.test(file.name) || /\.pdf$/i.test(file.name);
   if (!allowed) return showNotice("Unsupported file type", "Choose a PNG, JPG, WEBP, TIFF or PDF drawing.");
   if (file.size > 25 * 1024 * 1024) return showNotice("File is too large", "The maximum upload size is 25 MB.");
+  if (state.controller) { state.controller.abort(); state.controller = null; }
   if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
   if (state.resizeObserver) state.resizeObserver.disconnect();
   if (state.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
   state.resizeObserver = null; state.resizeHandler = null;
+  $("#previewImage").onload = null;
   state.file = file;
   state.objectUrl = URL.createObjectURL(file);
   state.result = null;
@@ -183,6 +188,9 @@ $("#overlayToggle").addEventListener("click", () => {
 
 async function analyse() {
   if (!state.file) return;
+  const file = state.file;
+  const controller = new AbortController();
+  state.controller = controller;
   const button = $("#analyzeButton");
   button.disabled = true;
   button.textContent = "Analysing…";
@@ -190,21 +198,27 @@ async function analyse() {
   $("#detectStep").classList.remove("complete");
   try {
     const form = new FormData();
-    form.append("file", state.file);
-    const response = await fetch("/api/analyze", { method: "POST", body: form });
+    form.append("file", file);
+    const response = await fetch("/api/analyze", { method: "POST", body: form, signal: controller.signal });
     const payload = await response.json().catch(() => ({}));
+    if (state.controller !== controller) return;
     if (!response.ok) throw new Error(payload.detail || "Analysis failed (HTTP " + response.status + ").");
     state.result = payload;
     $("#detectStep").classList.add("complete");
     renderResults(payload);
   } catch (error) {
-    $("#detectStep").classList.remove("complete");
-    showNotice("Analysis could not be completed", error.message || "Check that the local API is running.");
-    $("#resultStatus").textContent = "ANALYSIS FAILED";
+    if (error.name !== "AbortError" && state.controller === controller) {
+      $("#detectStep").classList.remove("complete");
+      showNotice("Analysis could not be completed", error.message || "Check that the local API is running.");
+      $("#resultStatus").textContent = "ANALYSIS FAILED";
+    }
   } finally {
-    $("#loader").classList.add("hidden");
-    button.disabled = false;
-    button.innerHTML = 'Analyse again <span>→</span>';
+    if (state.controller === controller) {
+      state.controller = null;
+      $("#loader").classList.add("hidden");
+      button.disabled = false;
+      button.innerHTML = 'Analyse again <span>→</span>';
+    }
   }
 }
 
