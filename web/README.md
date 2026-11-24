@@ -32,7 +32,7 @@ The application does not intentionally save an uploaded drawing as a project fil
 
 ### Manual dimension-chain validation
 
-The API accepts already-read values so a future review interface can check a dimension chain without guessing. Example request:
+The API accepts already-read values so the manual review panel can check a dimension chain without guessing. Example request:
 
 ```json
 {
