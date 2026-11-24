@@ -225,6 +225,7 @@ async function analyse() {
 $("#fileInput").addEventListener("change", (event) => setFile(event.target.files[0]));
 $("#analyzeButton").addEventListener("click", analyse);
 $("#removeFile").addEventListener("click", () => {
+  if (state.controller) { state.controller.abort(); state.controller = null; }
   if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
   if (state.resizeObserver) state.resizeObserver.disconnect();
   if (state.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
@@ -240,6 +241,9 @@ $("#removeFile").addEventListener("click", () => {
   $("#drawingTitle").textContent = "No drawing loaded";
   $("#viewTag").textContent = "EMPTY CANVAS";
   $("#previewImage").classList.add("hidden");
+  $("#previewImage").onload = null;
+  $("#previewImage").removeAttribute("src");
+  $("#loader").classList.add("hidden");
   $("#overlay").classList.add("hidden");
   $("#emptyState").classList.remove("hidden");
   $("#imageDimensions").textContent = "No source dimensions";
