@@ -92,6 +92,10 @@ def test_analyse_returns_regions_without_fabricating_ocr(monkeypatch) -> None:
     assert payload["image"] == {"width": 240, "height": 160}
     assert payload["counts"] == {"wall": 1, "dimension_value": 1}
     assert len(payload["dimension_regions"]) == 1
+    assert payload["dimension_regions"][0]["crop_data_url"].startswith(
+        "data:image/png;base64,"
+    )
+    assert payload["dimension_regions"][0]["crop_bbox"]["width"] > 60
     assert "value" not in payload["dimension_regions"][0]
     assert payload["export_ready"] is False
     assert payload["preview_data_url"].startswith("data:image/jpeg;base64,")
