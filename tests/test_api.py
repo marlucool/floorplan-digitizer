@@ -102,6 +102,37 @@ def test_analyse_returns_regions_without_fabricating_ocr(monkeypatch) -> None:
     assert any("OCR has not run" in note for note in payload["notes"])
 
 
+def test_dimension_review_crops_are_bounded(monkeypatch) -> None:
+    class ManyBoxes:
+        xyxy = np.tile(np.array([[20, 20, 50, 40]], dtype=float), (35, 1))
+        cls = np.full(35, 2, dtype=float)
+        conf = np.full(35, 0.8, dtype=float)
+
+        def __len__(self) -> int:
+            return len(self.xyxy)
+
+    class ManyResult:
+        names = {0: "wall", 1: "dimension_line", 2: "dimension_value"}
+        boxes = ManyBoxes()
+
+    class ManyDetector:
+        def predict(self, **kwargs):
+            assert kwargs["conf"] == 0.25
+            return [ManyResult()]
+
+    monkeypatch.setattr(api, "get_detector", lambda: ManyDetector())
+    response = TestClient(api.app).post(
+        "/api/analyze",
+        files={"file": ("plan.png", image_bytes(), "image/png")},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["dimension_regions"]) == 35
+    assert all("crop_data_url" in item for item in payload["dimension_regions"][:30])
+    assert all("crop_data_url" not in item for item in payload["dimension_regions"][30:])
+    assert any("first 30" in note for note in payload["notes"])
+
+
 def test_detector_load_and_prediction_are_serialized(monkeypatch) -> None:
     class LockCheckingDetector(FakeDetector):
         def predict(self, **kwargs):
