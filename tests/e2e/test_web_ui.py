@@ -71,7 +71,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                     json={
                         "confidence_threshold": 0.4,
                         "image": {"width": 400, "height": 300},
-                        "counts": {"wall": 1, "dimension_line": 0, "dimension_value": 0},
+                        "counts": {"wall": 1, "dimension_line": 0, "dimension_value": 1},
                         "detections": [
                             {
                                 "id": "det-001",
