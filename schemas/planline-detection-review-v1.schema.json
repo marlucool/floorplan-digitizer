@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/marlucool/floorplan-digitizer/blob/main/schemas/planline-detection-review-v1.schema.json",
+  "title": "Planline Detection Review v1",
+  "description": "Candidate detector output only. This format is not a verified measurement or CAD geometry record.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "source",
+    "analysis",
+    "counts",
+    "detections",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "planline-detection-review/v1"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "filename",
+        "image_width_px",
+        "image_height_px"
+      ],
+      "properties": {
+        "filename": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "image_width_px": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "image_height_px": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "confidence_threshold",
+        "status",
+        "coordinate_system"
+      ],
+      "properties": {
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "status": {
+          "const": "candidate_detection_only"
+        },
+        "coordinate_system": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wall",
+        "dimension_line",
+        "dimension_value"
+      ],
+      "properties": {
+        "wall": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dimension_line": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dimension_value": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "detections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class_name",
+          "confidence",
+          "bbox"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^det-[0-9]{3,}$"
+          },
+          "class_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "bbox": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "x1",
+              "y1",
+              "x2",
+              "y2",
+              "width",
+              "height"
+            ],
+            "properties": {
+              "x1": {
+                "type": "number",
+                "minimum": 0
+              },
+              "y1": {
+                "type": "number",
+                "minimum": 0
+              },
+              "x2": {
+                "type": "number",
+                "minimum": 0
+              },
+              "y2": {
+                "type": "number",
+                "minimum": 0
+              },
+              "width": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "height": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          },
+          "centre": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "type": "number",
+                "minimum": 0
+              },
+              "y": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
