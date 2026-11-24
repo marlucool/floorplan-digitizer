@@ -24,7 +24,7 @@ The application does not intentionally save an uploaded drawing as a project fil
 ## API
 
 - `GET /api/health` — lightweight service/model readiness status; does not load the detector.
-- `POST /api/analyze` — candidate-region detection for one uploaded file.
+- `POST /api/analyze` — candidate-region detection for one uploaded file. Optional multipart field `confidence_threshold` defaults to `0.25` and must be in `(0, 1]`; the UI exposes a narrower `0.05–0.80` range.
 - `POST /api/validate-dimension-chain` — arithmetic check for explicitly supplied dimension values and verification flags. This does not run OCR or associate dimensions with walls.
 - `GET /docs` — interactive FastAPI/OpenAPI documentation.
 - `GET /architecture` — the project architecture, research findings and implementation roadmap.
@@ -109,3 +109,6 @@ python -m pytest -q tests/e2e
 The browser test exercises local image preview, zoom controls and the manual dimension-chain checker with API responses stubbed. It does not validate YOLO accuracy or OCR.
 
 The automated tests use a fake detector. Passing them verifies API behaviour and serialization, not the accuracy of the real model. A separate smoke test with the actual weights and representative scans is still required.
+
+
+Detector confidence is a model filtering threshold, not a calibrated probability of correctness or measurement confidence.
