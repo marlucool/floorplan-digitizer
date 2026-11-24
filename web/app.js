@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1 };
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -14,7 +14,7 @@ function resetWorkspace() {
   if (state.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
   state.file = null; state.objectUrl = null; state.result = null; state.previewUrl = null;
   state.detections = []; state.selectedId = null; state.activeFilter = "all";
-  state.overlayVisible = true; state.resizeObserver = null; state.resizeHandler = null;
+  state.overlayVisible = true; state.resizeObserver = null; state.resizeHandler = null; state.zoom = 1;
   $("#fileInput").value = "";
   $("#fileCard").classList.add("hidden");
   $("#dropzone").classList.remove("hidden");
@@ -31,6 +31,12 @@ function resetWorkspace() {
   $("#loader").classList.add("hidden");
   $("#overlay").classList.add("hidden");
   $("#overlayToggle").textContent = "Hide boxes";
+  $("#zoomLevel").textContent = "100%";
+  $("#canvasWrap").classList.remove("zoomed");
+  $("#previewImage").style.width = "";
+  $("#previewImage").style.height = "";
+  $("#previewImage").style.maxWidth = "";
+  $("#previewImage").style.maxHeight = "";
   $("#classFilter").value = "all";
   $("#emptyState").classList.remove("hidden");
   $("#emptyState").querySelector("strong").textContent = "Your drawing will appear here";
@@ -69,7 +75,12 @@ function setFile(file) {
   state.selectedId = null;
   state.detections = [];
   state.overlayVisible = true;
+  state.zoom = 1;
   $("#overlayToggle").textContent = "Hide boxes";
+  $("#zoomLevel").textContent = "100%";
+  $("#canvasWrap").classList.remove("zoomed");
+  $("#previewImage").style.width = "";
+  $("#previewImage").style.height = "";
   $("#fileName").textContent = file.name;
   $("#fileMeta").textContent = formatBytes(file.size) + " · selected locally";
   $("#fileCard").classList.remove("hidden");
@@ -91,6 +102,7 @@ function setFile(file) {
   showNotice("Drawing ready", "Run local detection to locate candidate walls and dimension annotations. No measurements will be inferred.");
   if (file.type.startsWith("image/")) {
     const img = $("#previewImage");
+    img.onload = applyImageScale;
     img.src = state.objectUrl;
     img.classList.remove("hidden");
     img.onerror = () => {
@@ -112,6 +124,22 @@ function showNotice(title, message) {
   $("#notice").classList.remove("hidden");
 }
 
+function applyImageScale() {
+  const img = $("#previewImage");
+  const wrap = $("#canvasWrap");
+  $("#zoomLevel").textContent = Math.round(state.zoom * 100) + "%";
+  if (!img.naturalWidth || !img.naturalHeight) return;
+  const availableWidth = Math.max(120, wrap.clientWidth - 48);
+  const fitScale = Math.min(1, availableWidth / img.naturalWidth, 590 / img.naturalHeight);
+  const scale = fitScale * state.zoom;
+  img.style.width = Math.max(1, Math.round(img.naturalWidth * scale)) + "px";
+  img.style.height = Math.max(1, Math.round(img.naturalHeight * scale)) + "px";
+  img.style.maxWidth = "none";
+  img.style.maxHeight = "none";
+  img.style.margin = state.zoom > 1 ? "0" : "0 auto";
+  wrap.classList.toggle("zoomed", state.zoom > 1);
+}
+
 function drawDetections(previewUrl, detections, imageSize) {
   const img = $("#previewImage");
   const canvas = $("#overlay");
@@ -121,12 +149,15 @@ function drawDetections(previewUrl, detections, imageSize) {
   state.imageSize = imageSize;
   const paint = () => {
     if (!img.complete || !img.naturalWidth || img.classList.contains("hidden")) return;
+    applyImageScale();
     const imageRect = img.getBoundingClientRect();
     const wrapRect = wrap.getBoundingClientRect();
     canvas.width = img.naturalWidth;
     canvas.height = img.naturalHeight;
     canvas.style.width = imageRect.width + "px";
     canvas.style.height = imageRect.height + "px";
+    canvas.style.maxWidth = "none";
+    canvas.style.maxHeight = "none";
     canvas.style.left = (imageRect.left - wrapRect.left + wrap.scrollLeft) + "px";
     canvas.style.top = (imageRect.top - wrapRect.top + wrap.scrollTop) + "px";
     const ctx = canvas.getContext("2d");
@@ -135,11 +166,11 @@ function drawDetections(previewUrl, detections, imageSize) {
     const sy = img.naturalHeight / imageSize.height;
     detections.forEach((d) => {
       if (state.activeFilter !== "all" && d.class_name !== state.activeFilter) return;
-      const b = d.bbox;
+      const box = d.bbox;
       const selected = state.selectedId === d.id;
       ctx.strokeStyle = selected ? "#d34e3e" : d.class_name === "wall" ? "#287c56" : d.class_name === "dimension_value" ? "#c47734" : "#4778a8";
       ctx.lineWidth = selected ? Math.max(4, canvas.width / 450) : Math.max(2, canvas.width / 700);
-      ctx.strokeRect(b.x1 * sx, b.y1 * sy, b.width * sx, b.height * sy);
+      ctx.strokeRect(box.x1 * sx, box.y1 * sy, box.width * sx, box.height * sy);
     });
     canvas.classList.toggle("hidden", !state.overlayVisible);
   };
@@ -224,6 +255,17 @@ $("#classFilter").addEventListener("change", (event) => {
   renderDetectionRows(state.detections || []);
   if (state.result) drawDetections(state.previewUrl, state.detections, state.result.image);
 });
+function setZoom(value) {
+  state.zoom = Math.max(0.5, Math.min(3, value));
+  applyImageScale();
+  if (state.result && state.previewUrl) {
+    drawDetections(state.previewUrl, state.detections, state.result.image);
+  }
+}
+$("#zoomIn").addEventListener("click", () => setZoom(state.zoom + 0.25));
+$("#zoomOut").addEventListener("click", () => setZoom(state.zoom - 0.25));
+$("#fitView").addEventListener("click", () => setZoom(1));
+
 $("#overlayToggle").addEventListener("click", () => {
   state.overlayVisible = !state.overlayVisible;
   $("#overlayToggle").textContent = state.overlayVisible ? "Hide boxes" : "Show boxes";
