@@ -209,6 +209,7 @@ def health() -> dict[str, Any]:
         "detector_weights_present": DETECTOR_PATH.is_file(),
         "detector_loaded": get_detector.cache_info().currsize > 0,
         "ocr_available": False,
+        "dimension_chain_validation_available": True,
         "geometry_available": False,
     }
 
