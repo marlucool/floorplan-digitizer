@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { file: null, objectUrl: null, result: null, previewUrl: null };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", overlayVisible: true, resizeObserver: null };
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -16,6 +16,8 @@ function setFile(file) {
   state.file = file;
   state.objectUrl = URL.createObjectURL(file);
   state.result = null;
+  state.selectedId = null;
+  state.detections = [];
   $("#fileName").textContent = file.name;
   $("#fileMeta").textContent = formatBytes(file.size) + " · selected locally";
   $("#fileCard").classList.remove("hidden");
@@ -26,7 +28,9 @@ function setFile(file) {
   $("#viewTag").textContent = "READY TO ANALYSE";
   $("#emptyState").classList.add("hidden");
   $("#previewImage").classList.add("hidden");
+  $("#previewImage").removeAttribute("src");
   $("#overlay").classList.add("hidden");
+  $("#classFilter").value = "all"; state.activeFilter = "all";
   $("#imageDimensions").textContent = "Waiting for analysis";
   $("#detectionCount").textContent = "0 detected regions";
   $("#resultStatus").textContent = "NOT ANALYSED";
@@ -59,33 +63,44 @@ function showNotice(title, message) {
 function drawDetections(previewUrl, detections, imageSize) {
   const img = $("#previewImage");
   const canvas = $("#overlay");
-  img.onload = () => {
-    const rect = img.getBoundingClientRect();
-    const scaleX = img.naturalWidth / imageSize.width;
-    const scaleY = img.naturalHeight / imageSize.height;
+  const wrap = $("#canvasWrap");
+  state.previewUrl = previewUrl;
+  state.detections = detections;
+  state.imageSize = imageSize;
+  const paint = () => {
+    if (!img.complete || !img.naturalWidth || img.classList.contains("hidden")) return;
+    const imageRect = img.getBoundingClientRect();
+    const wrapRect = wrap.getBoundingClientRect();
     canvas.width = img.naturalWidth;
     canvas.height = img.naturalHeight;
-    canvas.style.width = rect.width + "px";
-    canvas.style.height = rect.height + "px";
-    canvas.style.left = img.offsetLeft + "px";
-    canvas.style.top = img.offsetTop + "px";
+    canvas.style.width = imageRect.width + "px";
+    canvas.style.height = imageRect.height + "px";
+    canvas.style.left = (imageRect.left - wrapRect.left + wrap.scrollLeft) + "px";
+    canvas.style.top = (imageRect.top - wrapRect.top + wrap.scrollTop) + "px";
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const sx = img.naturalWidth / imageSize.width;
+    const sy = img.naturalHeight / imageSize.height;
     detections.forEach((d) => {
+      if (state.activeFilter !== "all" && d.class_name !== state.activeFilter) return;
       const b = d.bbox;
-      const x = b.x1 / scaleX, y = b.y1 / scaleY;
-      const w = b.width / scaleX, h = b.height / scaleY;
-      ctx.strokeStyle = d.class_name === "wall" ? "#287c56" : d.class_name === "dimension_value" ? "#c47734" : "#4778a8";
-      ctx.lineWidth = Math.max(2, canvas.width / 700);
-      ctx.strokeRect(x, y, w, h);
+      const selected = state.selectedId === d.id;
+      ctx.strokeStyle = selected ? "#d34e3e" : d.class_name === "wall" ? "#287c56" : d.class_name === "dimension_value" ? "#c47734" : "#4778a8";
+      ctx.lineWidth = selected ? Math.max(4, canvas.width / 450) : Math.max(2, canvas.width / 700);
+      ctx.strokeRect(b.x1 * sx, b.y1 * sy, b.width * sx, b.height * sy);
     });
-    canvas.classList.remove("hidden");
+    canvas.classList.toggle("hidden", !state.overlayVisible);
   };
-  img.src = previewUrl;
+  img.onload = paint;
+  if (img.src !== previewUrl) img.src = previewUrl;
   img.classList.remove("hidden");
   $("#emptyState").classList.add("hidden");
+  if (img.complete) paint();
+  if (state.resizeObserver) state.resizeObserver.disconnect();
+  state.resizeObserver = new ResizeObserver(paint);
+  state.resizeObserver.observe(img);
+  window.addEventListener("resize", paint, { passive: true });
 }
-
 function renderResults(payload) {
   const detections = payload.detections || [];
   $("#sourceState").textContent = "Analysed";
@@ -109,9 +124,13 @@ function renderResults(payload) {
   });
   $("#summary").classList.remove("hidden");
   $("#detectionList").innerHTML = "";
+  state.selectedId = null;
   detections.forEach((d) => {
-    const row = document.createElement("div");
+    const row = document.createElement("button");
+    row.type = "button";
     row.className = "detection-row";
+    row.setAttribute("aria-pressed", "false");
+    row.addEventListener("click", () => { state.selectedId = d.id; renderDetectionRows(detections); drawDetections(state.previewUrl, detections, payload.image); });
     const id = document.createElement("span");
     id.className = "det-id";
     id.textContent = d.id;
@@ -125,14 +144,37 @@ function renderResults(payload) {
     confidence.className = "confidence";
     confidence.textContent = Math.round(d.confidence * 100) + "% score";
     row.append(id, name, box, confidence);
+    row.dataset.className = d.class_name;
+    row.dataset.detectionId = d.id;
     $("#detectionList").append(row);
   });
+  renderDetectionRows(detections);
   const notes = (payload.notes || []).join(" ");
   showNotice(detections.length ? "Detection finished — OCR has not run" : "No candidate regions detected", detections.length ? notes : "The model returned no boxes at its current confidence threshold. This does not prove that the drawing contains no walls or dimensions. " + notes);
-  if (payload.preview_data_url) {
-    drawDetections(payload.preview_data_url, detections, payload.image);
-  }
+  if (payload.source && payload.source.note) showNotice("Detection finished — first PDF page only", notes + " " + payload.source.note);
+  if (payload.preview_data_url) drawDetections(payload.preview_data_url, detections, payload.image);
 }
+
+function renderDetectionRows(detections) {
+  document.querySelectorAll(".detection-row").forEach((row) => {
+    const visible = state.activeFilter === "all" || row.dataset.className === state.activeFilter;
+    row.classList.toggle("hidden", !visible);
+    const selected = row.dataset.detectionId === state.selectedId;
+    row.classList.toggle("selected", selected);
+    row.setAttribute("aria-pressed", selected ? "true" : "false");
+  });
+}
+
+$("#classFilter").addEventListener("change", (event) => {
+  state.activeFilter = event.target.value;
+  renderDetectionRows(state.detections || []);
+  if (state.result) drawDetections(state.previewUrl, state.detections, state.result.image);
+});
+$("#overlayToggle").addEventListener("click", () => {
+  state.overlayVisible = !state.overlayVisible;
+  $("#overlayToggle").textContent = state.overlayVisible ? "Hide boxes" : "Show boxes";
+  $("#overlay").classList.toggle("hidden", !state.overlayVisible);
+});
 
 async function analyse() {
   if (!state.file) return;
@@ -145,8 +187,8 @@ async function analyse() {
     const form = new FormData();
     form.append("file", state.file);
     const response = await fetch("/api/analyze", { method: "POST", body: form });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.detail || "Analysis failed.");
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || "Analysis failed (HTTP " + response.status + ").");
     state.result = payload;
     $("#detectStep").classList.add("complete");
     renderResults(payload);
@@ -165,7 +207,7 @@ $("#fileInput").addEventListener("change", (event) => setFile(event.target.files
 $("#analyzeButton").addEventListener("click", analyse);
 $("#removeFile").addEventListener("click", () => {
   if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
-  state.file = null; state.objectUrl = null; state.result = null;
+  state.file = null; state.objectUrl = null; state.result = null; state.detections = []; state.previewUrl = null; state.selectedId = null;
   $("#fileInput").value = "";
   $("#fileCard").classList.add("hidden");
   $("#dropzone").classList.remove("hidden");
