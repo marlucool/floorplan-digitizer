@@ -140,7 +140,7 @@ async function analyse() {
   button.disabled = true;
   button.textContent = "Analysing…";
   $("#loader").classList.remove("hidden");
-  $("#detectStep").classList.add("complete");
+  $("#detectStep").classList.remove("complete");
   try {
     const form = new FormData();
     form.append("file", state.file);
@@ -148,8 +148,10 @@ async function analyse() {
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || "Analysis failed.");
     state.result = payload;
+    $("#detectStep").classList.add("complete");
     renderResults(payload);
   } catch (error) {
+    $("#detectStep").classList.remove("complete");
     showNotice("Analysis could not be completed", error.message || "Check that the local API is running.");
     $("#resultStatus").textContent = "ANALYSIS FAILED";
   } finally {
@@ -168,7 +170,8 @@ $("#removeFile").addEventListener("click", () => {
   $("#fileCard").classList.add("hidden");
   $("#dropzone").classList.remove("hidden");
   $("#analyzeButton").disabled = true;
-  $("#analyzeButton").textContent = "Analyse drawing →";
+  $("#analyzeButton").innerHTML = "Analyse drawing <span>→</span>";
+  $("#detectStep").classList.remove("complete");
   $("#sourceState").textContent = "Waiting";
   $("#drawingTitle").textContent = "No drawing loaded";
   $("#viewTag").textContent = "EMPTY CANVAS";
