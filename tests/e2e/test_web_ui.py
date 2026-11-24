@@ -64,8 +64,12 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             preview_data_url = "data:image/png;base64," + base64.b64encode(sample_png).decode("ascii")
 
             def analyse(route) -> None:
+                request_body = route.request.post_data or ""
+                assert "confidence_threshold" in request_body
+                assert "0.4" in request_body
                 route.fulfill(
                     json={
+                        "confidence_threshold": 0.4,
                         "image": {"width": 400, "height": 300},
                         "counts": {"wall": 1, "dimension_line": 0, "dimension_value": 0},
                         "detections": [
@@ -119,6 +123,10 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             )
             page.locator("#zoomIn").click()
             assert page.locator("#zoomLevel").inner_text() == "125%"
+            page.locator("#confidenceThreshold").evaluate(
+                "(element) => { element.value = '0.4'; element.dispatchEvent(new Event('input', { bubbles: true })); }"
+            )
+            assert page.locator("#confidenceValue").inner_text() == "0.40"
             page.locator("#analyzeButton").click()
             page.wait_for_function(
                 "document.querySelector('#resultStatus').textContent === 'DETECTION COMPLETE'"
@@ -143,6 +151,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             from jsonschema import Draft202012Validator, FormatChecker
             Draft202012Validator(schema, format_checker=FormatChecker()).validate(exported)
             assert exported["source"]["filename"] == "plan.png"
+            assert exported["analysis"]["confidence_threshold"] == 0.4
             assert exported["detections"][0]["bbox"]["x1"] == 10
             assert "preview_data_url" not in exported
 
