@@ -131,6 +131,15 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             )
             assert max(alignment.values()) < 2
 
+            with page.expect_download() as download_info:
+                page.locator("#exportReview").click()
+            download = download_info.value
+            exported = json.loads(Path(download.path()).read_text())
+            assert exported["schema_version"] == "planline-detection-review/v1"
+            assert exported["source"]["filename"] == "plan.png"
+            assert exported["detections"][0]["bbox"]["x1"] == 10
+            assert "preview_data_url" not in exported
+
             page.locator("#chainChecker > summary").click()
             page.locator(".segment-value").nth(0).fill("3000")
             page.locator(".segment-verified").nth(0).check()
