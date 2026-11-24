@@ -7,11 +7,6 @@ function formatBytes(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 
-function clearDrawing() {
-  if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
-  state = { file: null, objectUrl: null, result: null, previewUrl: null };
-}
-
 function setFile(file) {
   if (!file) return;
   const allowed = /\.(png|jpe?g|webp|tiff?)$/i.test(file.name) || /\.pdf$/i.test(file.name);
@@ -53,7 +48,6 @@ function setFile(file) {
 
 function showNotice(title, message) {
   $("#notice").innerHTML = "";
-  $("#notice").classList.remove("hidden");
   const strong = document.createElement("b");
   strong.textContent = title;
   const span = document.createElement("span");
