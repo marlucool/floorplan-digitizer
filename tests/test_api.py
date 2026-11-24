@@ -153,6 +153,54 @@ def test_rejects_empty_upload() -> None:
     assert response.status_code == 400
 
 
+def test_dimension_chain_endpoint_checks_only_explicit_values() -> None:
+    response = TestClient(api.app).post(
+        "/api/validate-dimension-chain",
+        json={
+            "segment_values": ["3000", "4500", "2500"],
+            "segment_verified": [True, True, True],
+            "overall_value": "10000",
+            "overall_verified": True,
+            "unit": "mm",
+            "tolerance": "0",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "matches"
+    assert response.json()["difference"] == "0"
+
+
+def test_dimension_chain_endpoint_keeps_unverified_values_unresolved_for_review() -> None:
+    response = TestClient(api.app).post(
+        "/api/validate-dimension-chain",
+        json={
+            "segment_values": ["3000", "4500", "2500"],
+            "segment_verified": [True, False, True],
+            "overall_value": "10000",
+            "overall_verified": True,
+            "unit": "mm",
+            "tolerance": "0",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "needs_review"
+    assert response.json()["unverified_indices"] == [1]
+
+
+def test_dimension_chain_endpoint_rejects_mismatched_verification_flags() -> None:
+    response = TestClient(api.app).post(
+        "/api/validate-dimension-chain",
+        json={
+            "segment_values": ["3000", "4500"],
+            "segment_verified": [True],
+            "overall_value": "7500",
+            "overall_verified": True,
+            "unit": "mm",
+        },
+    )
+    assert response.status_code == 422
+
+
 def test_rejects_unsupported_file_type() -> None:
     response = TestClient(api.app).post(
         "/api/analyze",
