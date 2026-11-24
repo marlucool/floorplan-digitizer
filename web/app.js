@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1 };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], dimensionTextReview: {}, selectedId: null, activeFilter: "all", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1 };
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -13,7 +13,7 @@ function resetWorkspace() {
   if (state.resizeObserver) state.resizeObserver.disconnect();
   if (state.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
   state.file = null; state.objectUrl = null; state.result = null; state.previewUrl = null;
-  state.detections = []; state.selectedId = null; state.activeFilter = "all";
+  state.detections = []; state.dimensionTextReview = {}; state.selectedId = null; state.activeFilter = "all";
   state.overlayVisible = true; state.resizeObserver = null; state.resizeHandler = null; state.zoom = 1;
   $("#fileInput").value = "";
   $("#fileCard").classList.add("hidden");
@@ -75,6 +75,7 @@ function setFile(file) {
   state.previewUrl = null;
   state.selectedId = null;
   state.detections = [];
+  state.dimensionTextReview = {};
   state.overlayVisible = true;
   state.zoom = 1;
   $("#exportReview").disabled = true;
@@ -237,10 +238,77 @@ function renderResults(payload) {
     $("#detectionList").append(row);
   });
   renderDetectionRows(detections);
+  state.dimensionTextReview = {};
+  renderDimensionTextReview(payload.dimension_regions || []);
   const notes = (payload.notes || []).join(" ");
   showNotice(detections.length ? "Detection finished — OCR has not run" : "No candidate regions detected", detections.length ? notes : "The model returned no boxes at its current confidence threshold. This does not prove that the drawing contains no walls or dimensions. " + notes);
   if (payload.source && payload.source.note) showNotice("Detection finished — first PDF page only", notes + " " + payload.source.note);
   if (payload.preview_data_url) drawDetections(payload.preview_data_url, detections, payload.image);
+}
+
+function renderDimensionTextReview(regions) {
+  const panel = $("#dimensionTextReview");
+  const container = $("#dimensionTextItems");
+  container.replaceChildren();
+  if (!regions.length) {
+    panel.classList.add("hidden");
+    return;
+  }
+  panel.classList.remove("hidden");
+  regions.forEach((region, index) => {
+    const entry = { raw_text: "", verified: false };
+    state.dimensionTextReview[region.id] = entry;
+    const row = document.createElement("article");
+    row.className = "dimension-text-item";
+    row.dataset.detectionId = region.id;
+
+    if (region.crop_data_url) {
+      const crop = document.createElement("img");
+      crop.className = "dimension-text-crop";
+      crop.src = region.crop_data_url;
+      crop.alt = "Original-resolution crop for dimension candidate " + (index + 1);
+      row.append(crop);
+    } else {
+      const placeholder = document.createElement("div");
+      placeholder.className = "dimension-text-crop-placeholder";
+      placeholder.textContent = "Crop unavailable for this candidate";
+      row.append(placeholder);
+    }
+
+    const fields = document.createElement("div");
+    fields.className = "dimension-text-fields";
+    const meta = document.createElement("span");
+    meta.className = "dimension-text-meta";
+    meta.textContent = "Candidate " + (index + 1) + " · " +
+      Math.round(region.confidence * 100) + "% detector score · " + region.id;
+
+    const textLabel = document.createElement("label");
+    textLabel.textContent = "Transcribe exactly as written";
+    const textInput = document.createElement("input");
+    textInput.className = "dimension-text-value";
+    textInput.type = "text";
+    textInput.autocomplete = "off";
+    textInput.spellcheck = false;
+    textInput.placeholder = "Enter the visible text";
+    textInput.addEventListener("input", () => {
+      entry.raw_text = textInput.value;
+    });
+    textLabel.append(textInput);
+
+    const verifiedLabel = document.createElement("label");
+    verifiedLabel.className = "dimension-text-verified";
+    const verifiedInput = document.createElement("input");
+    verifiedInput.className = "dimension-text-verified-input";
+    verifiedInput.type = "checkbox";
+    verifiedInput.addEventListener("change", () => {
+      entry.verified = verifiedInput.checked;
+    });
+    verifiedLabel.append(verifiedInput, document.createTextNode(" I checked this transcription"));
+
+    fields.append(meta, textLabel, verifiedLabel);
+    row.append(fields);
+    container.append(row);
+  });
 }
 
 function renderDetectionRows(detections) {
@@ -354,8 +422,21 @@ function exportReviewJson() {
       bbox: detection.bbox,
       centre: detection.centre
     })),
+    manual_dimension_text_review: (result.dimension_regions || []).map((region) => {
+      const entry = state.dimensionTextReview[region.id] || { raw_text: "", verified: false };
+      return {
+        detection_id: region.id,
+        raw_text: entry.raw_text,
+        verified: entry.verified,
+        detector_confidence: region.confidence,
+        bbox: region.bbox,
+        crop_bbox: region.crop_bbox || null
+      };
+    }),
     limitations: [
-      "No OCR or dimension transcription has been performed.",
+      "No OCR has been performed; manual transcription entries are user-entered and not machine-verified.",
+      "Manual transcriptions have not been associated with walls, dimension lines or scale.",
+
       "No dimension-to-wall association or scale calibration has been performed.",
       "Bounding boxes are detector candidates, not measured wall geometry.",
       "No measured DXF geometry is included."
