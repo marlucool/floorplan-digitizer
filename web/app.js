@@ -13,6 +13,9 @@ function setFile(file) {
   if (!allowed) return showNotice("Unsupported file type", "Choose a PNG, JPG, WEBP, TIFF or PDF drawing.");
   if (file.size > 25 * 1024 * 1024) return showNotice("File is too large", "The maximum upload size is 25 MB.");
   if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+  if (state.resizeObserver) state.resizeObserver.disconnect();
+  if (state.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
+  state.resizeObserver = null; state.resizeHandler = null;
   state.file = file;
   state.objectUrl = URL.createObjectURL(file);
   state.result = null;
@@ -209,6 +212,9 @@ $("#fileInput").addEventListener("change", (event) => setFile(event.target.files
 $("#analyzeButton").addEventListener("click", analyse);
 $("#removeFile").addEventListener("click", () => {
   if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+  if (state.resizeObserver) state.resizeObserver.disconnect();
+  if (state.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
+  state.resizeObserver = null; state.resizeHandler = null;
   state.file = null; state.objectUrl = null; state.result = null; state.detections = []; state.previewUrl = null; state.selectedId = null;
   $("#fileInput").value = "";
   $("#fileCard").classList.add("hidden");
