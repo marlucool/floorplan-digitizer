@@ -234,3 +234,8 @@ in this web integration. The existing command-line pipeline remains separate.
 Do not use a detector box or pixel distance as a verified architectural
 measurement. Written dimensions must be read and checked before geometry is
 reconstructed.
+
+
+## Planline web workflow and engineering notes
+
+The browser interface is served by the local FastAPI application. See [the web guide](web/README.md) for setup, API routes, current capability boundaries and development checks. The implementation roadmap and technical decisions are documented in [PLANLINE_ARCHITECTURE.md](docs/PLANLINE_ARCHITECTURE.md). The web workflow is detection/review only: it does not yet read dimensions or generate measured DXF geometry.
