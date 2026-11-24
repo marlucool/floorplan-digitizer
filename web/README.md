@@ -19,7 +19,7 @@ Open http://127.0.0.1:8000. The default bind address is loopback-only. To make t
 4. The API returns source pixel dimensions, class counts, candidate bounding boxes, detector scores and a reduced preview.
 5. The UI draws the returned boxes over the preview. Use the class filter to narrow the list, select a detection row to highlight its box, and hide/show the overlay.
 
-Uploads are not intentionally persisted by this application. The API currently reads the upload into memory and returns a base64 preview. Reverse proxies, server logs, browser caches and operating-system temporary storage are separate deployment concerns and should be reviewed before handling sensitive drawings.
+The application does not intentionally save an uploaded drawing as a project file. However, FastAPI/Starlette receive multipart uploads using a spooled temporary file: smaller uploads may remain in memory, while larger uploads can roll over to temporary disk storage before this endpoint reads them. The endpoint then reads the file into memory for decoding and closes the upload. Therefore, this is **not a guarantee of memory-only handling**. Review the operating-system temporary directory, container storage, reverse-proxy buffering, server logs and browser caches before processing sensitive drawings. The 25 MB application check is performed after multipart parsing, so it is not a pre-parser disk-spooling limit.
 
 ## API
 
