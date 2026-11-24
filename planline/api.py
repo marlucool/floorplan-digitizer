@@ -246,7 +246,10 @@ def validate_dimension_chain_endpoint(
 
 
 @app.post("/api/analyze")
-async def analyze_drawing(\n    file: UploadFile = File(...),\n    confidence_threshold: float = Form(0.25),\n) -> dict[str, Any]:
+async def analyze_drawing(
+    file: UploadFile = File(...),
+    confidence_threshold: float = Form(0.25),
+) -> dict[str, Any]:
     """Detect candidate regions after multipart parsing and bounded in-memory decoding."""
     if not math.isfinite(confidence_threshold) or not 0.0 < confidence_threshold <= 1.0:
         raise HTTPException(
