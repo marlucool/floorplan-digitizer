@@ -422,9 +422,8 @@ function exportReviewJson() {
       bbox: detection.bbox,
       centre: detection.centre
     })),
-    manual_dimension_text_review: (result.dimension_regions || []).map((region) => {
-      const row = [...document.querySelectorAll(".dimension-text-item")]
-        .find((item) => item.dataset.detectionId === region.id);
+    manual_dimension_text_review: (result.dimension_regions || []).map((region, index) => {
+      const row = document.querySelectorAll(".dimension-text-item")[index];
       return {
         detection_id: region.id,
         raw_text: row?.querySelector(".dimension-text-value")?.value || "",
