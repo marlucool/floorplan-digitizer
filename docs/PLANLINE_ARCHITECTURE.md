@@ -220,7 +220,7 @@ Split training/validation/test by original drawing and writer, not by cropped di
 - [x] Document API setup and the current capability boundary.
 - [ ] Run a real-weight smoke test with `yolo_floorplan.pt` and representative old scans.
 - [ ] Audit the legacy digit classifier on held-out scans; do not integrate its current integer output as dimension OCR.
-- [ ] Fix and test end-of-row digit segmentation in `dataset_creator.py` before generating any replacement dataset.
+- [x] Fix and test end-of-row digit segmentation in `dataset_creator.py` before generating any replacement dataset.
 - [ ] Replace random crop-level validation with drawing-/writer-grouped held-out evaluation before trusting OCR accuracy.
 - [ ] Benchmark at least two OCR baselines on complete dimension strings, including rotated, faded and handwritten samples.
 - [ ] Add text-to-dimension-line and dimension-line-to-span association records with multiple candidates and human review.
