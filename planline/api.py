@@ -2,7 +2,8 @@
 
 This first integration deliberately stops at object detection. The bundled
 YOLO model detects candidate regions; it does not read dimensions or create
-measured geometry. No upload is persisted to disk.
+measured geometry. The application does not intentionally persist source drawings
+as project files; multipart parsing may spool uploads to temporary storage.
 """
 from __future__ import annotations
 
