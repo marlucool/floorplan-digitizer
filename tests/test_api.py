@@ -272,6 +272,7 @@ def test_web_ui_assets_and_architecture_notes_are_served() -> None:
     assert 'id="addSegment"' in page.text
     assert 'id="checkChain"' in page.text
     assert 'id="exportReview"' in page.text
+    assert 'id="confidenceThreshold"' in page.text
     assert "exportReviewJson" in script.text
     assert "checkDimensionChain" in script.text
 
