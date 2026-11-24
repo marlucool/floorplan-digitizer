@@ -4,5 +4,6 @@ opencv-python-headless>=4.8
 fastapi>=0.115,<1.0
 pydantic>=2.7,<3.0
 python-multipart>=0.0.9,<1.0
-httpx>=0.27,<1.0
+# Starlette TestClient now prefers httpx2; the legacy httpx adapter is deprecated.
+httpx2>=2.0,<3.0
 pytest>=8.0,<10.0
