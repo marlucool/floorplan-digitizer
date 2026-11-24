@@ -323,7 +323,7 @@ async function analyse() {
 function exportReviewJson() {
   if (!state.result) return;
   const safeStem = (state.file?.name || "drawing")
-    .replace(/\\.[^.]+$/, "")
+    .replace(/\.[^.]+$/, "")
     .replace(/[^a-zA-Z0-9._-]+/g, "-")
     .slice(0, 60) || "drawing";
   const result = state.result;
