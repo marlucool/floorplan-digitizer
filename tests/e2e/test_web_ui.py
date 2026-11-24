@@ -70,7 +70,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                         "counts": {"wall": 1, "dimension_line": 0, "dimension_value": 0},
                         "detections": [
                             {
-                                "id": "det-1",
+                                "id": "det-001",
                                 "class_name": "wall",
                                 "bbox": {
                                     "x1": 10, "y1": 20, "x2": 110, "y2": 70,
@@ -137,6 +137,11 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert download.suggested_filename == "plan-planline-review.json"
             exported = json.loads(Path(download.path()).read_text())
             assert exported["schema_version"] == "planline-detection-review/v1"
+            schema = json.loads(
+                (Path(__file__).resolve().parents[2] / "schemas" / "planline-detection-review-v1.schema.json").read_text()
+            )
+            from jsonschema import Draft202012Validator, FormatChecker
+            Draft202012Validator(schema, format_checker=FormatChecker()).validate(exported)
             assert exported["source"]["filename"] == "plan.png"
             assert exported["detections"][0]["bbox"]["x1"] == 10
             assert "preview_data_url" not in exported
