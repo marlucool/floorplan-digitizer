@@ -197,7 +197,7 @@ def serialise_detections(result: Any, image_shape: tuple[int, ...]) -> list[dict
     return detections
 
 
-MAX_DIMENSION_CROPS = 50
+MAX_DIMENSION_CROPS = 30
 
 
 def make_region_crop(image: np.ndarray, bbox: dict[str, float]) -> dict[str, Any] | None:
@@ -215,7 +215,7 @@ def make_region_crop(image: np.ndarray, bbox: dict[str, float]) -> dict[str, Any
     if crop.size == 0:
         return None
     edge = max(crop.shape[:2])
-    scale = min(4.0, 512.0 / edge) if edge < 512 else 512.0 / edge
+    scale = min(4.0, 384.0 / edge) if edge < 512 else 384.0 / edge
     if abs(scale - 1.0) > 0.01:
         interpolation = cv2.INTER_CUBIC if scale > 1 else cv2.INTER_AREA
         crop = cv2.resize(
