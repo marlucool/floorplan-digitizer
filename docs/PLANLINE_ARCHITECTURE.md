@@ -137,6 +137,7 @@ A 2026 paper in *Buildings*, “A Hybrid Deep Learning and Rule-Based Method for
 Reference: https://www.mdpi.com/2075-5309/16/5/1043
 
 The paper's use of modular regularisation is not adopted as an automatic Planline rule: a drawing-specific module or grid assumption could incorrectly alter a real measurement. Any such prior must be optional, visible and independently validated.
+The paper reports 89.3% accuracy for dimension-text recognition on a 150-sample test set. This is useful evidence that a tailored pipeline is feasible, but it is not a guarantee for Planline's scans, handwriting, or drafting conventions. Its reported detector mAP and its OCR accuracy measure different stages and must not be conflated. The paper also applies a 50 mm modular regularisation step; Planline will not silently snap dimensions to a module because a drawing may use different conventions or contain non-modular values.
 
 ### Dimension-aware text-to-geometry matching
 
