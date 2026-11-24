@@ -224,9 +224,12 @@ python -m uvicorn planline.api:app --host 127.0.0.1 --port 8000
 ```
 
 Then open http://127.0.0.1:8000. The API runs the bundled YOLO detector and
-returns candidate regions plus a bounded preview image. Uploaded files are
-processed in memory and are not persisted. PDF support currently analyses
-only the first page.
+returns candidate regions plus a bounded preview image. The application does
+not intentionally save uploaded drawings as project files, but multipart
+parsing may spool larger uploads to temporary storage before the endpoint
+reads and closes them. The 25 MB application limit is checked after multipart
+parsing, not before it. PDF support currently analyses only the first page.
+See [the web guide](web/README.md) for the upload lifecycle and privacy limits.
 
 **Current scope:** object detection and human review only. OCR, dimension
 association, calibrated geometry and measured DXF export are not implemented
