@@ -82,6 +82,7 @@ def validate_dimension_chain(request: DimensionChainRequest) -> dict[str, object
         "tolerance": _decimal_text(request.tolerance),
         "unit": request.unit,
         "unresolved_indices": unresolved_indices,
+        "overall_unresolved": request.overall_value is None,
         "unverified_indices": unverified_indices,
         "overall_verified": request.overall_verified,
     }
