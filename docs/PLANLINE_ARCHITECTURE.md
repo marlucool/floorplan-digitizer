@@ -19,7 +19,8 @@ The current web integration is intentionally a detection-and-review slice:
 - PDF handling rasterises page one only.
 - The existing YOLO weights detect candidate `wall`, `dimension_line`, and `dimension_value` regions.
 - The UI displays the preview, candidate boxes, class counts, detector scores, a configurable confidence threshold, filtering, selected-box highlighting, zoom/fit controls and a scrollable zoomed view.
-- A candidate-review JSON export preserves source pixel dimensions, detector metadata, bounding boxes and scores under a versioned schema; it excludes the source image and is not a measurement record.
+- A candidate-review JSON export preserves source pixel dimensions, detector metadata, bounding boxes, scores and optional user-entered dimension-text transcriptions under a versioned schema; it excludes source/crop pixels and is not a measurement record.
+- The dimension-value crop panel returns bounded crops from the original raster for manual transcription. It does not run OCR or associate text with geometry.
 - The application does not intentionally save source drawings as project files; multipart parsing may spool larger uploads to temporary storage. No measured DXF is emitted.
 - Raster image dimensions are preflighted from the image header before OpenCV decodes the full image; the pixel limit is enforced again after decode. PDF page dimensions are checked before rasterisation.
 - OCR, dimension association, calibration, topology reconstruction and measured DXF export are not part of this web workflow.
