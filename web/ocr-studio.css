@@ -102,3 +102,15 @@
 .dependency-note{padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:#fafbf8}
 
 .crop-zoom-controls{display:grid;grid-template-columns:auto minmax(90px,1fr) 42px;align-items:center;gap:10px;margin:0 0 10px;color:var(--muted);font:9px 'DM Mono'}.crop-zoom-controls input{width:100%;accent-color:var(--green)}.crop-zoom-controls span{text-align:right;color:var(--green-dark)}
+
+.top-links{display:flex;align-items:center;gap:14px;margin-left:auto}
+.top-links .repo-link{margin-left:0;white-space:nowrap}
+.theme-toggle{font-size:11px;padding:8px 10px}
+html[data-theme="dark"] .studio-card,html[data-theme="dark"] .sample-row,html[data-theme="dark"] .dataset-stats>div,html[data-theme="dark"] .job-panel,html[data-theme="dark"] .dependency-note{background:#202620;color:var(--ink);border-color:var(--line)}
+html[data-theme="dark"] .sample-row:hover,html[data-theme="dark"] .sample-row.selected{background:#29332b}
+html[data-theme="dark"] .studio-upload{background:#252d26;border-color:#52664e}
+html[data-theme="dark"] .crop-canvas-wrap{background-color:#202720;border-color:var(--line)}
+html[data-theme="dark"] .sample-split{background:#303a31;color:#d8e4d2}
+html[data-theme="dark"] .benchmark-metric{background:#252d26;border-color:var(--line)}
+html[data-theme="dark"] .training-warning{background:#302b20;border-color:#5b503a;color:#dbc99f}
+@media(max-width:760px){.top-links{gap:8px}.theme-toggle{padding:7px}.top-links .repo-link{font-size:10px}}
