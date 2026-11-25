@@ -161,8 +161,13 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             )
             page.locator("#detectionSearch").fill("dimension_value")
             assert page.locator(".detection-row:visible").count() == 1
+            page.locator("#detectionSearch").fill("does-not-exist")
+            assert page.locator("#noDetectionMatches").is_visible()
             page.locator("#detectionSearch").fill("")
             page.locator("#detectionSort").select_option("confidence")
+            page.locator('[data-detection-id="det-002"]').click()
+            assert page.locator("#selectedDetection").is_visible()
+            assert "det-002" in page.locator("#selectedDetection").inner_text()
             page.locator("#themeToggle").click()
             assert page.locator("html").get_attribute("data-theme") == "dark"
             page.locator("#themeToggle").click()
