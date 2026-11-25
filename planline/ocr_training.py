@@ -309,7 +309,7 @@ def _training_worker(
 def start_benchmark_job(
     dataset_dir: Path,
     *,
-    model: str = "en_PP-OCRv5_mobile_rec",
+    model: str = "PP-OCRv5_mobile_rec",
     model_dir: Path | None = None,
     device: str = "cpu",
 ) -> dict[str, Any]:
