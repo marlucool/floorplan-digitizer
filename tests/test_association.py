@@ -61,7 +61,7 @@ def test_gap_model_ranks_a_label_by_its_position_between_walls() -> None:
     result = associate_dimensions(detections)[0]
     spans = result["candidate_lines"][0]["wall_spans"]
     assert spans[0]["wall_ids"] == ["wall-left", "wall-middle"]
-    assert spans[0]["text_center_offset_px"] < 0
+    assert spans[0]["text_center_offset_px"] > 0  # Text centre is right of this gap centre.
 
 
 def test_value_outside_all_wall_gaps_is_not_assigned_to_a_span() -> None:
