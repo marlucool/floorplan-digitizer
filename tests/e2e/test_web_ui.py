@@ -255,6 +255,36 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert exported["manual_dimension_text_review"][0]["association"]["confirmed"] is True
             assert "preview_data_url" not in exported
 
+            with page.expect_download() as project_download_info:
+                page.locator("#saveProject").click()
+            project_download = project_download_info.value
+            assert project_download.suggested_filename == "plan.planline"
+            project_payload = json.loads(Path(project_download.path()).read_text())
+            assert project_payload["format"] == "planline-project"
+            assert project_payload["format_version"] == 1
+            assert project_payload["source"]["filename"] == "plan.png"
+            assert project_payload["analysis_result"]["image"] == {"width": 400, "height": 300}
+            project_schema = json.loads(
+                (Path(__file__).resolve().parents[2] / "schemas" / "planline-project-v1.schema.json").read_text()
+            )
+            from jsonschema import Draft202012Validator
+            Draft202012Validator(project_schema).validate(project_payload)
+
+            page.locator("#projectInput").set_input_files({
+                "name": "restored.planline",
+                "mimeType": "application/vnd.planline.project+json",
+                "buffer": json.dumps(project_payload).encode("utf-8"),
+            })
+            page.wait_for_function(
+                "document.querySelector('#resultStatus').textContent === 'DETECTION COMPLETE'"
+            )
+            assert page.locator(".dimension-text-value").input_value() == "4200"
+            assert page.locator(".dimension-text-style").input_value() == "handwritten"
+            assert page.locator(".dimension-text-verified-input").is_checked()
+            assert page.locator(".dimension-association-verified-input").is_checked()
+            assert page.locator("#calibrationState").inner_text() == "Applied"
+            assert page.locator("#fileName").inner_text() == "plan.png"
+
             page.locator("#fitView").click()
             assert page.locator("#zoomLevel").inner_text() == "100%"
             page.set_viewport_size({"width": 390, "height": 844})

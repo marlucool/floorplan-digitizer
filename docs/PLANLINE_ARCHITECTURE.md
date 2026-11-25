@@ -21,11 +21,15 @@ The current web integration is intentionally a detection-and-review slice:
 - The UI displays the preview, candidate boxes, class counts, detector scores, a configurable confidence threshold, filtering, selected-box highlighting, zoom/fit controls and a scrollable zoomed view.
 - A candidate-review JSON export preserves source pixel dimensions, detector metadata, bounding boxes, scores, optional user-entered dimension-text transcriptions, and optional user-supplied two-point scale calibration under a versioned schema; it excludes source/crop pixels and is not a measurement record.
 - The dimension-value crop panel returns bounded crops from the original raster for manual transcription. User-entered text, a printed/handwritten/unclear style label and verification flags are included in the review JSON; this does not run OCR or associate text with geometry.
-- The application does not intentionally save source drawings as project files; multipart parsing may spool larger uploads to temporary storage. No measured DXF is emitted.
+- The application does not automatically persist source drawings or upload them to a server. Users can explicitly save a portable `.planline` project containing the embedded source file, analysis payload and manual review state; the file remains under the user’s control. No measured DXF is emitted.
 - Raster image dimensions are preflighted from the image header before OpenCV decodes the full image; the pixel limit is enforced again after decode. PDF page dimensions are checked before rasterisation.
 - A manual two-point scale calibration is available after analysis. It records the source-image pixel coordinates, known distance, unit, pixels-per-millimetre factor and source page in the review JSON. It is a user-supplied reference only; it does not verify the reference dimension, correct scan distortion, associate dimensions with walls or create measured geometry.
 - A manual `/api/validate-dimension-chain` endpoint checks explicitly supplied values with decimal arithmetic and verification flags. It does not perform OCR, unit conversion, geometry association or DXF export.
 - The UI can export candidate detections as a versioned JSON review artifact containing source pixel dimensions, model metadata and detector boxes. It excludes the source image and does not represent verified measurements.
+
+### Portable project files
+
+The Drawing workspace supports explicit save/open of versioned `.planline` JSON project files. A project embeds the original source file (up to the existing 25 MB source limit), current analysis payload, manual dimension transcriptions, association selections and scale calibration. Saving is user-initiated; there is no background project upload or server-side project storage. Project import validates the format version and source byte count before replacing the current workspace. Keep project files in a trusted local location because they contain the source drawing.
 
 ### Manual scale calibration
 

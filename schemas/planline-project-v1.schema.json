@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/marlucool/floorplan-digitizer/blob/main/schemas/planline-project-v1.schema.json",
+  "title": "Planline Project v1",
+  "description": "Portable local Planline workspace containing its original source file, analysis result and human review state.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "format_version",
+    "created_at",
+    "source",
+    "analysis_result",
+    "review"
+  ],
+  "properties": {
+    "format": {
+      "const": "planline-project"
+    },
+    "format_version": {
+      "const": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "filename",
+        "mime_type",
+        "last_modified",
+        "size_bytes",
+        "data_base64"
+      ],
+      "properties": {
+        "filename": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mime_type": {
+          "type": "string"
+        },
+        "last_modified": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 26214400
+        },
+        "data_base64": {
+          "type": "string",
+          "minLength": 4,
+          "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+        }
+      }
+    },
+    "analysis_result": {
+      "type": "object",
+      "required": [
+        "image",
+        "detections",
+        "preview_data_url"
+      ],
+      "properties": {
+        "image": {
+          "type": "object",
+          "required": [
+            "width",
+            "height"
+          ],
+          "properties": {
+            "width": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "detections": {
+          "type": "array"
+        },
+        "preview_data_url": {
+          "type": "string",
+          "pattern": "^data:image/"
+        }
+      },
+      "additionalProperties": true
+    },
+    "review": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "generated_at",
+        "source",
+        "analysis",
+        "counts",
+        "detections",
+        "manual_dimension_text_review",
+        "limitations"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "planline-detection-review/v1"
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source": {
+          "type": "object"
+        },
+        "analysis": {
+          "type": "object"
+        },
+        "counts": {
+          "type": "object"
+        },
+        "detections": {
+          "type": "array"
+        },
+        "manual_dimension_text_review": {
+          "type": "array"
+        },
+        "calibration": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "limitations": {
+          "type": "array"
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}
