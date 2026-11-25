@@ -338,8 +338,12 @@ def test_web_ui_assets_and_architecture_notes_are_served() -> None:
     assert 'id="classFilter"' in page.text
     assert 'id="overlayToggle"' in page.text
     assert 'id="pdfPageNumber"' in page.text
+    assert 'id="startCalibration"' in page.text
+    assert 'id="applyCalibration"' in page.text
 
     script = client.get("/app.js")
+    assert "user_two_point_reference" in script.text
+    assert "pixels_per_mm" in script.text
     assert script.status_code == 200
     assert "renderDetectionRows" in script.text
     assert "applyImageScale" in script.text

@@ -171,6 +171,15 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.wait_for_function(
                 "!document.querySelector('#overlay').classList.contains('hidden')"
             )
+            page.locator("#fitView").click()
+            page.locator("#startCalibration").click()
+            page.locator("#previewImage").click(position={"x": 50, "y": 100})
+            page.locator("#previewImage").click(position={"x": 350, "y": 100})
+            page.locator("#calibrationDistance").fill("3.5")
+            page.locator("#calibrationUnit").select_option("m")
+            page.locator("#applyCalibration").click()
+            assert "0.085714" in page.locator("#calibrationResult").inner_text()
+            assert page.locator("#calibrationState").inner_text() == "Applied"
             page.locator("#detectionSearch").fill("dimension_value")
             assert page.locator(".detection-row:visible").count() == 1
             page.locator("#detectionSearch").fill("does-not-exist")
@@ -230,6 +239,11 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             Draft202012Validator(schema, format_checker=FormatChecker()).validate(exported)
             assert exported["source"]["filename"] == "plan.png"
             assert exported["analysis"]["confidence_threshold"] == 0.4
+            assert exported["calibration"]["method"] == "user_two_point_reference"
+            assert exported["calibration"]["input_unit"] == "m"
+            assert exported["calibration"]["known_distance_mm"] == 3500
+            assert exported["calibration"]["pixels_per_mm"] > 0
+            assert exported["calibration"]["status"] == "user_supplied_reference_not_geometry_validation"
             assert exported["detections"][0]["bbox"]["x1"] == 100
             assert exported["manual_dimension_text_review"][0]["detection_id"] == "det-004"
             assert exported["manual_dimension_text_review"][0]["raw_text"] == "4200"

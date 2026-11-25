@@ -490,6 +490,96 @@
           }
         }
       }
+    },
+    "calibration": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "points_px",
+            "pixel_distance",
+            "known_distance",
+            "input_unit",
+            "known_distance_mm",
+            "pixels_per_mm",
+            "source_filename",
+            "source_page_index",
+            "status"
+          ],
+          "properties": {
+            "method": {
+              "const": "user_two_point_reference"
+            },
+            "points_px": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "x",
+                  "y"
+                ],
+                "properties": {
+                  "x": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "y": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                }
+              }
+            },
+            "pixel_distance": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "known_distance": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "input_unit": {
+              "type": "string",
+              "enum": [
+                "mm",
+                "cm",
+                "m",
+                "in",
+                "ft"
+              ]
+            },
+            "known_distance_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "pixels_per_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "source_filename": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source_page_index": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "status": {
+              "const": "user_supplied_reference_not_geometry_validation"
+            }
+          }
+        }
+      ]
     }
   }
 }

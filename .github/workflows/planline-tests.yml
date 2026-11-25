@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, "feat/planline-web-integration"]
   pull_request:
-    branches: [main, "feat/multipage-pdf-workspace"]
+    branches: [main, "feat/two-point-scale-calibration"]
 
 permissions:
   contents: read

@@ -19,13 +19,17 @@ The current web integration is intentionally a detection-and-review slice:
 - Multi-page PDFs support explicit 1-based page selection in the drawing workspace; each selected page is rasterised independently and source page identity is preserved in the review result.
 - The existing YOLO weights detect candidate `wall`, `dimension_line`, and `dimension_value` regions.
 - The UI displays the preview, candidate boxes, class counts, detector scores, a configurable confidence threshold, filtering, selected-box highlighting, zoom/fit controls and a scrollable zoomed view.
-- A candidate-review JSON export preserves source pixel dimensions, detector metadata, bounding boxes, scores and optional user-entered dimension-text transcriptions with printed/handwritten/unclear labels under a versioned schema; it excludes source/crop pixels and is not a measurement record.
+- A candidate-review JSON export preserves source pixel dimensions, detector metadata, bounding boxes, scores, optional user-entered dimension-text transcriptions, and optional user-supplied two-point scale calibration under a versioned schema; it excludes source/crop pixels and is not a measurement record.
 - The dimension-value crop panel returns bounded crops from the original raster for manual transcription. User-entered text, a printed/handwritten/unclear style label and verification flags are included in the review JSON; this does not run OCR or associate text with geometry.
 - The application does not intentionally save source drawings as project files; multipart parsing may spool larger uploads to temporary storage. No measured DXF is emitted.
 - Raster image dimensions are preflighted from the image header before OpenCV decodes the full image; the pixel limit is enforced again after decode. PDF page dimensions are checked before rasterisation.
-- OCR, dimension association, calibration, topology reconstruction and measured DXF export are not part of this web workflow.
+- A manual two-point scale calibration is available after analysis. It records the source-image pixel coordinates, known distance, unit, pixels-per-millimetre factor and source page in the review JSON. It is a user-supplied reference only; it does not verify the reference dimension, correct scan distortion, associate dimensions with walls or create measured geometry.
 - A manual `/api/validate-dimension-chain` endpoint checks explicitly supplied values with decimal arithmetic and verification flags. It does not perform OCR, unit conversion, geometry association or DXF export.
 - The UI can export candidate detections as a versioned JSON review artifact containing source pixel dimensions, model metadata and detector boxes. It excludes the source image and does not represent verified measurements.
+
+### Manual scale calibration
+
+The Drawing workspace allows a reviewer to click two source-image points and enter their known separation in mm, cm, m, inches or feet. The preview click coordinates are mapped back to the original raster coordinate system before computing pixels per millimetre. Calibration is scoped to the currently analysed source page and is included in the exported review JSON. It is never inferred from OCR or detector boxes. The result is explicitly labelled as a user-supplied reference and must not be treated as validation of any wall, dimension or reconstructed geometry. A single global factor also cannot correct perspective or local scan distortion.
 
 ### Detection resolution risk
 

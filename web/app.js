@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1 };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1, calibration: { points: [], picking: false, applied: null } };
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -16,6 +16,7 @@ function resetWorkspace() {
   state.detections = []; state.selectedId = null; state.activeFilter = "all";
   state.overlayVisible = true; state.resizeObserver = null; state.resizeHandler = null; state.zoom = 1;
   state.searchQuery = ""; state.sortMode = "original";
+  clearCalibration();
   if ($("#detectionSearch")) $("#detectionSearch").value = "";
   if ($("#detectionSort")) $("#detectionSort").value = "original";
   $("#fileInput").value = "";
@@ -83,6 +84,7 @@ function setFile(file) {
   state.objectUrl = URL.createObjectURL(file);
   state.result = null;
   state.previewUrl = null;
+  clearCalibration();
   state.selectedId = null;
   state.detections = [];
   state.overlayVisible = true;
@@ -193,6 +195,33 @@ function drawDetections(previewUrl, detections, imageSize) {
       ctx.lineWidth = selected ? Math.max(4, canvas.width / 450) : Math.max(2, canvas.width / 700);
       ctx.strokeRect(box.x1 * sx, box.y1 * sy, box.width * sx, box.height * sy);
     });
+    if (state.calibration.points.length) {
+      const points = state.calibration.points.map((point) => ({ x: point.x * sx, y: point.y * sy }));
+      if (points.length === 2) {
+        ctx.strokeStyle = "#0b8f67";
+        ctx.lineWidth = Math.max(3, canvas.width / 500);
+        ctx.setLineDash([10, 6]);
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        ctx.lineTo(points[1].x, points[1].y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      points.forEach((point, index) => {
+        ctx.beginPath();
+        ctx.fillStyle = "#0b8f67";
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = Math.max(2, canvas.width / 700);
+        ctx.arc(point.x, point.y, Math.max(7, canvas.width / 250), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold " + Math.max(12, canvas.width / 90) + "px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(index + 1), point.x, point.y);
+      });
+    }
     canvas.classList.toggle("hidden", !state.overlayVisible);
   };
   img.onload = paint;
@@ -207,6 +236,109 @@ function drawDetections(previewUrl, detections, imageSize) {
   state.resizeHandler = paint;
   window.addEventListener("resize", state.resizeHandler, { passive: true });
 }
+const CALIBRATION_UNIT_TO_MM = { mm: 1, cm: 10, m: 1000, in: 25.4, ft: 304.8 };
+
+function clearCalibration() {
+  state.calibration = { points: [], picking: false, applied: null };
+  const status = $("#calibrationState");
+  if (!status) return;
+  status.textContent = "Not set";
+  $("#calibrationPoints").textContent = "Point 1: not set · Point 2: not set";
+  $("#calibrationResult").textContent = "No scale applied.";
+  $("#startCalibration").disabled = !state.result;
+  $("#startCalibration").textContent = "Pick two points";
+  $("#applyCalibration").disabled = true;
+  $("#clearCalibration").disabled = true;
+  $("#previewImage").classList.remove("calibration-picking");
+  if (state.result && state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+}
+
+function renderCalibrationStatus() {
+  const points = state.calibration.points;
+  $("#calibrationPoints").textContent = "Point 1: " +
+    (points[0] ? Math.round(points[0].x) + ", " + Math.round(points[0].y) + " px" : "not set") +
+    " · Point 2: " +
+    (points[1] ? Math.round(points[1].x) + ", " + Math.round(points[1].y) + " px" : "not set");
+  $("#startCalibration").disabled = !state.result;
+  $("#startCalibration").textContent = state.calibration.picking ? "Click the drawing…" : "Pick two points";
+  $("#applyCalibration").disabled = points.length !== 2;
+  $("#clearCalibration").disabled = points.length === 0 && !state.calibration.applied;
+  $("#calibrationState").textContent = state.calibration.applied ? "Applied" :
+    state.calibration.picking ? "Picking points" : points.length ? "2 points ready" : "Not set";
+  $("#previewImage").classList.toggle("calibration-picking", state.calibration.picking);
+}
+
+function startCalibration() {
+  if (!state.result) return;
+  state.calibration = { points: [], picking: true, applied: null };
+  $("#calibrationResult").textContent = "Click the first point, then the second point on the drawing.";
+  renderCalibrationStatus();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+}
+
+function addCalibrationPoint(event) {
+  if (!state.calibration.picking || !state.result) return;
+  const image = $("#previewImage");
+  const rect = image.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const x = Math.max(0, Math.min(state.result.image.width,
+    ((event.clientX - rect.left) / rect.width) * state.result.image.width));
+  const y = Math.max(0, Math.min(state.result.image.height,
+    ((event.clientY - rect.top) / rect.height) * state.result.image.height));
+  state.calibration.points.push({ x, y });
+  if (state.calibration.points.length >= 2) state.calibration.picking = false;
+  renderCalibrationStatus();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+  if (state.calibration.points.length === 2) $("#calibrationResult").textContent =
+    "Two points selected. Enter their known distance and apply the scale.";
+}
+
+function applyCalibration() {
+  const points = state.calibration.points;
+  const distance = Number($("#calibrationDistance").value);
+  const unit = $("#calibrationUnit").value;
+  if (points.length !== 2) return;
+  if (!Number.isFinite(distance) || distance <= 0 || !CALIBRATION_UNIT_TO_MM[unit]) {
+    $("#calibrationResult").textContent = "Enter a positive distance and choose a supported unit.";
+    $("#calibrationDistance").focus();
+    return;
+  }
+  const dx = points[1].x - points[0].x;
+  const dy = points[1].y - points[0].y;
+  const pixelDistance = Math.hypot(dx, dy);
+  if (!Number.isFinite(pixelDistance) || pixelDistance < 1) {
+    $("#calibrationResult").textContent = "The selected points are too close together. Pick two distinct points.";
+    return;
+  }
+  const distanceMm = distance * CALIBRATION_UNIT_TO_MM[unit];
+  if (!Number.isFinite(distanceMm) || distanceMm <= 0) {
+    $("#calibrationResult").textContent = "That distance is outside the supported numeric range.";
+    return;
+  }
+  state.calibration.applied = {
+    method: "user_two_point_reference",
+    points_px: points.map((point) => ({ x: Number(point.x.toFixed(2)), y: Number(point.y.toFixed(2)) })),
+    pixel_distance: Number(pixelDistance.toFixed(3)),
+    known_distance: distance,
+    input_unit: unit,
+    known_distance_mm: Number(distanceMm.toFixed(6)),
+    pixels_per_mm: Number((pixelDistance / distanceMm).toFixed(9)),
+    source_filename: state.file?.name || null,
+    source_page_index: state.result?.source?.page_index ?? 0,
+    status: "user_supplied_reference_not_geometry_validation"
+  };
+  $("#calibrationResult").textContent = pixelDistance.toFixed(1) + " px / " +
+    distanceMm.toLocaleString(undefined, { maximumFractionDigits: 3 }) +
+    " mm = " + state.calibration.applied.pixels_per_mm.toFixed(6) +
+    " px/mm. User-supplied reference only.";
+  renderCalibrationStatus();
+}
+
+$("#startCalibration").addEventListener("click", startCalibration);
+$("#applyCalibration").addEventListener("click", applyCalibration);
+$("#clearCalibration").addEventListener("click", clearCalibration);
+$("#previewImage").addEventListener("click", addCalibrationPoint);
+
 function renderResults(payload) {
   const detections = payload.detections || [];
   if (payload.source?.source_type === "pdf") {
@@ -220,6 +352,8 @@ function renderResults(payload) {
     $("#pdfPageControl").classList.add("hidden");
   }
   $("#exportReview").disabled = false;
+  $("#startCalibration").disabled = false;
+  renderCalibrationStatus();
   $("#sourceState").textContent = "Analysed";
   $("#viewTag").textContent = "DETECTION OVERLAY";
   $("#imageDimensions").textContent = payload.image.width + " × " + payload.image.height + " px";
@@ -610,6 +744,7 @@ function exportReviewJson() {
       image_width_px: result.image.width,
       image_height_px: result.image.height
     },
+    calibration: state.calibration.applied ? { ...state.calibration.applied } : null,
     analysis: {
       model: "yolo_floorplan.pt",
       confidence_threshold: result.confidence_threshold ?? 0.25,
@@ -684,7 +819,9 @@ function exportReviewJson() {
     limitations: [
       "No OCR has been performed; manual transcription entries are user-entered and not machine-verified.",
       "Geometric association suggestions are axis-aligned box hypotheses; only explicitly confirmed line and wall-pair selections are marked as reviewed.",
-      "Association scores are relative fit rankings, not probabilities. No pixel-to-unit scale or measured geometry has been inferred.",
+      state.calibration.applied
+        ? "A two-point scale was supplied by the user and recorded as pixels per millimetre; it is not an independently verified measurement or validated geometry."
+        : "No pixel-to-unit scale or measured geometry has been inferred.",
       "Bounding boxes are detector candidates, not measured wall geometry.",
       "No measured DXF geometry is included."
     ]
