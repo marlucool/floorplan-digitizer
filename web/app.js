@@ -572,7 +572,7 @@ function renderGeometryControls() {
   } else {
     $("#wallLength").textContent = "Select a wall to view its length.";
   }
-  updateWallDimensionCheckControls();
+  refreshWallDimensionOptions();
   const selectedRoom = geometry.rooms.find((room) => room.id === geometry.selectedRoomId);
   if (selectedRoom) {
     const areaPx = polygonAreaPx2(selectedRoom.vertices_px);
