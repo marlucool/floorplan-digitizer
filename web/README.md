@@ -43,7 +43,7 @@ py -3 -m pip install -r requirements-desktop.txt
 .\run_planline_desktop.bat
 ~~~
 
-On macOS/Linux, install requirements-desktop.txt and run ./run_planline_desktop.sh. The desktop launcher selects a free loopback port, starts the same FastAPI app and opens a native WebView window. Keep the service loopback-only; it has no user authentication and must not be exposed directly to a LAN or the public internet.
+On macOS/Linux, install requirements-desktop.txt and run sh run_planline_desktop.sh. The desktop launcher selects a free loopback port, starts the same FastAPI app and opens a native WebView window. Keep the service loopback-only; it has no user authentication and must not be exposed directly to a LAN or the public internet.
 
 ### Crop and label workflow
 
