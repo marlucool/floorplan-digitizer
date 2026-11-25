@@ -174,9 +174,18 @@ def _dataset_payload(dataset_id: str, dataset_dir: Path) -> dict[str, Any]:
     }
 
 
+def paddle_python_supported(version_info: tuple[int, ...] | Any = sys.version_info) -> bool:
+    """PaddlePaddle's published wheels currently target CPython 3.9 through 3.13."""
+    try:
+        major, minor = int(version_info[0]), int(version_info[1])
+    except (TypeError, ValueError, IndexError):
+        return False
+    return (major, minor) >= (3, 9) and (major, minor) <= (3, 13)
+
+
 @router.get("/status")
 def ocr_studio_status() -> dict[str, Any]:
-    """Check optional OCR dependencies without importing GPU libraries."""
+    """Check optional OCR dependencies and Python compatibility without importing GPU libraries."""
     try:
         paddleocr_installed = importlib.util.find_spec("paddleocr") is not None
     except (ImportError, ValueError):
@@ -185,13 +194,42 @@ def ocr_studio_status() -> dict[str, Any]:
         paddle_installed = importlib.util.find_spec("paddle") is not None
     except (ImportError, ValueError):
         paddle_installed = False
+
+    version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    python_compatible = paddle_python_supported()
+    if not python_compatible:
+        training_note = (
+            f"Planline is running Python {version}. PaddlePaddle's current published wheels "
+            "support Python 3.9–3.13, so this runtime cannot host the OCR engine. "
+            "Dataset annotation and crop storage still work; a separate compatible runtime is required."
+        )
+    elif not paddle_installed:
+        training_note = (
+            "This Python version is compatible, but PaddlePaddle is not installed. "
+            "Training also requires a local PaddleOCR source checkout and a matching .pdparams checkpoint."
+        )
+    elif not paddleocr_installed:
+        training_note = (
+            "PaddlePaddle is installed, but the PaddleOCR inference package is missing. "
+            "Training still requires a local PaddleOCR source checkout and a matching .pdparams checkpoint."
+        )
+    else:
+        training_note = (
+            "PaddlePaddle and PaddleOCR are available. Fine-tuning still requires a local PaddleOCR source checkout "
+            "and a matching .pdparams checkpoint."
+        )
     return {
         "status": "ok",
+        "python_version": version,
+        "python_executable": sys.executable,
+        "python_compatible_for_paddle": python_compatible,
         "paddleocr_installed": paddleocr_installed,
         "paddle_installed": paddle_installed,
+        "training_supported": python_compatible,
+        "training_runtime_ready": python_compatible and paddle_installed,
+        "inference_runtime_ready": python_compatible and paddle_installed and paddleocr_installed,
         "dataset_root": str(OCR_DATASET_ROOT),
-        "training_supported": True,
-        "training_note": "Fine-tuning requires a local PaddleOCR source checkout and a matching .pdparams checkpoint.",
+        "training_note": training_note,
     }
 
 
