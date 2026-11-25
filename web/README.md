@@ -23,9 +23,9 @@ The application does not intentionally save an uploaded drawing as a project fil
 
 ## Desktop OCR Studio
 
-Open /ocr in the local app. It is a separate workspace within the same FastAPI application, not a disconnected demo.
+The installed Windows app opens OCR Studio in its native desktop window. Normal users should use the single interactive Planline-Setup.exe installer linked from the root README; the source-launch commands below are for contributors only.
 
-### Launch
+### Launch from a source checkout (development only)
 
 Browser mode:
 
@@ -54,11 +54,11 @@ On macOS/Linux, install requirements-desktop.txt and run sh run_planline_desktop
 5. Reuse the same source ID for all crops from the same drawing. Use a stable pseudonymous writer ID for one handwriting author when evaluating generalisation across writers.
 6. Review, correct or delete saved labels in the sample library. Any label/group change invalidates the previous split plan.
 
-Only the selected crop is sent to the local API. The full input scan stays in the browser. Saved crop images and manifests are written below datasets/ocr/, which is ignored by Git. The OCR Studio endpoint accepts raster images only; add PDF pages through the drawing workflow or rasterise the desired page locally before adding it as an image. Do not commit personal property information or complete source plans into the repository.
+Only the selected crop is sent to the local API. The full input scan stays in the browser. Saved crop images and manifests are written below datasets/ocr/ for source/development runs. Installed Windows builds use %LOCALAPPDATA%/Planline/ocr, outside the application folder. The OCR Studio endpoint accepts raster images only; add PDF pages through the drawing workflow or rasterise the desired page locally before adding it as an image. Do not commit personal property information or complete source plans into the repository.
 
 ### Training and evaluation
 
-Install a PaddlePaddle build compatible with the local Python/CUDA environment, then install requirements-ocr-paddle.txt into the same environment used to launch Planline. Fine-tuning additionally needs a local PaddleOCR source checkout and a matching PP-OCRv5 .pdparams checkpoint. The mobile recogniser and a conservative batch size are the initial low-VRAM option; the server model has a higher memory requirement.
+The first Windows installer does not yet provision the optional PaddlePaddle/PaddleOCR fine-tuning runtime. Fine-tuning needs a separately managed compatible Python environment, a PaddleOCR source checkout and a matching PP-OCRv5 .pdparams checkpoint. The intended user experience is an in-app setup wizard rather than manual package commands; until that wizard ships, training is not ready for one-click use. The mobile recogniser and a conservative batch size are the initial low-VRAM option; the server model has a higher memory requirement.
 
 Build drawing-safe splits before training. Samples sharing a source drawing or writer ID are kept in one connected group so crops from one drawing/author cannot leak across train, validation and test. Fine-tuning receives train and validation data only; the held-out test split is excluded from optimisation. Benchmark runs generate predictions and calculate exact full-string match, prediction coverage and character error rate on the held-out test group.
 
