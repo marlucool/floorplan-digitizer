@@ -255,3 +255,66 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_pdf_page_selector_submits_selected_page() -> None:
+    web_dir = Path(__file__).resolve().parents[2] / "web"
+    handler = partial(QuietHandler, directory=str(web_dir))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.route(
+                "**/api/health",
+                lambda route: route.fulfill(
+                    json={"status": "ok", "detector_weights_present": True}
+                ),
+            )
+            submitted: dict[str, str] = {}
+
+            def analyse(route) -> None:
+                submitted["body"] = route.request.post_data or ""
+                preview = "data:image/png;base64," + base64.b64encode(make_png()).decode("ascii")
+                route.fulfill(
+                    json={
+                        "source": {"source_type": "pdf", "page_index": 1, "page_count": 3},
+                        "image": {"width": 2, "height": 2},
+                        "counts": {},
+                        "detections": [],
+                        "dimension_regions": [],
+                        "association_candidates": [],
+                        "notes": [],
+                        "preview_data_url": preview,
+                        "confidence_threshold": 0.25,
+                    }
+                )
+
+            page.route("**/api/analyze", analyse)
+            page.goto(f"http://127.0.0.1:{server.server_port}/")
+            page.locator("#fileInput").set_input_files(
+                {
+                    "name": "multi-page-plan.pdf",
+                    "mimeType": "application/pdf",
+                    "buffer": b"%PDF-1.4 test placeholder",
+                }
+            )
+            assert not page.locator("#pdfPageControl").evaluate(
+                "(element) => element.classList.contains('hidden')"
+            )
+            page.locator("#pdfPageNumber").fill("2")
+            page.locator("#analyzeButton").click()
+            page.wait_for_function(
+                "document.querySelector('#resultStatus').textContent === 'DETECTION COMPLETE'"
+            )
+            assert 'name="page_index"' in submitted["body"]
+            assert "1" in submitted["body"]
+            assert page.locator("#pdfPageCount").inner_text() == "Page 2 of 3"
+            browser.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
