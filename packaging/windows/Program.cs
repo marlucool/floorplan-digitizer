@@ -497,14 +497,22 @@ internal sealed class SetupForm : Form
             info.ArgumentList.Add("--query-gpu=name");
             info.ArgumentList.Add("--format=csv,noheader");
             using var process = Process.Start(info);
-            if (process is null || !process.WaitForExit(5000))
+            if (process is null)
             {
-                process?.Kill(entireProcessTree: true);
                 return "";
             }
-            string output = process.StandardOutput.ReadToEnd();
-            string error = process.StandardError.ReadToEnd();
-            process.WaitForExit();
+
+            Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+            Task<string> errorTask = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(5000))
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit();
+                return "";
+            }
+
+            string output = outputTask.GetAwaiter().GetResult();
+            _ = errorTask.GetAwaiter().GetResult();
             return process.ExitCode == 0 ? output.Trim() : "";
         }
         catch
@@ -816,7 +824,7 @@ internal sealed class SetupForm : Form
     {
         if (InvokeRequired)
         {
-            BeginInvoke((Action)(() => SetStatusAsync(message)));
+            Invoke((Action)(() => _status.Text = message));
             return Task.CompletedTask;
         }
         _status.Text = message;
