@@ -30,6 +30,7 @@ from .association import associate_dimensions
 from .constraints import DimensionChainRequest, validate_dimension_chain
 from .dxf_export import ManualGeometryDXFRequest, export_manual_geometry_dxf
 from .dimensions import interpret_dimension_text
+from .dimension_constraints import WallDimensionCheckRequest, compare_wall_dimension
 from .ocr_studio_api import router as ocr_studio_router
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -321,6 +322,12 @@ def install_update() -> dict[str, str]:
         return updater.stage_and_launch_update()
     except updater.UpdateError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/validate-wall-dimension")
+def validate_wall_dimension_endpoint(request: WallDimensionCheckRequest) -> dict[str, Any]:
+    """Compare a user-drawn wall to a manually verified explicit dimension."""
+    return compare_wall_dimension(request)
 
 
 class DimensionTextRequest(BaseModel):
