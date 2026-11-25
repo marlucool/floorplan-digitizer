@@ -345,10 +345,13 @@ internal static class InstallerMaintenance
 
 internal sealed class SetupForm : Form
 {
+    // Keep the bundled interpreter within the Python range supported by PaddlePaddle.
+    // 3.13.17 is the latest Python 3.13 Windows installer release.
+    private const string PythonVersion = "3.13.17";
     private const string PythonUrl =
-        "https://www.python.org/ftp/python/3.14.10/python-3.14.10-amd64.exe";
+        $"https://www.python.org/ftp/python/{PythonVersion}/python-{PythonVersion}-amd64.exe";
     private const string PythonSha256 =
-        "92480239264744fe0386a1bd8275786fefa126e3129e56a68e22b52c73329965";
+        "5da012101ba2e17113a9a1cd901e9ce1441086f2b7ecb5de06ec94163899a190";
     private const string WebView2BootstrapperUrl =
         "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
     private const string TorchCudaIndex = "https://download.pytorch.org/whl/cu126";
@@ -770,12 +773,13 @@ internal sealed class SetupForm : Form
             Directory.CreateDirectory(installDirectory);
             string tempDirectory = Path.Combine(Path.GetTempPath(), "PlanlineSetup");
             Directory.CreateDirectory(tempDirectory);
-            string pythonInstaller = Path.Combine(tempDirectory, "python-3.14.10-amd64.exe");
+            string pythonInstaller = Path.Combine(tempDirectory, $"python-{PythonVersion}-amd64.exe");
             string webViewInstaller = Path.Combine(tempDirectory, "MicrosoftEdgeWebView2Setup.exe");
 
             string pythonDirectory = Path.Combine(installDirectory, "python");
             string python = Path.Combine(pythonDirectory, "python.exe");
-            bool reusePythonRuntime = existingInstall && File.Exists(python);
+            bool reusePythonRuntime = existingInstall && File.Exists(python) &&
+                await IsCompatiblePythonRuntimeAsync(python);
             if (!reusePythonRuntime)
             {
                 await SetStatusAsync("Downloading the private Python runtime…");
@@ -935,7 +939,7 @@ internal sealed class SetupForm : Form
                 version = Program.Version,
                 installed_at_utc = DateTimeOffset.UtcNow,
                 data_directory = dataDirectory,
-                python_version = "3.14.10",
+                python_version = PythonVersion,
                 accelerator = cpuFallback ? "cpu-fallback" : (useGpu ? "cuda-12.6" : "cpu"),
             };
             File.WriteAllText(marker, JsonSerializer.Serialize(markerData, new JsonSerializerOptions { WriteIndented = true }));
@@ -1015,6 +1019,32 @@ internal sealed class SetupForm : Form
             _installPath.Enabled = true;
             _workPanel.Visible = false;
             _setupOptions.Visible = true;
+        }
+    }
+
+    private async Task<bool> IsCompatiblePythonRuntimeAsync(string python)
+    {
+        try
+        {
+            string output = await RunProcessAsync(
+                python,
+                new[]
+                {
+                    "-c",
+                    "import sys; print('.'.join(str(part) for part in sys.version_info[:3]))",
+                },
+                Path.GetDirectoryName(python)!
+            );
+
+            return output
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Any(line => line.Trim() == PythonVersion);
+        }
+        catch
+        {
+            // A missing, damaged or obsolete private runtime must be replaced
+            // rather than silently reused during an application update.
+            return false;
         }
     }
 

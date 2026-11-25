@@ -7,10 +7,12 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import re
 import subprocess
 import sys
 import threading
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -136,19 +138,76 @@ def _run_process(job_id: str, command: list[str], cwd: Path, step: str) -> int:
         bufsize=1,
         env=os.environ.copy(),
     )
+    assert process.stdout is not None
+
+    # Drain stdout on a dedicated thread. Reading the pipe directly in this
+    # thread made cancellation depend on the child printing another line:
+    # quiet or stalled processes could therefore run forever after Cancel.
+    output: queue.Queue[str | None] = queue.Queue()
+
+    def _read_output() -> None:
+        try:
+            for output_line in process.stdout:
+                output.put(output_line)
+        finally:
+            output.put(None)
+
+    reader = threading.Thread(
+        target=_read_output,
+        daemon=True,
+        name=f"planline-ocr-log-{job_id}",
+    )
     with _JOB_LOCK:
         _PROCESSES[job_id] = process
-    assert process.stdout is not None
-    for line in process.stdout:
-        _append_log(job_id, line)
+        cancel_event = _JOBS[job_id]["cancel_event"]
+    reader.start()
+
+    cancel_started: float | None = None
+    reader_finished = False
+    try:
+        while not reader_finished or process.poll() is None:
+            if cancel_event.is_set() and process.poll() is None:
+                if cancel_started is None:
+                    cancel_started = time.monotonic()
+                    try:
+                        process.terminate()
+                    except OSError:
+                        pass
+                elif time.monotonic() - cancel_started >= 3:
+                    try:
+                        process.kill()
+                    except OSError:
+                        pass
+
+            try:
+                line = output.get(timeout=0.1)
+            except queue.Empty:
+                continue
+
+            if line is None:
+                reader_finished = True
+            else:
+                _append_log(job_id, line)
+
+        return process.wait()
+    finally:
+        if process.poll() is None:
+            try:
+                process.kill()
+            except OSError:
+                pass
+            process.wait()
+        reader.join(timeout=2)
         with _JOB_LOCK:
-            should_stop = _JOBS[job_id]["cancel_event"].is_set()
-        if should_stop and process.poll() is None:
-            process.terminate()
-    return_code = process.wait()
-    with _JOB_LOCK:
-        _PROCESSES.pop(job_id, None)
-    return return_code
+            _PROCESSES.pop(job_id, None)
+
+
+def _has_exported_inference_weights(inference_dir: Path) -> bool:
+    """Require a non-empty Paddle Inference parameter file before publishing a model."""
+    return inference_dir.is_dir() and any(
+        path.is_file() and path.stat().st_size > 0
+        for path in inference_dir.glob("*.pdiparams")
+    )
 
 
 def _finish(job_id: str, status: str, **fields: Any) -> None:
@@ -294,6 +353,14 @@ def _training_worker(
         if export_return != 0:
             _finish(job_id, "completed_no_export", error=f"Training succeeded but model export exited with code {export_return}.", checkpoint=str(weights))
             return
+        if not _has_exported_inference_weights(inference_dir):
+            _finish(
+                job_id,
+                "completed_no_export",
+                error="Model export exited successfully but did not produce non-empty inference .pdiparams weights.",
+                checkpoint=str(weights),
+            )
+            return
         _finish(
             job_id,
             "completed",
@@ -427,5 +494,9 @@ def cancel_job(job_id: str) -> dict[str, Any] | None:
         job["cancel_event"].set()
         process = _PROCESSES.get(job_id)
         if process is not None and process.poll() is None:
-            process.terminate()
+            try:
+                process.terminate()
+            except OSError:
+                # The process may have exited between poll() and terminate().
+                pass
         return _public_job(job)

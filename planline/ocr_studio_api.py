@@ -58,7 +58,7 @@ class UpdateSampleRequest(BaseModel):
     source_id: str = Field(min_length=1, max_length=128)
     writer_id: str | None = Field(default=None, max_length=128)
     text_style: str = "handwritten"
-    verified: bool = True
+    verified: bool = False
 
 
 class CreateSplitsRequest(BaseModel):
@@ -182,6 +182,20 @@ def paddle_python_supported(version_info: tuple[int, ...] | Any = sys.version_in
     except (TypeError, ValueError, IndexError):
         return False
     return (major, minor) >= (3, 9) and (major, minor) <= (3, 13)
+
+
+def _require_supported_paddle_python() -> None:
+    """Reject OCR jobs before spawning a process on an unsupported interpreter."""
+    if not paddle_python_supported():
+        version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Planline is running Python {version}; PaddlePaddle wheels are "
+                "supported here only on CPython 3.9–3.13. Install a compatible "
+                "Planline runtime before starting OCR inference or training."
+            ),
+        )
 
 
 @router.get("/status")
@@ -495,6 +509,7 @@ def audit_ocr_dataset(dataset_id: str) -> dict[str, Any]:
 
 @router.post("/datasets/{dataset_id}/train", status_code=202)
 def start_ocr_training(dataset_id: str, request: StartTrainingRequest) -> dict[str, Any]:
+    _require_supported_paddle_python()
     dataset_dir = _dataset_dir(dataset_id)
     try:
         return start_training_job(
@@ -512,6 +527,7 @@ def start_ocr_training(dataset_id: str, request: StartTrainingRequest) -> dict[s
 
 @router.post("/datasets/{dataset_id}/benchmark", status_code=202)
 def start_ocr_benchmark(dataset_id: str, request: StartBenchmarkRequest) -> dict[str, Any]:
+    _require_supported_paddle_python()
     dataset_dir = _dataset_dir(dataset_id)
     try:
         model_dir = Path(request.model_dir) if request.model_dir else None
