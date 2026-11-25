@@ -117,7 +117,7 @@ Set `PLANLINE_SMOKE_DEVICE=cpu` to force CPU inference, or use the Ultralytics d
 
 ## OCR benchmark evaluation
 
-The manual transcription export can serve as ground truth for comparing OCR engines. The evaluator does not run OCR; it compares a predictions JSON file against **verified** entries in a Planline review export and reports exact-string rate and character error rate (CER), overall and by printed/handwritten/unclear style.
+The manual transcription export can serve as ground truth for comparing OCR engines. The evaluator does not run OCR; it compares a predictions JSON file against **verified** entries in a Planline review export and reports exact-string rate, prediction coverage and character error rate (CER), overall and by printed/handwritten/unclear style.
 
 Prediction file format:
 
