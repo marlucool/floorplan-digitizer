@@ -65,6 +65,7 @@ def test_evaluate_ocr_uses_only_verified_manual_labels_and_groups_by_style() -> 
     assert report["metrics"]["predicted_count"] == 2
     assert report["metrics"]["exact_matches"] == 1
     assert report["metrics"]["exact_match_rate"] == pytest.approx(1 / 3)
+    assert report["metrics"]["prediction_coverage_rate"] == pytest.approx(2 / 3)
     assert report["metrics"]["character_error_rate"] == pytest.approx(4 / 11)
     assert report["by_text_style"]["handwritten"]["sample_count"] == 2
     assert report["by_text_style"]["handwritten"]["character_error_rate"] == pytest.approx(3 / 7)
