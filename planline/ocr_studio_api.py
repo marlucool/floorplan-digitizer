@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -25,7 +26,15 @@ from .dataset import (
 from .ocr_training import cancel_job, get_job, start_benchmark_job, start_training_job
 from .ocr_quality import audit_dataset
 
-OCR_DATASET_ROOT = Path(__file__).resolve().parents[1] / "datasets" / "ocr"
+def _get_ocr_dataset_root() -> Path:
+    """Use user data storage for installed builds, repo-local storage in development."""
+    configured_root = os.environ.get("PLANLINE_DATA_DIR")
+    if configured_root:
+        return Path(configured_root).expanduser().resolve() / "ocr"
+    return Path(__file__).resolve().parents[1] / "datasets" / "ocr"
+
+
+OCR_DATASET_ROOT = _get_ocr_dataset_root()
 MAX_CROP_BYTES = 25 * 1024 * 1024
 DATASET_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,47}$")
 
