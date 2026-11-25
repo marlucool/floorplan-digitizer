@@ -125,8 +125,8 @@ def interpret_dimension_text(text: str) -> dict[str, Any]:
 
     # Architectural feet-and-inches notation: 4'-6", 4 ft 6 in, 4' 6 1/2".
     feet_inches = re.fullmatch(
-        r"(?P<feet>\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')"
-        r"(?:\s*[- ]\s*(?P<inches>\d+(?:\.\d+)?|\d+\s+\d+/\d+|\d+/\d+)\s*(?:in|inch(?:es)?|")?)?",
+        r"""(?P<feet>\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')
+        (?:\s*(?:-\s*)?(?P<inches>\d+(?:\.\d+)?|\d+\s+\d+/\d+|\d+/\d+)\s*(?:in|inch(?:es)?|")?)?""",
         value,
         re.IGNORECASE,
     )
