@@ -6,8 +6,6 @@ boxes, OCR suggestions and unverified dimensions are never converted to CAD.
 from __future__ import annotations
 
 import math
-from typing import Annotated
-
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -32,7 +30,7 @@ class ManualGeometryDXFRequest(BaseModel):
 
     source_width: int = Field(ge=1, le=25_000_000)
     source_height: int = Field(ge=1, le=25_000_000)
-    pixels_per_mm: float | None = Field(default=None, gt=0, le=1_000_000)
+    pixels_per_mm: float | None = Field(default=None, ge=1e-12, le=1_000_000)
     segments: list[WallSegmentInput] = Field(default_factory=list, max_length=10_000)
     rooms: list[RoomPolygonInput] = Field(default_factory=list, max_length=2_000)
 
@@ -46,6 +44,10 @@ class ManualGeometryDXFRequest(BaseModel):
             not math.isfinite(self.pixels_per_mm) or self.pixels_per_mm <= 0
         ):
             raise ValueError("pixels_per_mm must be finite and greater than zero.")
+
+        point_count = 2 * len(self.segments) + sum(len(room.vertices_px) for room in self.rooms)
+        if point_count > 100_000:
+            raise ValueError("DXF export is limited to 100,000 geometry points.")
 
         identifiers: set[str] = set()
         for item in [*self.segments, *self.rooms]:
