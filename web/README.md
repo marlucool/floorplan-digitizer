@@ -101,7 +101,7 @@ PowerShell:
 ```powershell
 python -m pip install -r requirements-web.txt
 $env:PLANLINE_RUN_MODEL_SMOKE = "1"
-$env:PLANLINE_SMOKE_IMAGE = "C:\\path\\to\\representative-scan.png"
+$env:PLANLINE_SMOKE_IMAGE = "C:\path\to\representative-scan.png"
 python -m pytest -m integration tests/test_real_model_smoke.py -q
 ```
 
@@ -109,7 +109,7 @@ Bash:
 
 ```bash
 python -m pip install -r requirements-web.txt
-PLANLINE_RUN_MODEL_SMOKE=1 PLANLINE_SMOKE_IMAGE=/path/to/representative-scan.png \\
+PLANLINE_RUN_MODEL_SMOKE=1 PLANLINE_SMOKE_IMAGE=/path/to/representative-scan.png \
   python -m pytest -m integration tests/test_real_model_smoke.py -q
 ```
 
