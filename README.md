@@ -66,7 +66,7 @@ py -3 -m pip install -r requirements-desktop.txt
 .\run_planline_desktop.bat
 ```
 
-On macOS/Linux, install `requirements-desktop.txt` and run `./run_planline_desktop.sh`. The desktop launcher starts the API on a loopback-only random port and opens OCR Studio. The optional native window needs a platform WebView (Windows WebView2, or the system webview on macOS/Linux).
+On macOS/Linux, install `requirements-desktop.txt` and run `sh run_planline_desktop.sh`. The desktop launcher starts the API on a loopback-only random port and opens OCR Studio. The optional native window needs a platform WebView (Windows WebView2, or the system webview on macOS/Linux).
 
 
 The API binds to loopback by default. Do not expose the development server directly to the public internet. If remote access is ever required, put an authenticated, encrypted access layer in front of it and configure the deployment deliberately.
