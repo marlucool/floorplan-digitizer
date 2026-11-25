@@ -204,3 +204,6 @@ html[data-theme="dark"] .geometry-tools button.active-tool{background:#263c2c;co
 #roomArea{font:10px/1.5 'DM Mono';color:var(--ink);padding:8px;background:var(--panel);border-radius:6px}
 
 #wallLength{font:10px/1.5 "DM Mono";color:var(--ink);padding:8px;background:var(--panel);border-radius:6px}
+
+.geometry-snap{display:flex;align-items:flex-start;gap:7px;font:9px/1.5 'DM Mono';color:var(--muted)}
+.geometry-snap input{margin:1px 0 0;accent-color:var(--green)}

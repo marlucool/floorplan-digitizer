@@ -207,6 +207,14 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.mouse.move(image_box["x"] + 70, image_box["y"] + 230, steps=4)
             page.mouse.up()
             assert "2.686 m" in page.locator("#wallLength").inner_text()
+            page.locator("#drawWallTool").click()
+            page.locator("#previewImage").click(position={"x": 305, "y": 222})
+            assert "Snapped to manual-wall-002" in page.locator("#geometryStatus").inner_text()
+            page.locator("#previewImage").click(position={"x": 350, "y": 220})
+            assert page.locator("#geometryCount").inner_text() == "2 manual walls"
+            page.locator("#selectWallTool").click()
+            page.locator("#deleteWall").click()
+            assert page.locator("#geometryCount").inner_text() == "1 manual wall"
             with page.expect_download() as svg_download_info:
                 page.locator("#exportGeometry").click()
             svg_download = svg_download_info.value
