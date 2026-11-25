@@ -23,7 +23,7 @@ The important problem is not tracing pixels. Survey drawings can be skewed, fade
 | Image preparation | Bounded brightness/contrast adjustments before detection and crop generation; source coordinates remain unchanged |
 | Detection | Bundled YOLO model proposes wall, dimension_line and dimension_value regions |
 | Review | Detection overlays, zoom, confidence-threshold control, class filtering, selected-box highlighting and dimension-region crops |
-| Manual transcription | Reviewer-entered text can be linked to detection IDs and marked as printed, handwritten or unclear |
+| Manual transcription | Reviewer-entered text can be linked to detection IDs and marked as printed, handwritten or unclear; individually verified dimension crops can be saved directly into an OCR dataset without uploading the full drawing |
 | Review export | Versioned planline-detection-review/v1 JSON export with source dimensions, bounding boxes, detector scores and limitations |
 | Dimension association | Uses local parallel-wall gaps, text/line alignment, wall-face spans and global one-to-one text-to-wall-gap recommendations (dimension-line detections can be shared by chained labels); the reviewer confirms each relationship |
 | Dimension chain | Dimension-chain checker validates explicit values and can propose the remainder for exactly one missing segment when all other inputs are verified; the proposed value remains unverified until the user confirms it |
