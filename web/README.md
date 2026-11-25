@@ -163,7 +163,7 @@ Set `PLANLINE_SMOKE_DEVICE=cpu` to force CPU inference, or use the Ultralytics d
 
 ## Optional PaddleOCR recognition runner
 
-An optional offline runner applies PaddleOCR's recognition-only module to the dimension crops already identified by YOLO. The default is `en_PP-OCRv5_mobile_rec` (compact English recognizer); use `--model PP-OCRv5_server_rec` to compare the multilingual server recognizer.
+An optional offline runner applies PaddleOCR's recognition-only module to the dimension crops already identified by YOLO. The default is `PP-OCRv5_mobile_rec`, matching the mobile fine-tuning configuration in OCR Studio; use `--model PP-OCRv5_server_rec` to compare the server variant.
 
 1. Install a compatible PaddlePaddle CPU or GPU package using the [official installation guide](https://www.paddleocr.ai/latest/en/version3.x/installation.html).
 2. Install the optional OCR package:
@@ -193,7 +193,7 @@ python -m planline.ocr_paddle \
   --output handwriting-predictions.json
 ~~~
 
-Dataset predictions are keyed by crop_id. This recognises the whole dataset; it does not train the model.
+Dataset predictions are keyed by crop_id. By default this recognises the whole dataset; use `--split test` to run only inference on the held-out test group, or `--split validation` for a diagnostic subset. This runner does not train the model.
 
 ## OCR benchmark evaluation
 
