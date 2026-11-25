@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f2ec">
+  <title>Planline — OCR Studio</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/ocr-studio.css">
+  <script src="/ocr-studio.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Planline home"><span class="brand-mark">P</span><span>planline<span class="brand-dot">.</span></span></a>
+    <div class="top-meta"><span class="local-dot"></span><span id="apiStatus">Local OCR workbench</span><span class="divider">/</span> OCR Studio</div>
+    <a class="repo-link" href="/">Drawing review ↗</a>
+  </header>
+  <main>
+<section id="ocrStudio" class="ocr-studio hidden" aria-label="OCR dataset and model training studio">
+      <div class="studio-hero">
+        <div><p class="eyebrow">PLANLINE / OCR LAB</p><h1>Teach Planline<br><em>to read dimensions.</em></h1></div>
+        <p>Build a private dataset from scanned plan crops. Draw a box around one complete dimension, type exactly what it says, and save. Planline keeps the crop, your transcription and its drawing/writer group together.</p>
+      </div>
+
+      <div class="studio-workspace">
+        <aside class="studio-sidebar">
+          <section class="studio-card dataset-card">
+            <div class="studio-card-heading"><span>DATASET</span><span id="datasetState">LOADING</span></div>
+            <div class="dataset-select-row"><select id="datasetSelect" aria-label="Select OCR dataset"></select><button id="newDatasetButton" class="toolbar-button" type="button">New</button></div>
+            <div id="datasetStats" class="dataset-stats"><div><strong>—</strong><span>CROPS</span></div><div><strong>—</strong><span>DRAWINGS</span></div><div><strong>—</strong><span>WRITERS</span></div></div>
+            <p class="studio-hint" id="datasetHint">Each crop is stored locally under the repository's ignored datasets/ folder.</p>
+            <div id="newDatasetForm" class="new-dataset-form hidden"><input id="newDatasetName" type="text" maxlength="64" placeholder="e.g. handwritten-dimensions"><button id="createDatasetButton" class="toolbar-button" type="button">Create dataset</button></div>
+          </section>
+
+          <section class="studio-card annotation-card">
+            <div class="studio-card-heading"><span>01 / ANNOTATE</span><span id="queueStatus">NO IMAGE</span></div>
+            <label class="studio-upload" for="cropFiles"><span class="upload-icon">＋</span><strong>Add plan or crop images</strong><small>Select one plan or several crops from the same drawing. Only the crop you save is sent to the local API; the full scan stays in this browser window.</small><input id="cropFiles" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" multiple></label>
+            <div class="studio-form-fields">
+              <label>Drawing / source ID <input id="sourceId" type="text" maxlength="128" value="plan-01" placeholder="plan-01"></label>
+              <label>Handwriting author ID <input id="writerId" type="text" maxlength="128" placeholder="Optional · e.g. writer-a"><small>Reuse for the same handwriting author. If every drawing has the same writer ID, all samples stay in one group and cannot be split into independent train/test sets.</small></label>
+              <label>Text style <select id="textStyle"><option value="handwritten">Handwritten</option><option value="printed">Printed</option><option value="unclear">Unclear</option><option value="unknown">Unknown</option></select></label>
+              <label>Exact dimension text <input id="sampleText" type="text" maxlength="128" autocomplete="off" placeholder="e.g. 4,200 mm"></label>
+              <label class="verified-label"><input id="labelVerified" type="checkbox" checked> I checked this transcription against the drawing</label>
+            </div>
+            <div class="annotation-actions"><button id="saveCropButton" class="primary-button" type="button" disabled>Save label + next <span>→</span></button><button id="skipCropButton" class="toolbar-button" type="button" disabled>Skip image</button></div>
+            <div class="annotation-actions hidden" id="editActions"><button id="saveCorrectionButton" class="primary-button" type="button">Save correction</button><button id="deleteSampleButton" class="toolbar-button danger-button" type="button">Delete crop</button><button id="cancelEditButton" class="toolbar-button" type="button">Done</button></div>
+            <p id="annotationMessage" class="studio-message" role="status"></p>
+          </section>
+        </aside>
+
+        <div class="studio-main">
+          <section class="studio-card crop-editor-card">
+            <div class="studio-card-heading"><span>02 / CROP EDITOR</span><span id="cropDimensions">WAITING FOR IMAGE</span></div>
+            <p class="studio-hint">Drag around one complete dimension string. Keep commas, decimal points and units inside the crop, with a little margin. Zoom in on high-resolution scans. For an image that is already cropped, choose “Use entire image”.</p>
+            <div class="crop-zoom-controls"><label for="cropZoom">IMAGE ZOOM</label><input id="cropZoom" type="range" min="1" max="4" step="0.25" value="1"><span id="cropZoomValue">1.0×</span></div>
+            <div id="cropCanvasWrap" class="crop-canvas-wrap"><div id="cropCanvasEmpty" class="crop-canvas-empty"><strong>No image selected</strong><span>Add a scan or a pre-cropped dimension image on the left.</span></div><canvas id="cropCanvas" class="hidden" aria-label="Drag to select a dimension crop"></canvas></div>
+            <div class="crop-editor-footer"><button id="useWholeImageButton" class="toolbar-button" type="button" disabled>Use entire image</button><span id="cropSelectionInfo">No crop selected</span></div>
+            <div id="savedImagePreviewWrap" class="saved-image-preview hidden"><span class="eyebrow">SAVED CROP</span><img id="savedImagePreview" alt="Selected dataset crop"></div>
+          </section>
+
+          <section class="studio-card samples-card">
+            <div class="samples-toolbar"><div><p class="eyebrow">03 / LABEL LIBRARY</p><h2>Saved dimension crops</h2></div><div class="samples-filter"><select id="sampleFilter" aria-label="Filter saved crops"><option value="all">All styles</option><option value="handwritten">Handwritten</option><option value="printed">Printed</option><option value="unclear">Unclear</option><option value="unknown">Unknown</option></select><span id="sampleCount">0 samples</span></div></div>
+            <div id="sampleList" class="sample-list"><div class="sample-list-empty">Saved crops will appear here.</div></div>
+          </section>
+        </div>
+      </div>
+
+      <section class="studio-card training-card">
+        <div class="training-heading"><div><p class="eyebrow">04 / MODEL TRAINING</p><h2>Fine-tune the dimension recogniser</h2><p>Start from an official PaddleOCR recognition checkpoint, then fine-tune on your verified crop labels. The held-out test group is kept out of training.</p></div><div class="training-readiness" id="trainingReadiness">Collecting labelled crops</div></div>
+        <p id="ocrDependencyNote" class="studio-hint dependency-note">Checking local OCR dependencies…</p>
+        <div class="training-settings">
+          <label>PaddleOCR source folder<input id="paddleSourcePath" type="text" spellcheck="false" placeholder="C:\\AI\\PaddleOCR"></label>
+          <label>Pretrained checkpoint (.pdparams)<input id="pretrainedPath" type="text" spellcheck="false" placeholder="C:\\AI\\PP-OCRv5_mobile_rec_pretrained.pdparams"></label>
+          <div class="training-links"><a href="https://github.com/PaddlePaddle/PaddleOCR" target="_blank" rel="noreferrer">PaddleOCR source ↗</a><a href="https://paddle-model-ecology.bj.bcebos.com/paddlex/official_pretrained_model/PP-OCRv5_mobile_rec_pretrained.pdparams" target="_blank" rel="noreferrer">Mobile weights ↗</a><a href="https://paddle-model-ecology.bj.bcebos.com/paddlex/official_pretrained_model/PP-OCRv5_server_rec_pretrained.pdparams" target="_blank" rel="noreferrer">Server weights ↗</a><a href="https://www.paddleocr.ai/latest/en/version3.x/installation.html" target="_blank" rel="noreferrer">Paddle install guide ↗</a></div>
+          <label>Base recogniser<select id="modelVariant"><option value="mobile">PP-OCRv5 mobile · recommended for 11 GB GPUs</option><option value="server">PP-OCRv5 server · higher memory use</option></select></label>
+          <label>Epochs<input id="trainingEpochs" type="number" min="1" max="500" value="30"></label>
+          <label>Batch size<input id="trainingBatch" type="number" min="1" max="32" step="1" value="8"></label>
+          <label class="gpu-toggle"><input id="useGpu" type="checkbox" checked> Use NVIDIA GPU</label>
+        </div>
+        <label class="saved-model-select">Fine-tuned model<select id="trainedModelSelect"><option value="">Select an exported fine-tuned model</option></select></label>
+        <div class="training-actions"><button id="buildSplitsButton" class="toolbar-button" type="button">Build drawing-safe splits</button><button id="trainButton" class="primary-button" type="button" disabled>Start fine-tuning <span>→</span></button><button id="benchmarkBaseButton" class="toolbar-button" type="button" disabled>Benchmark base OCR</button><button id="benchmarkTrainedButton" class="toolbar-button" type="button" disabled>Benchmark trained model</button><button id="cancelJobButton" class="toolbar-button danger-button hidden" type="button">Cancel job</button></div>
+        <p class="studio-hint training-warning">A few crops are enough to test the workflow, not to train a reliable handwriting model. Collect examples from different drawings and, where possible, different handwriting styles before trusting results. The same source drawing and handwriting author are deliberately kept in one split; if that joins every sample into one group, collect additional independent examples or omit writer IDs when testing generalisation to new drawings by the same writer.</p>
+        <div id="jobPanel" class="job-panel hidden"><div class="job-panel-heading"><strong id="jobTitle">OCR job</strong><span id="jobStatus">QUEUED</span></div><div class="job-progress"><span id="jobProgressBar"></span></div><pre id="jobLog" aria-live="polite"></pre><div id="benchmarkMetrics" class="benchmark-metrics hidden"></div></div>
+      </section>
+    </section>
+    <footer><span>PLANLINE · LOCAL OCR TRAINING WORKBENCH</span><span><a href="/architecture">Technical notes</a> · data stays in datasets/ocr</span></footer>
+  </main>
+</body>
+</html>
