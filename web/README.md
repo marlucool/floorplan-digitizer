@@ -221,12 +221,13 @@ image,text,source_id,writer_id,text_style,verified
 crops/plan-a-001.png,"4,200 mm",plan-a,writer-01,handwritten,true
 crops/plan-a-002.png,2750,plan-a,writer-01,handwritten,true
 crops/plan-b-001.png,3.65m,plan-b,writer-02,handwritten,true
+crops/plan-c-001.png,1800,plan-c,writer-03,handwritten,true
 ~~~
 
 - image is a path relative to the CSV file (or an absolute path).
 - text is the exact visible string; preserve decimal marks and units rather than normalising them.
 - source_id must be the same for every crop from the same drawing.
-- writer_id is optional but should be a stable pseudonymous ID when known. Do not use a person's real name.
+- writer_id is optional but should be a stable pseudonymous ID when known. Do not use a person's real name. Samples with the same writer_id are kept in the same split, even across different drawings. If every crop is from one writer, keeping that writer_id will intentionally make one group and prevent an independent split. You can omit writer_id to measure generalisation to unseen drawings by that same writer, but that will not test generalisation to new handwriting styles.
 - text_style is handwritten, printed, unclear or unknown. The default import selects handwritten rows.
 - verified must be true only after the label has been checked against the source.
 
