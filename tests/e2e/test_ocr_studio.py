@@ -56,6 +56,16 @@ def test_ocr_studio_manual_crop_and_typed_label() -> None:
                     route.fulfill(json={"datasets": [{"dataset_id": "handwriting", "summary": dataset_payload()["summary"]}]})
                 elif path.endswith("/api/ocr/datasets/handwriting") and request.method == "GET":
                     route.fulfill(json=dataset_payload())
+                elif path.endswith("/api/ocr/datasets/handwriting/quality") and request.method == "GET":
+                    route.fulfill(json={
+                        "schema": "planline-ocr-quality-report/v1", "dataset": "handwriting",
+                        "valid": True, "sample_count": len(samples), "verified_count": len(samples),
+                        "source_count": 1 if samples else 0, "writer_count": 0,
+                        "duplicate_crop_count": 0, "conflicting_duplicate_image_count": 0,
+                        "character_frequencies": {"4": 1, ",": 1, "2": 1, "0": 2, " ": 1, "m": 2},
+                        "warnings": [{"code": "small_dataset", "message": "A few samples are not enough to claim reliable model accuracy."}],
+                        "notes": [], "ready_for_training": False, "splits": {"present": False, "counts": {}, "groups": {}}
+                    })
                 elif path.endswith("/api/ocr/datasets/handwriting/samples") and request.method == "POST":
                     body = request.post_data_buffer or b""
                     assert b"4,200 mm" in body
@@ -70,6 +80,9 @@ def test_ocr_studio_manual_crop_and_typed_label() -> None:
             page.route("**/api/ocr/**", api_mock)
             page.goto(f"http://127.0.0.1:{server.server_port}/ocr.html")
             page.wait_for_function("document.querySelector('#datasetSelect option[value=handwriting]') !== null")
+            page.locator("#auditDatasetButton").click()
+            page.wait_for_function("!document.querySelector('#qualityPanel').classList.contains('hidden')")
+            assert "small dataset" in page.locator("#qualityWarnings").inner_text().lower()
             page.set_input_files("#cropFiles", {"name": "old-plan.png", "mimeType": "image/png", "buffer": png})
             page.wait_for_function("document.querySelector('#cropCanvas').width > 0")
             canvas_box = page.locator("#cropCanvas").bounding_box()
