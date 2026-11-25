@@ -76,6 +76,19 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                     {"dataset_id": "handwritten-dimensions", "summary": {"samples": 2}}
                 ]}),
             )
+            page.route(
+                "**/api/interpret-dimension",
+                lambda route: route.fulfill(json={
+                    "raw_text": "4200",
+                    "status": "unit_missing",
+                    "dimension_type": "linear",
+                    "value": "4200",
+                    "unit": None,
+                    "value_mm": None,
+                    "reason": "A unit is not written; no conversion to millimetres was made.",
+                    "requires_review": True,
+                }),
+            )
             crop_saved: dict[str, str] = {}
 
             def save_crop(route) -> None:
@@ -340,6 +353,10 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert page.locator("#dimensionTextReview").evaluate("(node) => node.open")
             page.locator(".dimension-text-value").fill("4200")
             page.locator(".dimension-text-style").select_option("handwritten")
+            page.locator(".interpret-dimension-button").click()
+            page.wait_for_function("document.querySelector('.dimension-interpretation').dataset.status === 'unit_missing'")
+            assert "No unit is written" in page.locator(".dimension-interpretation").inner_text()
+            assert "millimetres" in page.locator(".dimension-interpretation").inner_text()
             assert page.locator(".dimension-text-value").input_value() == "4200"
             assert page.locator(".dimension-text-item").get_attribute("data-detection-id") == "det-004"
             page.locator("#drawingDatasetSelect").select_option("handwritten-dimensions")
