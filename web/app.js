@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1 };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1 };
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -15,6 +15,9 @@ function resetWorkspace() {
   state.file = null; state.objectUrl = null; state.result = null; state.previewUrl = null;
   state.detections = []; state.selectedId = null; state.activeFilter = "all";
   state.overlayVisible = true; state.resizeObserver = null; state.resizeHandler = null; state.zoom = 1;
+  state.searchQuery = ""; state.sortMode = "original";
+  if ($("#detectionSearch")) $("#detectionSearch").value = "";
+  if ($("#detectionSort")) $("#detectionSort").value = "original";
   $("#fileInput").value = "";
   $("#fileCard").classList.add("hidden");
   $("#dropzone").classList.remove("hidden");
@@ -328,19 +331,48 @@ function renderDimensionTextReview(regions) {
 }
 
 function renderDetectionRows(detections) {
-  document.querySelectorAll(".detection-row").forEach((row) => {
-    const visible = state.activeFilter === "all" || row.dataset.className === state.activeFilter;
-    row.classList.toggle("hidden", !visible);
+  const container = $("#detectionList");
+  const rows = [...container.querySelectorAll(".detection-row")];
+  const byId = new Map((detections || []).map((item) => [item.id, item]));
+  const query = state.searchQuery.trim().toLowerCase();
+  rows.forEach((row) => {
+    const item = byId.get(row.dataset.detectionId);
+    const matchesClass = state.activeFilter === "all" || row.dataset.className === state.activeFilter;
+    const searchable = [row.dataset.detectionId, row.dataset.className].join(" ").toLowerCase();
+    const matchesQuery = !query || searchable.includes(query);
+    row.classList.toggle("hidden", !(matchesClass && matchesQuery));
     const selected = row.dataset.detectionId === state.selectedId;
     row.classList.toggle("selected", selected);
     row.setAttribute("aria-pressed", selected ? "true" : "false");
+    if (item) row.dataset.confidence = String(item.confidence || 0);
   });
+  const sorted = [...rows].sort((a, b) => {
+    if (state.sortMode === "confidence") return Number(b.dataset.confidence) - Number(a.dataset.confidence);
+    if (state.sortMode === "size") {
+      const aa = byId.get(a.dataset.detectionId)?.bbox || {};
+      const bb = byId.get(b.dataset.detectionId)?.bbox || {};
+      return (Number(bb.width) * Number(bb.height)) - (Number(aa.width) * Number(aa.height));
+    }
+    return (detections || []).findIndex((item) => item.id === a.dataset.detectionId) -
+      (detections || []).findIndex((item) => item.id === b.dataset.detectionId);
+  });
+  sorted.forEach((row) => container.append(row));
+  const visible = rows.filter((row) => !row.classList.contains("hidden")).length;
+  if (state.result) $("#detectionCount").textContent = visible + " of " + rows.length + " regions shown";
 }
 
 $("#classFilter").addEventListener("change", (event) => {
   state.activeFilter = event.target.value;
   renderDetectionRows(state.detections || []);
   if (state.result) drawDetections(state.previewUrl, state.detections, state.result.image);
+});
+$("#detectionSearch").addEventListener("input", (event) => {
+  state.searchQuery = event.target.value;
+  renderDetectionRows(state.detections || []);
+});
+$("#detectionSort").addEventListener("change", (event) => {
+  state.sortMode = event.target.value;
+  renderDetectionRows(state.detections || []);
 });
 function setZoom(value) {
   state.zoom = Math.max(0.5, Math.min(3, value));
@@ -606,6 +638,34 @@ $("#chainSegments").addEventListener("click", (event) => {
 });
 $("#checkChain").addEventListener("click", checkDimensionChain);
 renumberChainRows();
+
+const themeButton = $("#themeToggle");
+function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const dark = theme === "dark";
+  themeButton.textContent = dark ? "Light mode" : "Dark mode";
+  themeButton.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
+  try { localStorage.setItem("planline-theme", theme); } catch (_) {}
+}
+let savedTheme = "light";
+try { savedTheme = localStorage.getItem("planline-theme") || "light"; } catch (_) {}
+setTheme(savedTheme === "dark" ? "dark" : "light");
+themeButton.addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
+
+document.addEventListener("keydown", (event) => {
+  const command = event.ctrlKey || event.metaKey;
+  const target = event.target;
+  const typing = target && (target.matches("input, textarea, select") || target.isContentEditable);
+  if (command && event.key.toLowerCase() === "o") {
+    event.preventDefault();
+    $("#fileInput").click();
+  } else if (command && event.key === "Enter" && !$("#analyzeButton").disabled) {
+    event.preventDefault();
+    analyse();
+  } else if (event.key === "Escape" && !typing && state.file) {
+    resetWorkspace();
+  }
+});
 
 $("#fileInput").addEventListener("change", (event) => setFile(event.target.files[0]));
 $("#analyzeButton").addEventListener("click", analyse);
