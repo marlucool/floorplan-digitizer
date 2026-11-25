@@ -8,9 +8,9 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class WallDimensionCheckRequest(BaseModel):
-    wall_length_px: Decimal = Field(gt=0, max_digits=18, decimal_places=4)
-    pixels_per_mm: Decimal = Field(gt=0, max_digits=18, decimal_places=8)
-    dimension_mm: Decimal = Field(gt=0, max_digits=18, decimal_places=4)
+    wall_length_px: Decimal = Field(gt=0, max_digits=30, decimal_places=20)
+    pixels_per_mm: Decimal = Field(gt=0, max_digits=30, decimal_places=20)
+    dimension_mm: Decimal = Field(gt=0, max_digits=24, decimal_places=8)
     tolerance_percent: Decimal = Field(default=Decimal("1.0"), ge=0, le=10, max_digits=5, decimal_places=2)
 
     @model_validator(mode="after")
