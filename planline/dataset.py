@@ -9,10 +9,12 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import io
 import json
 import os
 import random
 import re
+import shutil
 import sys
 import warnings
 from collections import Counter
@@ -528,6 +530,211 @@ def create_grouped_splits(dataset_dir: Path, *, seed: int = 42, force: bool = Fa
     os.replace(temporary, existing_path)
     validate_dataset(dataset_dir)
     return result
+
+
+
+def _write_manifest_atomic(dataset_dir: Path, entries: list[dict[str, Any]]) -> None:
+    manifest_path = dataset_dir / MANIFEST_NAME
+    temporary = manifest_path.with_suffix(".jsonl.tmp")
+    with temporary.open("w", encoding="utf-8", newline="\n") as handle:
+        for item in entries:
+            handle.write(json.dumps(item, ensure_ascii=False, sort_keys=True) + "\n")
+    os.replace(temporary, manifest_path)
+    (dataset_dir / SPLITS_NAME).unlink(missing_ok=True)
+
+
+def _validate_annotation_fields(
+    text: str, source_id: str, writer_id: str | None, text_style: str
+) -> tuple[str, str, str | None, str]:
+    label = str(text).strip()
+    stable_source_id = str(source_id).strip()
+    stable_writer_id = _normalise_writer(writer_id)
+    style = str(text_style).strip().lower()
+    if not label:
+        raise ValueError("Enter the exact text visible in the crop before saving it.")
+    if len(label) > 128 or any(character in label for character in "\r\n\t"):
+        raise ValueError("Dimension labels must be one line, at most 128 characters, with no tabs.")
+    if not stable_source_id or len(stable_source_id) > 128:
+        raise ValueError("source_id is required and must be at most 128 characters.")
+    if stable_writer_id and len(stable_writer_id) > 128:
+        raise ValueError("writer_id must be at most 128 characters.")
+    if style not in VALID_STYLES:
+        raise ValueError("text_style must be handwritten, printed, unclear or unknown.")
+    return label, stable_source_id, stable_writer_id, style
+
+
+def add_crop_sample(
+    dataset_dir: Path,
+    image_bytes: bytes,
+    filename: str,
+    *,
+    text: str,
+    source_id: str,
+    writer_id: str | None = None,
+    text_style: str = "handwritten",
+) -> dict[str, Any]:
+    """Add one user-labelled crop from bytes without persisting the original upload."""
+    label, stable_source_id, stable_writer_id, style = _validate_annotation_fields(
+        text, source_id, writer_id, text_style
+    )
+    if not image_bytes:
+        raise ValueError("The selected crop image is empty.")
+    if len(image_bytes) > MAX_IMAGE_BYTES:
+        raise ValueError(f"Crop image is larger than {MAX_IMAGE_BYTES // (1024 * 1024)} MB.")
+    if Path(filename).suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff"}:
+        raise ValueError("Crop images must be PNG, JPG, WEBP or TIFF. PDF is not accepted here.")
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(io.BytesIO(image_bytes)) as probe:
+                width, height = probe.size
+                if width <= 0 or height <= 0 or width * height > MAX_IMAGE_PIXELS:
+                    raise ValueError("Crop image exceeds the configured pixel limit.")
+    except ValueError:
+        raise
+    except (Image.DecompressionBombWarning, Image.DecompressionBombError) as exc:
+        raise ValueError("Crop image exceeds the configured pixel limit.") from exc
+    except (UnidentifiedImageError, OSError, SyntaxError) as exc:
+        raise ValueError("The selected file is not a readable image.") from exc
+
+    encoded = np.frombuffer(image_bytes, dtype=np.uint8)
+    image = cv2.imdecode(encoded, cv2.IMREAD_COLOR)
+    if image is None:
+        raise ValueError("OpenCV could not decode the selected crop image.")
+    if image.shape[0] * image.shape[1] > MAX_IMAGE_PIXELS:
+        raise ValueError("Crop image exceeds the configured pixel limit.")
+    crop_bytes = _encode_png(image)
+    crop_sha = _sha256_bytes(crop_bytes)
+    crop_id = _crop_id(stable_source_id, crop_sha, label, stable_writer_id, None)
+    entry = {
+        "dataset_schema_version": DATASET_SCHEMA,
+        "crop_id": crop_id,
+        "image_path": f"images/{crop_id}.png",
+        "text": label,
+        "text_style": style,
+        "verified": True,
+        "source_id": stable_source_id,
+        "source_sha256": None,
+        "source_filename": None,
+        "detection_id": None,
+        "writer_id": stable_writer_id,
+        "crop_bbox": None,
+        "crop_sha256": crop_sha,
+        "origin": "desktop_ocr_studio",
+    }
+    result = _write_entries(dataset_dir, [(entry, crop_bytes)])
+    result["crop_id"] = crop_id
+    return result
+
+
+def update_crop_sample(
+    dataset_dir: Path,
+    crop_id: str,
+    *,
+    text: str,
+    source_id: str,
+    writer_id: str | None = None,
+    text_style: str = "handwritten",
+) -> dict[str, Any]:
+    """Correct a sample label or grouping metadata and invalidate old splits."""
+    label, stable_source_id, stable_writer_id, style = _validate_annotation_fields(
+        text, source_id, writer_id, text_style
+    )
+    entries = _read_manifest(dataset_dir)
+    target = next((item for item in entries if item.get("crop_id") == crop_id), None)
+    if target is None:
+        raise ValueError(f"Unknown crop_id: {crop_id}")
+    target["text"] = label
+    target["source_id"] = stable_source_id
+    target["writer_id"] = stable_writer_id
+    target["text_style"] = style
+    target["verified"] = True
+
+    source_hashes: dict[str, set[str]] = {}
+    for item in entries:
+        source_sha = item.get("source_sha256")
+        if source_sha:
+            source_hashes.setdefault(item["source_id"], set()).add(source_sha)
+    for stable_id, hashes in source_hashes.items():
+        if len(hashes) > 1:
+            raise ValueError(
+                f"source_id {stable_id!r} maps to multiple source images; choose a different source_id."
+            )
+
+    _write_manifest_atomic(dataset_dir, entries)
+    return {"crop_id": crop_id, "updated": True, "samples": len(entries)}
+
+
+def delete_crop_sample(dataset_dir: Path, crop_id: str) -> dict[str, Any]:
+    """Remove a sample and invalidate any split plan built from the prior manifest."""
+    entries = _read_manifest(dataset_dir)
+    target = next((item for item in entries if item.get("crop_id") == crop_id), None)
+    if target is None:
+        raise ValueError(f"Unknown crop_id: {crop_id}")
+    image_rel = target.get("image_path")
+    if not isinstance(image_rel, str):
+        raise ValueError("Sample has an invalid image_path.")
+    pure = PurePosixPath(image_rel)
+    if pure.is_absolute() or ".." in pure.parts:
+        raise ValueError("Sample has an unsafe image_path.")
+    image_path = (dataset_dir / Path(*pure.parts)).resolve()
+    if not image_path.is_relative_to(dataset_dir.resolve()):
+        raise ValueError("Sample image path escapes the dataset directory.")
+    remaining = [item for item in entries if item.get("crop_id") != crop_id]
+    _write_manifest_atomic(dataset_dir, remaining)
+    image_path.unlink(missing_ok=True)
+    return {"deleted": crop_id, "samples": len(remaining)}
+
+
+def export_paddle_rec_dataset(dataset_dir: Path, output_dir: Path) -> dict[str, Any]:
+    """Export train/validation crops in PaddleOCR's tab-separated recognition format."""
+    validate_dataset(dataset_dir)
+    split_path = dataset_dir / SPLITS_NAME
+    if not split_path.is_file():
+        raise ValueError("Create source/writer-grouped train, validation and test splits first.")
+    split_data = json.loads(split_path.read_text(encoding="utf-8"))
+    assignments = split_data.get("assignments", {})
+    entries = _read_manifest(dataset_dir)
+    selected = {
+        name: [item for item in entries if assignments.get(item["crop_id"]) == name]
+        for name in ("train", "validation")
+    }
+    if not selected["train"] or not selected["validation"]:
+        raise ValueError("The split plan must contain both training and validation samples.")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    images_dir = output_dir / "images"
+    images_dir.mkdir(parents=True, exist_ok=True)
+    counts: dict[str, int] = {}
+    for split_name, samples in selected.items():
+        label_path = output_dir / ("train_list.txt" if split_name == "train" else "val_list.txt")
+        lines: list[str] = []
+        for item in samples:
+            label = item["text"]
+            if any(character in label for character in "\r\n\t"):
+                raise ValueError(
+                    f"Sample {item['crop_id']} contains a tab or line break and cannot be exported to PaddleOCR."
+                )
+            pure = PurePosixPath(item["image_path"])
+            if pure.is_absolute() or ".." in pure.parts:
+                raise ValueError(f"Unsafe crop image path for {item['crop_id']}.")
+            source = (dataset_dir / Path(*pure.parts)).resolve()
+            if not source.is_relative_to(dataset_dir.resolve()) or not source.is_file():
+                raise ValueError(f"Missing or unsafe crop image for {item['crop_id']}.")
+            destination_name = f"{item['crop_id']}.png"
+            shutil.copyfile(source, images_dir / destination_name)
+            lines.append(f"images/{destination_name}\t{label}")
+        label_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        counts[split_name] = len(samples)
+
+    return {
+        "output_dir": str(output_dir.resolve()),
+        "training_samples": counts["train"],
+        "validation_samples": counts["validation"],
+        "test_samples": sum(1 for item in entries if assignments.get(item["crop_id"]) == "test"),
+        "train_list": str((output_dir / "train_list.txt").resolve()),
+        "validation_list": str((output_dir / "val_list.txt").resolve()),
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
