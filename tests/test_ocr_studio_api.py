@@ -156,3 +156,33 @@ def test_review_recognition_returns_unverified_crop_predictions(monkeypatch) -> 
         {"detection_id": "det-001", "text": "4,200 mm", "confidence": 0.93}
     ]
     assert any("unverified suggestions" in note for note in payload["notes"])
+
+
+@pytest.mark.parametrize(
+    ("version", "expected"),
+    [
+        ((3, 8, 20), False),
+        ((3, 9, 0), True),
+        ((3, 12, 5), True),
+        ((3, 13, 18), True),
+        ((3, 14, 0), False),
+        ((4, 0, 0), False),
+    ],
+)
+def test_paddle_python_compatibility_range(version, expected) -> None:
+    assert ocr_studio_api.paddle_python_supported(version) is expected
+
+
+def test_ocr_status_exposes_runtime_compatibility() -> None:
+    app = FastAPI()
+    app.include_router(ocr_studio_api.router)
+    response = TestClient(app).get("/api/ocr/status")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["python_version"]
+    assert payload["python_executable"]
+    assert isinstance(payload["python_compatible_for_paddle"], bool)
+    assert payload["training_supported"] == payload["python_compatible_for_paddle"]
+    assert "training_runtime_ready" in payload
+    assert "inference_runtime_ready" in payload
+    assert payload["training_note"]
