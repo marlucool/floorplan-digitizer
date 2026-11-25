@@ -122,3 +122,15 @@ main{min-width:0}
 .selected-detection-metrics b{font:600 11px 'DM Mono',monospace;color:var(--ink)}
 html[data-theme="dark"] .selected-detection{background:#263329;border-color:#4b6348}
 @media(max-width:600px){.selected-detection{align-items:flex-start;flex-direction:column;gap:12px}.selected-detection-metrics{gap:14px}}
+
+
+/* Human-confirmed dimension-value → line → wall-span associations. */
+.dimension-association{display:grid;gap:8px;margin-top:4px;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.dimension-association>strong{font:600 11px Manrope;color:var(--ink)}
+.dimension-association .association-help{margin:0;color:var(--muted);font-size:10px;line-height:1.55}
+.dimension-association label{display:grid;gap:5px;font:10px 'DM Mono';color:var(--muted);text-transform:uppercase}
+.dimension-association select{width:100%;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:11px 'DM Mono'}
+.dimension-association select:disabled{opacity:.55;cursor:not-allowed}
+.dimension-association-verified{display:flex!important;align-items:flex-start;gap:7px!important;text-transform:none!important;letter-spacing:0!important;line-height:1.5}
+.dimension-association-verified input{margin-top:2px;accent-color:var(--accent);flex:none}
+html[data-theme="dark"] .dimension-association{background:#202620;border-color:var(--line)}

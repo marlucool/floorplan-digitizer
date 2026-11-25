@@ -44,8 +44,8 @@
           <li class="complete"><span class="pipeline-num">01</span><span><b>Image import</b><small>Ready when a file is selected</small></span><i>●</i></li>
           <li id="detectStep"><span class="pipeline-num">02</span><span><b>Object detection</b><small>YOLO candidate regions</small></span><i>○</i></li>
           <li class="locked"><span class="pipeline-num">03</span><span><b>Dimension OCR</b><small>Not integrated yet</small></span><i>—</i></li>
-          <li class="locked"><span class="pipeline-num">04</span><span><b>Measured geometry</b><small>Requires verified dimensions</small></span><i>—</i></li>
-          <li class="locked"><span class="pipeline-num">05</span><span><b>DXF export</b><small>Disabled until geometry is valid</small></span><i>—</i></li>
+          <li><span class="pipeline-num">04</span><span><b>Dimension association</b><small>Ranked line and wall-span candidates · review required</small></span><i>◇</i></li>
+          <li class="locked"><span class="pipeline-num">05</span><span><b>Measured geometry / DXF</b><small>Not implemented; no measured export</small></span><i>—</i></li>
         </ol>
       </aside>
 
@@ -70,15 +70,15 @@
         <summary><span class="eyebrow">03 / DIMENSION TEXT</span><strong>Manual transcription <span class="summary-hint">OCR not connected</span></strong></summary>
         <div id="dimensionTextItems" class="dimension-text-items"></div>
       </details>
-      <div class="limitations"><div class="limitation-mark">i</div><div><strong>Important: detection is not measurement.</strong><p>This integration uses the repository’s existing YOLO model to locate candidate regions. It does not recognise dimension values, associate them with walls, establish drawing scale, or reconstruct a floor plan. Every value and geometric relationship must be verified before CAD export is enabled.</p></div></div>
+      <div class="limitations"><div class="limitation-mark">i</div><div><strong>Important: detection is not measurement.</strong><p>This workflow ranks dimension-value boxes against dimension-line boxes, then proposes wall pairs whose facing edges bracket each line. These are axis-aligned geometric hypotheses, not verified measurements or CAD geometry. OCR remains manual/optional, and every selected line and wall pair must be checked against the source drawing.</p></div></div>
     </section>
     <details class="chain-checker" id="chainChecker">
       <summary>
         <span class="eyebrow">04 / MANUAL MEASUREMENT CHECK</span>
-        <strong>Check a dimension chain <span class="summary-hint">Not OCR · no geometry association</span></strong>
+        <strong>Check a dimension chain <span class="summary-hint">Manual values · independent arithmetic check</span></strong>
       </summary>
       <div class="chain-content">
-        <p class="chain-explainer">Enter values you have read from the drawing to check their arithmetic. This tool does not read the scan, identify walls, infer missing values or create CAD geometry.</p>
+        <p class="chain-explainer">Enter values you have read from the drawing to check their arithmetic. This tool does not run OCR, decide which walls a value describes, infer missing values or create CAD geometry.</p>
         <div class="chain-segments-heading"><strong>Segment dimensions</strong><button id="addSegment" class="toolbar-button" type="button">＋ Add segment</button></div>
         <div id="chainSegments" class="chain-segments">
           <div class="chain-segment-row">
