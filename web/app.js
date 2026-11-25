@@ -22,6 +22,7 @@ function resetWorkspace() {
   $("#fileCard").classList.add("hidden");
   $("#pdfPageControl").classList.add("hidden");
   $("#pdfPageNumber").value = "1";
+  $("#pdfPageNumber").removeAttribute("max");
   $("#pdfPageCount").textContent = "Page count will be confirmed after analysis.";
   $("#dropzone").classList.remove("hidden");
   $("#analyzeButton").disabled = true;
