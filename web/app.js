@@ -49,6 +49,8 @@ function resetWorkspace() {
   $("#detectionCount").textContent = "0 detected regions";
   $("#summary").classList.add("hidden");
   $("#detectionList").innerHTML = "";
+  $("#selectedDetection").classList.add("hidden");
+  $("#noDetectionMatches").classList.add("hidden");
   clearDimensionTextReview();
   $("#resultStatus").textContent = "NOT ANALYSED";
 }
@@ -107,6 +109,8 @@ function setFile(file) {
   $("#resultStatus").textContent = "NOT ANALYSED";
   $("#summary").classList.add("hidden");
   $("#detectionList").innerHTML = "";
+  $("#selectedDetection").classList.add("hidden");
+  $("#noDetectionMatches").classList.add("hidden");
   clearDimensionTextReview();
   showNotice("Drawing ready", "Run local detection to locate candidate walls and dimension annotations. No measurements will be inferred.");
   if (file.type.startsWith("image/")) {
@@ -219,6 +223,8 @@ function renderResults(payload) {
   });
   $("#summary").classList.remove("hidden");
   $("#detectionList").innerHTML = "";
+  $("#selectedDetection").classList.add("hidden");
+  $("#noDetectionMatches").classList.add("hidden");
   state.selectedId = null;
   detections.forEach((d) => {
     const row = document.createElement("button");
@@ -419,6 +425,8 @@ async function analyse() {
   $("#overlay").classList.add("hidden");
   $("#summary").classList.add("hidden");
   $("#detectionList").innerHTML = "";
+  $("#selectedDetection").classList.add("hidden");
+  $("#noDetectionMatches").classList.add("hidden");
   clearDimensionTextReview();
   $("#resultStatus").textContent = "ANALYSING";
   $("#detectionCount").textContent = "Analysis in progress";
