@@ -43,7 +43,7 @@ Planned approach:
 
 Do not enable tiled inference by assumption alone: the current detector was trained on a small simplified-plan dataset, and higher-resolution crops cannot compensate for a domain mismatch.
 
-The API tests use a fake detector. They do not establish the real model's accuracy or prove that it works on representative scans. The real-weight smoke test remains outstanding.
+The API tests use a fake detector. They do not establish the real model's accuracy or prove that it works on representative scans. An opt-in real-weight smoke test is now available in `tests/test_real_model_smoke.py`; running it with the actual weights and representative old scans remains outstanding.
 
 A Playwright browser smoke test covers image preview, zoom, zoomed overlay alignment, candidate JSON export/schema validation, manual dimension-chain entry and a narrow mobile viewport. Manual visual inspection and PDF-preview verification remain outstanding.
 
