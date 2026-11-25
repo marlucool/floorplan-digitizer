@@ -145,16 +145,18 @@ def _wall_span_candidates(
     line_thickness = max(line_perp_end - line_perp_start, 1.0)
     required_wall_orientation = "vertical" if orientation == "horizontal" else "horizontal"
 
-    eligible: list[tuple[dict[str, Any], dict[str, float], float, float, float]] = []
+    eligible: list[tuple[dict[str, Any], dict[str, float], float, float, float, float]] = []
     for wall, rect in walls:
         if _orientation(rect) != required_wall_orientation:
             continue
         wall_axis_centre, _, _ = _axis_values(rect, orientation)
         wall_perp_centre, wall_perp_start, wall_perp_end = _perpendicular_values(rect, orientation)
-        wall_thickness = max(wall_perp_end - wall_perp_start, 1.0)
+        wall_thickness = max(
+            rect["width"] if orientation == "horizontal" else rect["height"], 1.0
+        )
         perpendicular_gap = _point_interval_gap(line_perp, wall_perp_start, wall_perp_end)
-        # Local tolerance scales with the detected line and this wall's thickness,
-        # not with the full image size (the legacy 15% snap radius was too broad).
+        # Local tolerance scales with the wall thickness (normal to the wall),
+        # not the wall segment length or the full image size.
         local_tolerance = max(6.0, line_thickness * 3.0, wall_thickness * 1.5)
         if perpendicular_gap > local_tolerance:
             continue
@@ -163,7 +165,7 @@ def _wall_span_candidates(
             inner_face = rect["x2"] if wall_axis_centre < line_centre else rect["x1"]
         else:
             inner_face = rect["y2"] if wall_axis_centre < line_centre else rect["y1"]
-        eligible.append((wall, rect, wall_axis_centre, inner_face, perpendicular_gap))
+        eligible.append((wall, rect, wall_axis_centre, inner_face, perpendicular_gap, local_tolerance))
 
     # The old implementation paired walls from globally sorted lists. Filtering
     # to the current line corridor first avoids pairing unrelated wall fragments
@@ -180,8 +182,8 @@ def _wall_span_candidates(
     after = [item for item in eligible if item[2] > line_centre]
     candidates: list[dict[str, Any]] = []
 
-    for first_index, first in enumerate(before):
-        for second_index, second in enumerate(after):
+    for first in before:
+        for second in after:
             span_start, span_end = first[3], second[3]
             span_length = span_end - span_start
             if span_length <= 0 or not (span_start < line_centre < span_end):
@@ -199,14 +201,11 @@ def _wall_span_candidates(
             ) / (2.0 * max(span_length, line_length, 1.0))
             overlap = max(0.0, min(span_end, line_end) - max(span_start, line_start))
             overlap_ratio = min(1.0, overlap / max(min(span_length, line_length), 1.0))
-            perpendicular_error = max(first[4], second[4]) / max(
-                6.0, line_thickness * 3.0,
-                (first[1]["width"] if orientation == "horizontal" else first[1]["height"]) * 1.5,
-                (second[1]["width"] if orientation == "horizontal" else second[1]["height"]) * 1.5,
+            perpendicular_tolerance = max(first[5], second[5], 1.0)
+            perpendicular_error = max(first[4], second[4]) / perpendicular_tolerance
+            intervening = sum(
+                1 for item in eligible if first[2] < item[2] < second[2]
             )
-            intervening = max(0, len(eligible) - len(before) - len(after))
-            intervening += max(0, len(before) - first_index - 1)
-            intervening += second_index
 
             score = exp(
                 -1.0 * centre_error
@@ -396,6 +395,7 @@ def associate_dimensions(detections: list[dict[str, Any]]) -> list[dict[str, Any
         candidates.sort(key=lambda item: (
             -item["assignment_score"], -item["score"], item["dimension_line_id"]
         ))
+        candidates = candidates[:MAX_CANDIDATES]
         value_records.append({
             "dimension_value_id": value_id,
             "candidate_lines": candidates,
@@ -406,7 +406,9 @@ def associate_dimensions(detections: list[dict[str, Any]]) -> list[dict[str, Any
     for record in value_records:
         row = [0.0] * len(unique_line_ids)
         for candidate in record["candidate_lines"]:
-            row[line_column[candidate["dimension_line_id"]]] = candidate["assignment_score"]
+            row[line_column[candidate["dimension_line_id"]]] = (
+                candidate["assignment_score"] if candidate["wall_spans"] else 0.0
+            )
         weights.append(row)
     assignment = _maximum_weight_assignment(weights)
 

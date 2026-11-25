@@ -93,7 +93,10 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                                             "dimension_line_id": "det-002",
                                             "orientation": "horizontal",
                                             "score": 0.84,
+                                            "assignment_score": 0.88,
                                             "wall_span_status": "candidate",
+                                            "globally_assigned": True,
+                                            "globally_assigned_to": "det-004",
                                             "wall_spans": [
                                                 {
                                                     "wall_ids": ["det-001", "det-003"],

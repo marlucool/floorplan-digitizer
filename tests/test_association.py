@@ -53,7 +53,7 @@ def test_vertical_value_to_line_to_horizontal_wall_gap() -> None:
 def test_gap_model_ranks_a_label_by_its_position_between_walls() -> None:
     detections = [
         detection("value", "dimension_value", (65, 31, 85, 49)),
-        detection("line", "dimension_line", (10, 54, 190, 58)),
+        detection("line", "dimension_line", (20, 54, 90, 58)),
         detection("wall-left", "wall", (10, 60, 20, 180)),
         detection("wall-middle", "wall", (90, 60, 100, 180)),
         detection("wall-right", "wall", (180, 60, 190, 180)),

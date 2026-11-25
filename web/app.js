@@ -354,8 +354,13 @@ function renderDimensionTextReview(regions) {
     (association.candidate_lines || []).forEach((candidate) => {
       const option = document.createElement("option");
       option.value = candidate.dimension_line_id;
+      const globalHint = candidate.globally_assigned
+        ? " · unique global suggestion"
+        : candidate.globally_assigned_to
+          ? " · globally suggested for " + candidate.globally_assigned_to
+          : "";
       option.textContent = candidate.dimension_line_id + " · " + candidate.orientation +
-        " · fit " + Math.round(candidate.score * 100) + "%";
+        " · rank " + Math.round((candidate.assignment_score ?? candidate.score) * 100) + globalHint;
       lineSelect.append(option);
     });
     lineLabel.append(lineSelect);
@@ -402,10 +407,14 @@ function renderDimensionTextReview(regions) {
       associationVerified.checked = false;
       associationVerified.disabled = true;
       associationHelp.textContent = !selectedLine
-        ? "Choose a dimension-line candidate. No selection is made automatically."
+        ? "Choose a dimension-line candidate. The global matching suggestion is advisory; nothing is selected automatically."
         : !(selectedLine.wall_spans || []).length
           ? "This line has no viable wall-pair candidate. Leave the association unresolved."
-          : "Check that the line and both wall faces describe this dimension, then explicitly confirm.";
+          : selectedLine.globally_assigned_to && selectedLine.globally_assigned_to !== association.dimension_value_id
+            ? "Another text region has the stronger global assignment for this line. Choosing it here is an override; verify the source drawing carefully."
+            : selectedLine.globally_assigned
+              ? "This is the globally preferred one-to-one line match. Still check both wall faces and explicitly confirm."
+              : "Check that the line and both wall faces describe this dimension, then explicitly confirm.";
     }
     lineSelect.addEventListener("change", updateWallSpanOptions);
     spanSelect.addEventListener("change", () => {
@@ -606,12 +615,22 @@ function exportReviewJson() {
             dimension_line_id: candidate.dimension_line_id,
             orientation: candidate.orientation,
             score: candidate.score,
+            assignment_score: candidate.assignment_score,
+            wall_span_status: candidate.wall_span_status,
+            globally_assigned: candidate.globally_assigned,
+            globally_assigned_to: candidate.globally_assigned_to,
             wall_spans: (candidate.wall_spans || []).map((span) => ({
               wall_ids: span.wall_ids,
               orientation: span.orientation,
               method: span.method,
               span_px: span.span_px,
-              score: span.score
+              score: span.score,
+              gap_center_px: span.gap_center_px,
+              text_center_offset_px: span.text_center_offset_px,
+              line_center_offset_px: span.line_center_offset_px,
+              endpoint_residual_px: span.endpoint_residual_px,
+              perpendicular_offset_px: span.perpendicular_offset_px,
+              intervening_wall_count: span.intervening_wall_count
             }))
           }))
         }

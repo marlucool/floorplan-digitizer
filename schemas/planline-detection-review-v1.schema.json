@@ -364,6 +364,10 @@
                     "dimension_line_id",
                     "orientation",
                     "score",
+                    "assignment_score",
+                    "wall_span_status",
+                    "globally_assigned",
+                    "globally_assigned_to",
                     "wall_spans"
                   ],
                   "properties": {
@@ -426,9 +430,52 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1
+                          },
+                          "gap_center_px": {
+                            "type": "number"
+                          },
+                          "text_center_offset_px": {
+                            "type": "number"
+                          },
+                          "line_center_offset_px": {
+                            "type": "number"
+                          },
+                          "endpoint_residual_px": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "perpendicular_offset_px": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "intervening_wall_count": {
+                            "type": "integer",
+                            "minimum": 0
                           }
                         }
                       }
+                    },
+                    "assignment_score": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "wall_span_status": {
+                      "type": "string",
+                      "enum": [
+                        "candidate",
+                        "ambiguous",
+                        "unmatched"
+                      ]
+                    },
+                    "globally_assigned": {
+                      "type": "boolean"
+                    },
+                    "globally_assigned_to": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   }
                 }
