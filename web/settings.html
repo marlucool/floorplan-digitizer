@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f2ec">
+  <title>Planline — Settings</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/settings.css">
+  <script src="/settings.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Planline home"><span class="brand-mark">P</span><span>planline<span class="brand-dot">.</span></span></a>
+    <div class="top-meta"><span class="local-dot"></span><span>Local desktop app</span><span class="divider">/</span> Settings</div>
+    <div class="top-links">
+      <button id="themeToggle" class="toolbar-button theme-toggle" type="button">Dark mode</button>
+      <a class="repo-link" href="/">Drawing workspace</a>
+      <a class="repo-link" href="/ocr">OCR Studio</a>
+      <a class="repo-link active" href="/settings" aria-current="page">Settings</a>
+    </div>
+  </header>
+  <main class="settings-main">
+    <section class="settings-intro">
+      <p class="eyebrow">PLANLINE / PREFERENCES</p>
+      <h1>Settings</h1>
+      <p>Application information, update controls and local preferences.</p>
+    </section>
+
+    <section class="settings-card">
+      <div class="settings-card-heading">
+        <div><p class="eyebrow">APPLICATION</p><h2>About Planline</h2></div>
+        <span class="settings-version" id="currentVersion">Checking…</span>
+      </div>
+      <p class="settings-copy">Planline runs locally on this computer. Your drawings and OCR dataset stay in the local app data directory unless you explicitly export them.</p>
+      <div class="settings-meta-grid">
+        <div><span>Workspace</span><strong>Local desktop</strong></div>
+        <div><span>Update channel</span><strong>Stable GitHub Releases</strong></div>
+        <div><span>Install</span><strong>Windows x64</strong></div>
+      </div>
+    </section>
+
+    <section class="settings-card update-card" aria-labelledby="updatesTitle">
+      <div class="settings-card-heading">
+        <div><p class="eyebrow">MAINTENANCE</p><h2 id="updatesTitle">Updates</h2></div>
+        <span class="update-indicator" id="updateIndicator">Not checked</span>
+      </div>
+      <p class="settings-copy">Check your fork's GitHub Releases for a newer stable version. Planline verifies the installer SHA-256 checksum before preparing the update.</p>
+      <label class="auto-check-row"><input id="autoCheckUpdates" type="checkbox" checked> Check for updates automatically when Settings opens</label>
+      <div class="update-status" id="updateStatus" role="status" aria-live="polite">
+        <strong id="updateTitle">Checking update support…</strong>
+        <p id="updateMessage">The latest stable release will appear here.</p>
+      </div>
+      <div class="update-actions">
+        <button id="checkUpdates" class="toolbar-button" type="button">Check for updates</button>
+        <button id="installUpdate" class="primary-button" type="button" hidden disabled>Download and install update <span>→</span></button>
+        <a id="viewRelease" class="repo-link hidden" href="https://github.com/marlucool/floorplan-digitizer/releases" target="_blank" rel="noreferrer">View GitHub release ↗</a>
+      </div>
+      <div class="release-notes-wrap hidden" id="releaseNotesWrap">
+        <strong>What's in this release</strong>
+        <pre id="releaseNotes"></pre>
+      </div>
+      <p class="settings-footnote">The updater only accepts Planline-Setup.exe and checksums.txt from this repository's stable releases. Your private Python and CPU/CUDA runtime are preserved during an in-app update.</p>
+    </section>
+
+    <section class="settings-card">
+      <div class="settings-card-heading"><div><p class="eyebrow">NAVIGATION</p><h2>Workspaces</h2></div></div>
+      <div class="workspace-links">
+        <a href="/"><strong>Drawing workspace</strong><span>Import plans, inspect detections and review dimension associations ↗</span></a>
+        <a href="/ocr"><strong>OCR Studio</strong><span>Build a verified crop dataset, annotate dimensions and fine-tune later ↗</span></a>
+      </div>
+    </section>
+
+    <footer><span>PLANLINE · SETTINGS</span><span><a href="/architecture">Technical notes</a> · <a href="https://github.com/marlucool/floorplan-digitizer" target="_blank" rel="noreferrer">Source repository</a></span></footer>
+  </main>
+</body>
+</html>
