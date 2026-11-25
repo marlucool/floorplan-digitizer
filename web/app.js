@@ -332,7 +332,88 @@ function renderDimensionTextReview(regions) {
     verifiedInput.type = "checkbox";
     verifiedLabel.append(verifiedInput, document.createTextNode(" I checked this transcription"));
 
-    fields.append(meta, textLabel, styleLabel, verifiedLabel);
+    const association = region.association || { status: "unmatched", candidate_lines: [] };
+    const associationPanel = document.createElement("section");
+    associationPanel.className = "dimension-association";
+    const associationHeading = document.createElement("strong");
+    associationHeading.textContent = "Geometric association · review required";
+    const associationHelp = document.createElement("p");
+    associationHelp.className = "association-help";
+    associationHelp.textContent = association.status === "unmatched"
+      ? "No compatible dimension-line candidate was found. Do not guess a connection."
+      : "Choose the dimension line and the two bounding walls that this value describes. Scores rank box geometry; they are not probabilities.";
+    const lineLabel = document.createElement("label");
+    lineLabel.textContent = "Dimension line candidate";
+    const lineSelect = document.createElement("select");
+    lineSelect.className = "dimension-line-select";
+    const linePlaceholder = document.createElement("option");
+    linePlaceholder.value = "";
+    linePlaceholder.textContent = "Choose a dimension line…";
+    lineSelect.append(linePlaceholder);
+    (association.candidate_lines || []).forEach((candidate) => {
+      const option = document.createElement("option");
+      option.value = candidate.dimension_line_id;
+      option.textContent = candidate.dimension_line_id + " · " + candidate.orientation +
+        " · fit " + Math.round(candidate.score * 100) + "%";
+      lineSelect.append(option);
+    });
+    lineLabel.append(lineSelect);
+
+    const spanLabel = document.createElement("label");
+    spanLabel.textContent = "Measured wall span candidate";
+    const spanSelect = document.createElement("select");
+    spanSelect.className = "dimension-wall-span-select";
+    spanSelect.disabled = true;
+    const spanPlaceholder = document.createElement("option");
+    spanPlaceholder.value = "";
+    spanPlaceholder.textContent = "Choose a wall pair…";
+    spanSelect.append(spanPlaceholder);
+    spanLabel.append(spanSelect);
+
+    const associationVerifiedLabel = document.createElement("label");
+    associationVerifiedLabel.className = "dimension-association-verified";
+    const associationVerified = document.createElement("input");
+    associationVerified.className = "dimension-association-verified-input";
+    associationVerified.type = "checkbox";
+    associationVerified.disabled = true;
+    associationVerifiedLabel.append(
+      associationVerified,
+      document.createTextNode(" I checked this line and wall pair against the drawing")
+    );
+
+    function updateWallSpanOptions() {
+      spanSelect.replaceChildren();
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "Choose a wall pair…";
+      spanSelect.append(placeholder);
+      const selectedLine = (association.candidate_lines || []).find(
+        (candidate) => candidate.dimension_line_id === lineSelect.value
+      );
+      (selectedLine?.wall_spans || []).forEach((span, spanIndex) => {
+        const option = document.createElement("option");
+        option.value = String(spanIndex);
+        option.textContent = span.wall_ids.join(" ↔ ") + " · " +
+          Math.round(span.span_px) + " px · fit " + Math.round(span.score * 100) + "%";
+        spanSelect.append(option);
+      });
+      spanSelect.disabled = !selectedLine || !(selectedLine.wall_spans || []).length;
+      associationVerified.checked = false;
+      associationVerified.disabled = true;
+      associationHelp.textContent = !selectedLine
+        ? "Choose a dimension-line candidate. No selection is made automatically."
+        : !(selectedLine.wall_spans || []).length
+          ? "This line has no viable wall-pair candidate. Leave the association unresolved."
+          : "Check that the line and both wall faces describe this dimension, then explicitly confirm.";
+    }
+    lineSelect.addEventListener("change", updateWallSpanOptions);
+    spanSelect.addEventListener("change", () => {
+      associationVerified.checked = false;
+      associationVerified.disabled = !lineSelect.value || !spanSelect.value;
+    });
+
+    associationPanel.append(associationHeading, associationHelp, lineLabel, spanLabel, associationVerifiedLabel);
+    fields.append(meta, textLabel, styleLabel, verifiedLabel, associationPanel);
     row.append(fields);
     container.append(row);
   });
@@ -496,6 +577,14 @@ function exportReviewJson() {
     manual_dimension_text_review: (result.dimension_regions || []).map((region, index) => {
       const textInputs = document.querySelectorAll(".dimension-text-value");
       const verifiedInputs = document.querySelectorAll(".dimension-text-verified-input");
+      const association = region.association || { status: "unmatched", candidate_lines: [] };
+      const lineSelect = document.querySelectorAll(".dimension-line-select")[index];
+      const spanSelect = document.querySelectorAll(".dimension-wall-span-select")[index];
+      const associationVerified = document.querySelectorAll(".dimension-association-verified-input")[index];
+      const selectedLine = (association.candidate_lines || []).find(
+        (candidate) => candidate.dimension_line_id === lineSelect?.value
+      );
+      const selectedSpan = selectedLine?.wall_spans?.[Number(spanSelect?.value)];
       return {
         detection_id: region.id,
         raw_text: textInputs[index]?.value || "",
@@ -503,12 +592,32 @@ function exportReviewJson() {
         verified: verifiedInputs[index]?.checked || false,
         detector_confidence: region.confidence,
         bbox: region.bbox,
-        crop_bbox: region.crop_bbox || null
+        crop_bbox: region.crop_bbox || null,
+        association: {
+          status: association.status || "unmatched",
+          dimension_line_id: selectedLine?.dimension_line_id || null,
+          wall_ids: selectedSpan?.wall_ids || [],
+          wall_span_px: selectedSpan?.span_px ?? null,
+          confirmed: associationVerified?.checked || false,
+          candidate_lines: (association.candidate_lines || []).map((candidate) => ({
+            dimension_line_id: candidate.dimension_line_id,
+            orientation: candidate.orientation,
+            score: candidate.score,
+            wall_spans: (candidate.wall_spans || []).map((span) => ({
+              wall_ids: span.wall_ids,
+              orientation: span.orientation,
+              method: span.method,
+              span_px: span.span_px,
+              score: span.score
+            }))
+          }))
+        }
       };
     }),
     limitations: [
       "No OCR has been performed; manual transcription entries are user-entered and not machine-verified.",
-      "No dimension-to-wall association, scale calibration or geometric reconstruction has been performed.",
+      "Geometric association suggestions are axis-aligned box hypotheses; only explicitly confirmed line and wall-pair selections are marked as reviewed.",
+      "Association scores are relative fit rankings, not probabilities. No pixel-to-unit scale or measured geometry has been inferred.",
       "Bounding boxes are detector candidates, not measured wall geometry.",
       "No measured DXF geometry is included."
     ]

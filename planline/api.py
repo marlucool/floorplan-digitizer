@@ -1,8 +1,8 @@
-"""Local API for the Planline 2D floor-plan review interface.
+"""Local API for Planline's floor-plan detection and association review.
 
-This first integration deliberately stops at object detection. The bundled
-YOLO model detects candidate regions; it does not read dimensions or create
-measured geometry. The application does not intentionally persist source drawings
+The bundled YOLO model detects candidate regions. A geometric ranking stage
+proposes value-to-line and line-to-wall-span hypotheses for human review; it
+does not read dimensions or create measured geometry. The application does not intentionally persist source drawings
 as project files; multipart parsing may spool uploads to temporary storage.
 """
 from __future__ import annotations
@@ -23,6 +23,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from .association import associate_dimensions
 from .constraints import DimensionChainRequest, validate_dimension_chain
 from .ocr_studio_api import router as ocr_studio_router
 
@@ -351,9 +352,17 @@ async def analyze_drawing(
     dimension_candidates = [
         item for item in detections if item["class_name"] == "dimension_value"
     ]
+    association_candidates = associate_dimensions(detections)
+    association_by_value = {
+        item["dimension_value_id"]: item for item in association_candidates
+    }
     dimension_regions = []
     for index, item in enumerate(dimension_candidates):
         region = dict(item)
+        region["association"] = association_by_value.get(
+            item["id"],
+            {"dimension_value_id": item["id"], "status": "unmatched", "candidate_lines": [], "confirmed": False},
+        )
         if index < MAX_DIMENSION_CROPS:
             crop = make_region_crop(image, item["bbox"])
             if crop is not None:
@@ -363,6 +372,8 @@ async def analyze_drawing(
     notes = [
         "Detected boxes are candidate regions, not recognised measurements.",
         "OCR has not run. Read and verify every dimension against the source drawing.",
+        "Geometric association candidates rank dimension-value boxes against dimension lines and wall pairs; they are unconfirmed hypotheses, not verified measurements.",
+        "Association scores are relative geometric-fit rankings, not probabilities or measurement confidence.",
         "No pixel-to-millimetre scale has been inferred.",
         "DXF export is disabled until dimensions and geometry are verified.",
         "The bundled detector was trained on a small dataset of simplified plans; review all detections.",
@@ -383,6 +394,7 @@ async def analyze_drawing(
         "confidence_threshold": confidence_threshold,
         "detections": detections,
         "dimension_regions": dimension_regions,
+        "association_candidates": association_candidates,
         "notes": notes,
         "export_ready": False,
     }

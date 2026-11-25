@@ -92,6 +92,9 @@ def test_analyse_returns_regions_without_fabricating_ocr(monkeypatch) -> None:
     assert payload["image"] == {"width": 240, "height": 160}
     assert payload["counts"] == {"wall": 1, "dimension_value": 1}
     assert len(payload["dimension_regions"]) == 1
+    assert len(payload["association_candidates"]) == 1
+    assert payload["association_candidates"][0]["status"] == "unmatched"
+    assert payload["dimension_regions"][0]["association"]["confirmed"] is False
     assert payload["dimension_regions"][0]["crop_data_url"].startswith(
         "data:image/png;base64,"
     )

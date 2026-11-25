@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/marlucool/floorplan-digitizer/blob/main/schemas/planline-detection-review-v1.schema.json",
   "title": "Planline Detection Review v1",
-  "description": "Candidate detector output only. This format is not a verified measurement or CAD geometry record.",
+  "description": "Candidate detector output with optional human-reviewed dimension association hypotheses. This format is not a verified measurement or CAD geometry record.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -312,6 +312,128 @@
               "handwritten",
               "unclear"
             ]
+          },
+          "association": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "dimension_line_id",
+              "wall_ids",
+              "wall_span_px",
+              "confirmed",
+              "candidate_lines"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "candidate",
+                  "ambiguous",
+                  "unmatched"
+                ]
+              },
+              "dimension_line_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "wall_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "wall_span_px": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "confirmed": {
+                "type": "boolean"
+              },
+              "candidate_lines": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "dimension_line_id",
+                    "orientation",
+                    "score",
+                    "wall_spans"
+                  ],
+                  "properties": {
+                    "dimension_line_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "orientation": {
+                      "type": "string",
+                      "enum": [
+                        "horizontal",
+                        "vertical"
+                      ]
+                    },
+                    "score": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "wall_spans": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "wall_ids",
+                          "orientation",
+                          "method",
+                          "span_px",
+                          "score"
+                        ],
+                        "properties": {
+                          "wall_ids": {
+                            "type": "array",
+                            "minItems": 2,
+                            "maxItems": 2,
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "orientation": {
+                            "type": "string",
+                            "enum": [
+                              "horizontal",
+                              "vertical"
+                            ]
+                          },
+                          "method": {
+                            "type": "string",
+                            "enum": [
+                              "between_vertical_walls",
+                              "between_horizontal_walls"
+                            ]
+                          },
+                          "span_px": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "score": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }

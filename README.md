@@ -4,7 +4,7 @@ Planline is a local-first project for turning scanned or hand-drawn 2D floor pla
 
 The important problem is not tracing pixels. Survey drawings can be skewed, faded, low-resolution, or drawn approximately rather than to scale. Planline is being developed to read written dimensions, relate them to the correct parts of the drawing, detect contradictions, and keep uncertain results in a human review workflow.
 
-> **Current status: drawing review plus OCR Studio workbench.** The local app now includes a crop editor, verified-label library, source/writer-safe dataset splits, background PP-OCRv5 fine-tuning jobs and held-out benchmark reporting. OCR Studio is available at `/ocr` in the browser app or in the native desktop window. The drawing-analysis workflow still does not automatically run OCR, associate dimensions with walls, calibrate scale, reconstruct measured geometry or generate verified DXF output.
+> **Current status: drawing review plus OCR Studio workbench.** The local app now includes a crop editor, verified-label library, source/writer-safe dataset splits, background PP-OCRv5 fine-tuning jobs and held-out benchmark reporting. OCR Studio is available at `/ocr` in the browser app or in the native desktop window. The drawing-analysis workflow now ranks geometric candidates linking dimension-value regions to dimension lines and wall spans, with explicit human confirmation. OCR is still manual/optional; scale calibration, measured reconstruction and verified DXF output are not implemented.
 
 ![Example survey drawing](docs/rysunek.png)
 
@@ -19,7 +19,7 @@ The important problem is not tracing pixels. Survey drawings can be skewed, fade
 | Review | Detection overlays, zoom, confidence-threshold control, class filtering, selected-box highlighting and dimension-region crops |
 | Manual transcription | Reviewer-entered text can be linked to detection IDs and marked as printed, handwritten or unclear |
 | Review export | Versioned planline-detection-review/v1 JSON export with source dimensions, bounding boxes, detector scores and limitations |
-| Dimension chain | Separate API endpoint checks explicitly supplied values, verification flags, units and tolerance using decimal arithmetic |
+| Dimension association | Ranks value-to-line and line-to-wall-pair hypotheses from axis-aligned detector boxes; the reviewer must confirm each relationship |\n| Dimension chain | Separate API endpoint checks explicitly supplied values, verification flags, units and tolerance using decimal arithmetic |
 | Optional OCR | Standalone PaddleOCR recognition runner for saved dimension crops; raw results remain unverified |
 | OCR evaluation | Compare predictions against verified review labels or curated crop datasets using exact-match rate, coverage and character error rate |
 | Crop dataset curation | Export verified full-string crops or import manual crops; validate manifests and create source/writer-safe splits |
@@ -91,7 +91,7 @@ Planline does not intentionally save uploaded drawings as project files. However
 ## What is not implemented yet
 
 - Automatic OCR directly in the drawing-analysis workflow (OCR Studio currently uses human-selected crops and user-verified transcriptions for dataset capture).
-- Automatic association between a recognised number, its dimension line and the measured wall/span.
+- Fully automatic, verified dimension association. Current box-based candidates require human confirmation and do not handle arbitrary rotated/diagonal geometry.
 - Reliable unit interpretation or scale calibration from written dimensions.
 - Automatic dimension-chain solving across a floor plan.
 - Editable wall/opening reconstruction with topology and geometry validation.
@@ -111,7 +111,7 @@ The target is a reviewable 2D digitisation pipeline:
 6. **Reconstruct editable 2D geometry.** Build walls and openings from verified constraints, validate connectivity and topology, and expose unresolved gaps or conflicts for manual correction.
 7. **Gate CAD export.** Generate DXF/SVG only from verified geometry, with explicit units and layers. A drawing that merely looks plausible is not ready for export.
 
-The OCR direction is deliberately numeric-first. General English room-label and note recognition is not an initial dependency unless evaluation shows it materially improves the dimension workflow. The optional PaddleOCR recogniser is a baseline to measure, not a claim that OCR is solved.
+The OCR direction is deliberately numeric-first. General English room-label and note recognition is not an initial dependency unless evaluation shows it materially improves the dimension workflow. The optional PaddleOCR recogniser is a baseline to measure, not a claim that OCR is solved. Dimension association now ranks candidate value→line→wall-span links using detector-box alignment and facing wall edges; every proposed link remains unconfirmed until the reviewer explicitly checks it.
 
 Dataset capture, validation, grouped splits, a local fine-tuning interface and held-out benchmark orchestration are implemented. Actual training still requires a compatible local PaddlePaddle installation, a PaddleOCR source checkout and the matching pretrained checkpoint; no model has been trained on the user's own plan crops yet. OCR Studio does not claim a recogniser is reliable until it has been evaluated on representative, independent held-out drawings. Evaluation must be split by original drawing and writer, not by individual crops.
 
