@@ -197,6 +197,33 @@ PaddleOCR is a reasonable local baseline to evaluate because it provides text de
 Reference implementation: https://github.com/PaddlePaddle/PaddleOCR
 
 
+### OCR baseline comparison (research update: 2026-11-25)
+
+The manual crop/transcription panel now provides a source of verified text labels. Use those labels to benchmark recognizers before selecting or integrating an OCR dependency.
+
+| Candidate | Relevant capability | Limitation for Planline | Decision |
+|---|---|---|---|
+| PaddleOCR PP-OCRv5 | Full text detection + recognition; documentation explicitly includes complex English handwriting and vertical text. The published internal recognition table reports a 0.5806 score for handwritten English versus 0.8679 for printed English. | Those are vendor-reported internal-set results, not floor-plan results. The handwriting score is not high enough to trust dimensions without review. | **First baseline to benchmark**, using original-resolution crops and human verification. |
+| TrOCR base handwritten | MIT-licensed recognizer fine-tuned on IAM handwriting; intended for single text-line images. | Recognition only, not text detection; IAM handwriting is not architectural dimension notation. | **Second baseline** for crops already isolated by the detector. |
+| EasyOCR | Convenient local text detection + recognition pipeline. | Its current project README lists handwritten-text support under “What's coming next”. | Do not select as the handwriting baseline. |
+| Surya | Document OCR/layout system with handwritten-document examples. | The code is Apache 2.0, but model weights use a modified AI Pubs Open Rail-M license with restrictions; the current inference path also adds deployment complexity. | Do not make it a core dependency without a separate license/deployment review. |
+
+References:
+- [PaddleOCR PP-OCRv5 documentation](https://www.paddleocr.ai/v3.3.0/en/version3.x/algorithm/PP-OCRv5/PP-OCRv5.html) — handwriting support and internal text-recognition results.
+- [PaddleOCR repository](https://github.com/PaddlePaddle/PaddleOCR) — Apache 2.0 project license.
+- [Microsoft TrOCR base-handwritten model card](https://huggingface.co/microsoft/trocr-base-handwritten) — MIT license, IAM fine-tuning and single-line OCR use.
+- [EasyOCR README](https://github.com/JaidedAI/EasyOCR) — handwriting support remains listed as upcoming.
+- [Surya README](https://github.com/datalab-to/surya) — separate code and model-weight licensing.
+
+Recommended evaluation order:
+1. Export manually verified dimension crops and use them as a small held-out benchmark. Keep printed and handwritten samples separate.
+2. Run PP-OCRv5 on the crop images, preserving raw output, alternatives where available, confidence and engine/model version.
+3. Run TrOCR on the same handwritten line crops as a recognition-only comparison.
+4. Report exact-string accuracy, character error rate, decimal/separator errors, unit errors and the proportion of crops requiring human correction. Include faint, skewed, rotated and overlapping examples.
+5. Keep all machine results **unverified**. Only a human-confirmed complete string may enter the dimension-chain workflow.
+
+Do not add either OCR package to the default install yet. The next step is a reproducible benchmark against representative scans, not another training run or an assumption that generic handwriting scores transfer to architectural dimensions.
+
 ### Floor-plan parsing challenges
 
 The open-access paper *Automatic structural scene digitalization* (2017) describes common issues in raster floor-plan parsing: dimension leaders being confused with walls, backgrounds containing grids/patterns, variable text fonts and orientations, text touching graphics, and vectorisation failures at junctions.
