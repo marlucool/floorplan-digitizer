@@ -109,3 +109,6 @@ html[data-theme="dark"] .canvas-wrap{background:#202720}
 html[data-theme="dark"] .workspace-nav{border-color:var(--line)}
 @media(max-width:760px){.workspace-nav{overflow-x:auto;white-space:nowrap}.workspace-nav-hint{display:none}.top-links{gap:8px}.top-links .repo-link{font-size:10px}.review-toolbar{align-items:stretch}.review-search{order:3;flex-basis:100%}.review-hint{display:none}}
 @media(max-width:520px){.top-links .repo-link:first-of-type{display:none}.theme-toggle{padding:7px}.workspace-nav-item{padding:8px 10px}}
+
+@media(max-width:520px){.topbar{gap:10px;min-width:0}.top-links{gap:8px;min-width:0}.top-links .repo-link{font-size:9px}.workspace-nav{max-width:100%;min-width:0;overflow-x:auto}.workspace-nav-item{flex:none}}
+main{min-width:0}
