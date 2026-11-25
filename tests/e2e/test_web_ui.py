@@ -212,6 +212,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.set_viewport_size({"width": 390, "height": 844})
             assert page.locator("#zoomIn").is_visible()
             assert page.locator("#checkChain").is_visible()
+            assert page.locator(".dimension-text-value").input_value() == "4200"
             assert page.evaluate(
                 "document.documentElement.scrollWidth <= window.innerWidth"
             )
