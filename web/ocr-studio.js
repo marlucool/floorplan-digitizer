@@ -33,7 +33,7 @@
     if (!response.ok) {
       const detail = Array.isArray(payload.detail)
         ? payload.detail.map((item) => item.msg || "Invalid input").join("; ")
-        : payload.detail || \`Request failed (\${response.status})\`;
+        : payload.detail || `Request failed (${response.status})`;
       throw new Error(detail);
     }
     return payload;
@@ -67,9 +67,9 @@
     const readiness = $("#trainingReadiness");
     if (!state.paddleReady) readiness.textContent = "Install PaddlePaddle to train";
     else if (!summary || !summary.samples) readiness.textContent = "Add verified crops to begin";
-    else if (summary.independent_groups < 3) readiness.textContent = \`\${summary.samples} crops · need 3 independent groups\`;
-    else if (!splitReady) readiness.textContent = \`\${summary.samples} crops · build splits before training\`;
-    else readiness.textContent = \`\${summary.samples} crops · split plan ready\`;
+    else if (summary.independent_groups < 3) readiness.textContent = `${summary.samples} crops · need 3 independent groups`;
+    else if (!splitReady) readiness.textContent = `${summary.samples} crops · build splits before training`;
+    else readiness.textContent = `${summary.samples} crops · split plan ready`;
   }
 
   async function loadDatasets(preferredId) {
@@ -109,7 +109,7 @@
 
   async function loadDataset() {
     if (!state.datasetId) return;
-    state.dataset = await api(\`/api/ocr/datasets/\${encodeURIComponent(state.datasetId)}\`);
+    state.dataset = await api(`/api/ocr/datasets/${encodeURIComponent(state.datasetId)}`);
     renderDataset();
   }
 
@@ -126,9 +126,9 @@
     });
     if (summary.splits_present) {
       const splits = summary.split_counts || {};
-      $("#datasetHint").textContent = \`Train \${splits.train || 0} · validation \${splits.validation || 0} · held-out test \${splits.test || 0}. Editing labels invalidates these splits.\`;
+      $("#datasetHint").textContent = `Train ${splits.train || 0} · validation ${splits.validation || 0} · held-out test ${splits.test || 0}. Editing labels invalidates these splits.`;
     } else {
-      $("#datasetHint").textContent = \`\${summary.independent_groups || 0} independent source/writer groups. Need at least three to make leak-resistant train, validation and test splits.\`;
+      $("#datasetHint").textContent = `${summary.independent_groups || 0} independent source/writer groups. Need at least three to make leak-resistant train, validation and test splits.`;
     }
     $("#datasetState").textContent = summary.valid === false ? "CHECK DATA" : "LOCAL";
     renderSamples();
@@ -161,7 +161,7 @@
     const all = state.dataset?.samples || [];
     const filter = $("#sampleFilter").value;
     const visible = all.filter((sample) => filter === "all" || sample.text_style === filter);
-    $("#sampleCount").textContent = \`\${visible.length} / \${all.length} samples\`;
+    $("#sampleCount").textContent = `${visible.length} / ${all.length} samples`;
     if (!visible.length) {
       const empty = document.createElement("div"); empty.className = "sample-list-empty";
       empty.textContent = all.length ? "No samples match this style filter." : "No saved crops yet. Add a scan, draw a crop and type its exact dimension.";
@@ -174,7 +174,7 @@
       const image = document.createElement("img"); image.src = sample.image_url; image.alt = ""; image.loading = "lazy";
       const info = document.createElement("span"); info.className = "sample-row-info";
       const text = document.createElement("strong"); text.textContent = sample.text;
-      const meta = document.createElement("small"); meta.textContent = \`\${sample.text_style} · \${sample.source_id}\${sample.writer_id ? \` · \${sample.writer_id}\` : ""}\`;
+      const meta = document.createElement("small"); meta.textContent = `${sample.text_style} · ${sample.source_id}${sample.writer_id ? ` · ${sample.writer_id}` : ""}`;
       info.append(text, meta);
       const split = document.createElement("span"); split.className = "sample-split"; split.textContent = sample.split || "unsplit";
       button.append(image, info, split);
@@ -198,7 +198,7 @@
       const payload = await api("/api/ocr/datasets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
       $("#newDatasetName").value = ""; $("#newDatasetForm").classList.add("hidden");
       state.editingId = null; clearEditMode(); await loadDatasets(payload.dataset_id);
-      message(\`Created dataset \${payload.dataset_id}.\`, "success");
+      message(`Created dataset ${payload.dataset_id}.`, "success");
     } catch (error) { message(error.message, "error"); }
   });
 
@@ -209,8 +209,8 @@
     const ratio = Math.min(1, 1400 / state.image.naturalWidth, 660 / state.image.naturalHeight) * zoom;
     canvas.width = Math.max(1, Math.round(state.image.naturalWidth * ratio));
     canvas.height = Math.max(1, Math.round(state.image.naturalHeight * ratio));
-    canvas.style.width = \`\${canvas.width}px\`;
-    canvas.style.height = \`\${canvas.height}px\`;
+    canvas.style.width = `${canvas.width}px`;
+    canvas.style.height = `${canvas.height}px`;
     const context = canvas.getContext("2d");
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.drawImage(state.image, 0, 0, canvas.width, canvas.height);
@@ -220,10 +220,10 @@
       drawSelection({ x: state.cropRect.x * scaleX, y: state.cropRect.y * scaleY,
         width: state.cropRect.width * scaleX, height: state.cropRect.height * scaleY });
     }
-    $("#cropZoomValue").textContent = \`\${zoom.toFixed(1)}×\`;
+    $("#cropZoomValue").textContent = `${zoom.toFixed(1)}×`;
     canvas.classList.remove("hidden");
     $("#cropCanvasEmpty").classList.add("hidden");
-    $("#cropDimensions").textContent = \`\${state.image.naturalWidth} × \${state.image.naturalHeight} PX\`;
+    $("#cropDimensions").textContent = `${state.image.naturalWidth} × ${state.image.naturalHeight} PX`;
     $("#useWholeImageButton").disabled = false;
   }
 
@@ -255,7 +255,7 @@
     state.cropBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
     state.cropRect = { x, y, width: canvas.width, height: canvas.height };
     drawSelection(rect);
-    $("#cropSelectionInfo").textContent = \`\${canvas.width} × \${canvas.height} px crop\`;
+    $("#cropSelectionInfo").textContent = `${canvas.width} × ${canvas.height} px crop`;
     setBusy(state.busy);
   }
 
@@ -279,14 +279,14 @@
     image.onload = () => {
       if (state.image?.__queueUrl) URL.revokeObjectURL(state.image.__queueUrl);
       image.__queueUrl = url; state.image = image; fitCropCanvas();
-      $("#queueStatus").textContent = \`\${state.queueIndex + 1} / \${state.queue.length} · \${file.name}\`;
+      $("#queueStatus").textContent = `${state.queueIndex + 1} / ${state.queue.length} · ${file.name}`;
       $("#cropSelectionInfo").textContent = "Drag to select a complete dimension";
       $("#sampleText").value = ""; $("#labelVerified").checked = true;
       $("#saveCropButton").textContent = "Save label + next →";
       $("#skipCropButton").disabled = false; $("#useWholeImageButton").disabled = false;
       setBusy(false);
     };
-    image.onerror = () => { URL.revokeObjectURL(url); message(\`Could not open \${file.name}.\`, "error"); skipQueueItem(); };
+    image.onerror = () => { URL.revokeObjectURL(url); message(`Could not open ${file.name}.`, "error"); skipQueueItem(); };
     image.src = url;
   }
 
@@ -298,7 +298,7 @@
     $("#cropZoom").value = "1";
     $("#cropFiles").value = "";
     if (!$("#sourceId").value.trim()) $("#sourceId").value = "plan-01";
-    message(\`\${usable.length} image\${usable.length === 1 ? "" : "s"} added to the local crop queue.\`);
+    message(`${usable.length} image${usable.length === 1 ? "" : "s"} added to the local crop queue.`);
     loadQueueImage();
   });
 
@@ -349,9 +349,9 @@
     form.append("text_style", $("#textStyle").value); form.append("verified", "true");
     setBusy(true); message("Saving verified crop locally…");
     try {
-      const result = await api(\`/api/ocr/datasets/\${encodeURIComponent(state.datasetId)}/samples\`, { method: "POST", body: form });
+      const result = await api(`/api/ocr/datasets/${encodeURIComponent(state.datasetId)}/samples`, { method: "POST", body: form });
       state.dataset = result.dataset; renderDataset();
-      state.queueIndex += 1; message(\`Saved “\${text}”.\`, "success"); loadQueueImage();
+      state.queueIndex += 1; message(`Saved “${text}”.`, "success"); loadQueueImage();
     } catch (error) { message(error.message, "error"); }
     finally { setBusy(false); }
   }
@@ -376,7 +376,7 @@
     $("#cropCanvasEmpty").querySelector("strong").textContent = "Editing saved label";
     $("#cropCanvasEmpty").querySelector("span").textContent = "Correct the transcription or grouping, then save the correction.";
     $("#cropDimensions").textContent = "SAVED SAMPLE"; $("#queueStatus").textContent = "EDITING LABEL";
-    $("#cropSelectionInfo").textContent = \`\${sample.split || "Unsplit"} · \${sample.crop_id}\`;
+    $("#cropSelectionInfo").textContent = `${sample.split || "Unsplit"} · ${sample.crop_id}`;
     renderSamples(); setBusy(false); message("Editing an existing crop. Corrections invalidate any previous train/test split.");
   }
   $("#saveCorrectionButton").addEventListener("click", async () => {
@@ -388,7 +388,7 @@
     };
     setBusy(true);
     try {
-      const result = await api(\`/api/ocr/datasets/\${encodeURIComponent(state.datasetId)}/samples/\${encodeURIComponent(state.editingId)}\`, {
+      const result = await api(`/api/ocr/datasets/${encodeURIComponent(state.datasetId)}/samples/${encodeURIComponent(state.editingId)}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
       });
       state.dataset = result.dataset; state.editingId = null; clearEditMode(); renderDataset(); message("Label corrected. Rebuild splits before benchmarking/training.", "success");
@@ -399,7 +399,7 @@
     if (!state.editingId || !window.confirm("Delete this crop and its label from the local dataset?")) return;
     setBusy(true);
     try {
-      const result = await api(\`/api/ocr/datasets/\${encodeURIComponent(state.datasetId)}/samples/\${encodeURIComponent(state.editingId)}\`, { method: "DELETE" });
+      const result = await api(`/api/ocr/datasets/${encodeURIComponent(state.datasetId)}/samples/${encodeURIComponent(state.editingId)}`, { method: "DELETE" });
       state.dataset = result.dataset; state.editingId = null; clearEditMode(); renderDataset(); message("Crop deleted. Previous splits have been removed.", "success");
     } catch (error) { message(error.message, "error"); }
     finally { setBusy(false); }
@@ -409,12 +409,12 @@
   $("#buildSplitsButton").addEventListener("click", async () => {
     setBusy(true); message("Grouping by source drawing and writer…");
     try {
-      const result = await api(\`/api/ocr/datasets/\${encodeURIComponent(state.datasetId)}/splits\`, {
+      const result = await api(`/api/ocr/datasets/${encodeURIComponent(state.datasetId)}/splits`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seed: 42, force: true })
       });
       state.dataset = result.dataset; renderDataset();
       const split = result.splits.sample_counts;
-      message(\`Splits built: train \${split.train}, validation \${split.validation}, test \${split.test}. No shared source/writer groups cross splits.\`, "success");
+      message(`Splits built: train ${split.train}, validation ${split.validation}, test ${split.test}. No shared source/writer groups cross splits.`, "success");
     } catch (error) { message(error.message, "error"); }
     finally { setBusy(false); }
   });
@@ -433,12 +433,12 @@
   async function pollJob() {
     if (!state.activeJobId) return;
     try {
-      const job = await api(\`/api/ocr/jobs/\${encodeURIComponent(state.activeJobId)}\`);
+      const job = await api(`/api/ocr/jobs/${encodeURIComponent(state.activeJobId)}`);
       $("#jobStatus").textContent = (job.status || "unknown").replaceAll("_", " ").toUpperCase();
       $("#jobLog").textContent = job.logs || "";
       $("#jobLog").scrollTop = $("#jobLog").scrollHeight;
       const progress = job.epochs ? Math.round((job.epoch || 0) / job.epochs * 100) : (terminalStatuses.has(job.status) ? 100 : 8);
-      $("#jobProgressBar").style.width = \`\${Math.max(0, Math.min(100, progress))}%\`;
+      $("#jobProgressBar").style.width = `${Math.max(0, Math.min(100, progress))}%`;
       if (job.metrics) renderMetrics(job.metrics);
       if (job.model_dir) {
         state.lastTrainedModel = job.model_dir;
@@ -448,17 +448,17 @@
       if (terminalStatuses.has(job.status)) {
         clearInterval(state.pollTimer); state.pollTimer = null; state.activeJobId = null;
         $("#cancelJobButton").classList.add("hidden"); refreshTrainingButtons();
-        message(job.status === "completed" ? "Job completed." : \`Job \${job.status.replaceAll("_", " ")}. Check its log for details.\`, job.status === "completed" ? "success" : "error");
+        message(job.status === "completed" ? "Job completed." : `Job ${job.status.replaceAll("_", " ")}. Check its log for details.`, job.status === "completed" ? "success" : "error");
       }
     } catch (error) {
       $("#jobStatus").textContent = "STATUS ERROR";
-      $("#jobLog").textContent += \`\n\${error.message}\`;
+      $("#jobLog").textContent += `\n${error.message}`;
     }
   }
 
   $("#cancelJobButton").addEventListener("click", async () => {
     if (!state.activeJobId) return;
-    try { await api(\`/api/ocr/jobs/\${encodeURIComponent(state.activeJobId)}/cancel\`, { method: "POST" }); message("Cancellation requested. The current process is being stopped."); }
+    try { await api(`/api/ocr/jobs/${encodeURIComponent(state.activeJobId)}/cancel`, { method: "POST" }); message("Cancellation requested. The current process is being stopped."); }
     catch (error) { message(error.message, "error"); }
   });
 
@@ -470,7 +470,7 @@
     };
     setBusy(true); message("Checking PaddleOCR source, checkpoint and dataset…");
     try {
-      const job = await api(\`/api/ocr/datasets/\${encodeURIComponent(state.datasetId)}/train\`, {
+      const job = await api(`/api/ocr/datasets/${encodeURIComponent(state.datasetId)}/train`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
       });
       beginJob(job, "Fine-tuning dimension recogniser"); message("Training job started. Keep this window open while it runs.", "success");
@@ -488,12 +488,12 @@
     ];
     items.forEach(([value, label]) => {
       const card = document.createElement("div"); card.className = "benchmark-metric";
-      const strong = document.createElement("strong"); strong.textContent = value == null ? "—" : \`\${(value * 100).toFixed(1)}%\`;
+      const strong = document.createElement("strong"); strong.textContent = value == null ? "—" : `${(value * 100).toFixed(1)}%`;
       const small = document.createElement("span"); small.textContent = label;
       card.append(strong, small); box.append(card);
     });
     const note = document.createElement("p"); note.className = "metrics-note";
-    note.textContent = \`\${metrics.sample_count ?? "—"} held-out samples · \${report.model || "OCR model"} · transcription only\`;
+    note.textContent = `${metrics.sample_count ?? "—"} held-out samples · ${report.model || "OCR model"} · transcription only`;
     box.append(note);
   }
 
@@ -506,7 +506,7 @@
     };
     setBusy(true); message(trained ? "Benchmarking your fine-tuned recogniser…" : "Benchmarking the base recogniser…");
     try {
-      const job = await api(\`/api/ocr/datasets/\${encodeURIComponent(state.datasetId)}/benchmark\`, {
+      const job = await api(`/api/ocr/datasets/${encodeURIComponent(state.datasetId)}/benchmark`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
       });
       $("#benchmarkMetrics").classList.add("hidden"); beginJob(job, trained ? "Fine-tuned model benchmark" : "Base model benchmark");
