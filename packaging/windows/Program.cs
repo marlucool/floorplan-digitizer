@@ -1,10 +1,12 @@
 using System.Diagnostics;
+using System.Drawing;
 using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.Win32;
+using System.Windows.Forms;
 
 namespace Planline.Setup;
 
@@ -500,7 +502,10 @@ internal sealed class SetupForm : Form
                 process?.Kill(entireProcessTree: true);
                 return "";
             }
-            return process.ExitCode == 0 ? process.StandardOutput.ReadToEnd().Trim() : "";
+            string output = process.StandardOutput.ReadToEnd();
+            string error = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            return process.ExitCode == 0 ? output.Trim() : "";
         }
         catch
         {
@@ -807,15 +812,16 @@ internal sealed class SetupForm : Form
         );
     }
 
-    private async Task SetStatusAsync(string message)
+    private Task SetStatusAsync(string message)
     {
         if (InvokeRequired)
         {
-            await (Task)Invoke(new Func<Task>(() => SetStatusAsync(message)));
-            return;
+            BeginInvoke((Action)(() => SetStatusAsync(message)));
+            return Task.CompletedTask;
         }
         _status.Text = message;
         _status.Refresh();
+        return Task.CompletedTask;
     }
 
     private async Task DownloadFileAsync(string url, string destination)
@@ -851,7 +857,6 @@ internal sealed class SetupForm : Form
             _status.Text = totalBytes is > 0
                 ? $"Downloading… {FormatBytes(totalRead)} of {FormatBytes(totalBytes.Value)}"
                 : $"Downloading… {FormatBytes(totalRead)}";
-            Application.DoEvents();
         }
     }
 
@@ -915,10 +920,14 @@ internal sealed class SetupForm : Form
             string compact = line.Length > 105 ? line[^105..] : line;
             if (IsHandleCreated && !IsDisposed)
             {
-                BeginInvoke((Action)(() =>
+                try
                 {
-                    _status.Text = compact;
-                }));
+                    BeginInvoke((Action)(() => _status.Text = compact));
+                }
+                catch (InvalidOperationException)
+                {
+                    // The setup window may be closing while a child process exits.
+                }
             }
         }
 
