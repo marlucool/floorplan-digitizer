@@ -51,7 +51,7 @@
     $("#saveCorrectionButton").disabled = busy || !state.editingId;
     $("#deleteSampleButton").disabled = busy || !state.editingId;
     $("#buildSplitsButton").disabled = busy || !state.dataset || state.dataset.summary.samples < 1;
-    $("#auditDatasetButton").disabled = busy || !state.dataset || state.dataset.summary.samples < 1;
+    $("#auditDatasetButton").disabled = busy || !state.dataset;
     refreshTrainingButtons();
   }
 
@@ -60,6 +60,7 @@
     const splitCounts = summary?.split_counts || {};
     const splitReady = Boolean(summary?.splits_present && splitCounts.train > 0 && splitCounts.validation > 0 && splitCounts.test > 0);
     const hasJob = Boolean(state.activeJobId);
+    $("#auditDatasetButton").disabled = state.busy || !state.dataset;
     $("#trainButton").disabled = state.busy || hasJob || !splitReady || !state.paddleReady || summary?.valid === false;
     $("#benchmarkBaseButton").disabled = state.busy || hasJob || !splitReady || !state.ocrReady || summary?.valid === false;
     const selectedModel = $("#trainedModelSelect")?.value || state.lastTrainedModel;
