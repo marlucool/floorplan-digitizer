@@ -19,7 +19,8 @@ The important problem is not tracing pixels. Survey drawings can be skewed, fade
 | Review | Detection overlays, zoom, confidence-threshold control, class filtering, selected-box highlighting and dimension-region crops |
 | Manual transcription | Reviewer-entered text can be linked to detection IDs and marked as printed, handwritten or unclear |
 | Review export | Versioned planline-detection-review/v1 JSON export with source dimensions, bounding boxes, detector scores and limitations |
-| Dimension association | Ranks value-to-line and line-to-wall-pair hypotheses from axis-aligned detector boxes; the reviewer must confirm each relationship |\n| Dimension chain | Separate API endpoint checks explicitly supplied values, verification flags, units and tolerance using decimal arithmetic |
+| Dimension association | Ranks value-to-line and line-to-wall-pair hypotheses from axis-aligned detector boxes; the reviewer must confirm each relationship |
+| Dimension chain | Separate API endpoint checks explicitly supplied values, verification flags, units and tolerance using decimal arithmetic |
 | Optional OCR | Standalone PaddleOCR recognition runner for saved dimension crops; raw results remain unverified |
 | OCR evaluation | Compare predictions against verified review labels or curated crop datasets using exact-match rate, coverage and character error rate |
 | Crop dataset curation | Export verified full-string crops or import manual crops; validate manifests and create source/writer-safe splits |
