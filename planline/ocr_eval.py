@@ -52,6 +52,8 @@ def _metrics(samples: list[dict[str, Any]]) -> dict[str, Any]:
 
 def evaluate_ocr(review: dict[str, Any], predictions: dict[str, Any]) -> dict[str, Any]:
     """Compare OCR predictions against verified manual transcriptions."""
+    if not isinstance(review, dict) or not isinstance(predictions, dict):
+        raise ValueError("Review and prediction inputs must be JSON objects.")
     if review.get("schema_version") != "planline-detection-review/v1":
         raise ValueError("Unsupported review schema version.")
     review_items = review.get("manual_dimension_text_review")
@@ -74,7 +76,9 @@ def evaluate_ocr(review: dict[str, Any], predictions: dict[str, Any]) -> dict[st
             raise ValueError(f"Duplicate prediction for detection_id {detection_id!r}.")
         confidence = item.get("confidence")
         if confidence is not None and (
-            not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1
+            isinstance(confidence, bool)
+            or not isinstance(confidence, (int, float))
+            or not 0 <= confidence <= 1
         ):
             raise ValueError(f"Invalid confidence for detection_id {detection_id!r}.")
         prediction_map[detection_id] = item
@@ -116,7 +120,11 @@ def evaluate_ocr(review: dict[str, Any], predictions: dict[str, Any]) -> dict[st
     return {
         "engine": predictions.get("engine", "unspecified"),
         "model": predictions.get("model", "unspecified"),
-        "source_filename": review.get("source", {}).get("filename"),
+        "source_filename": (
+            review.get("source", {}).get("filename")
+            if isinstance(review.get("source"), dict)
+            else None
+        ),
         "metrics": _metrics(samples),
         "by_text_style": {style: _metrics(items) for style, items in sorted(by_style.items())},
         "samples": samples,
