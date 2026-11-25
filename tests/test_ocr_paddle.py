@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from planline.dataset import import_crop_csv
+from planline.dataset import create_grouped_splits, import_crop_csv
 from planline.ocr_paddle import main as run_ocr_paddle, recognize_dataset_crops, recognize_review_crops
 
 
@@ -159,3 +159,36 @@ def test_ocr_runner_accepts_exported_model_directory(tmp_path, monkeypatch) -> N
     assert output["model"] == str(model_dir.resolve())
     assert len(output["predictions"]) == 1
 
+
+def test_recognize_dataset_crops_can_limit_inference_to_held_out_test_split(tmp_path) -> None:
+    crop_paths = []
+    annotations = tmp_path / "labels.csv"
+    for index in range(6):
+        crop_path = tmp_path / f"crop-{index}.png"
+        Image.new("RGB", (24, 12), (index * 20, 255 - index * 20, 90)).save(crop_path)
+        crop_paths.append(crop_path)
+    with annotations.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=["image", "text", "source_id", "writer_id", "text_style", "verified"],
+        )
+        writer.writeheader()
+        for index, crop_path in enumerate(crop_paths):
+            writer.writerow({
+                "image": crop_path.name, "text": f"{index + 1}200 mm",
+                "source_id": f"plan-{index}", "writer_id": f"writer-{index}",
+                "text_style": "handwritten", "verified": "true",
+            })
+    dataset = tmp_path / "dataset"
+    import_crop_csv(annotations, dataset)
+    split_plan = create_grouped_splits(dataset, seed=11)
+    expected_test_ids = {
+        crop_id for crop_id, split_name in split_plan["assignments"].items() if split_name == "test"
+    }
+    recognizer = FakeRecognizer()
+
+    predictions, skipped = recognize_dataset_crops(dataset, recognizer, split="test")
+
+    assert skipped == 0
+    assert {item["crop_id"] for item in predictions} == expected_test_ids
+    assert len(recognizer.seen_shapes) == len(expected_test_ids)
