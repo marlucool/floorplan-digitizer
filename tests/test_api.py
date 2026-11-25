@@ -401,6 +401,7 @@ def test_web_ui_assets_and_architecture_notes_are_served() -> None:
     assert 'id="exportGeometry"' in page.text
     assert 'id="drawRoomTool"' in page.text
     assert 'id="wallLength"' in page.text
+    assert 'id="geometrySnap"' in page.text
     assert 'id="finishRoom"' in page.text
     assert 'id="roomArea"' in page.text
 
@@ -418,6 +419,7 @@ def test_web_ui_assets_and_architecture_notes_are_served() -> None:
     assert "manual_rooms" in script.text
     assert "polygonAreaPx2" in script.text
     assert "function beginWallEndpointDrag" in script.text
+    assert "function snapPointToGeometry" in script.text
     assert "function moveWallEndpointDrag" in script.text
     assert script.status_code == 200
     assert "renderDetectionRows" in script.text

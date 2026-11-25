@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false } };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -456,12 +456,13 @@ function renderGeometryControls() {
   $("#drawRoomTool").classList.toggle("active-tool", geometry.mode === "draw_room");
   $("#selectWallTool").classList.toggle("active-tool", geometry.mode === "select");
   $("#previewImage").classList.toggle("geometry-drawing", geometry.mode === "draw_wall" || geometry.mode === "draw_room");
+  const snapNote = geometry.lastSnap ? " Snapped to " + geometry.lastSnap.id + "." : "";
   if (geometry.mode === "draw_wall") {
-    $("#geometryStatus").textContent = geometry.pendingPoint ? "Start point set. Click the end point." : "Draw mode: click a wall start, then its end.";
+    $("#geometryStatus").textContent = (geometry.pendingPoint ? "Start point set. Click the end point." : "Draw mode: click a wall start, then its end.") + snapNote;
   } else if (geometry.mode === "draw_room") {
     $("#geometryStatus").textContent = geometry.pendingRoom.length
-      ? geometry.pendingRoom.length + " room vertices placed. Add more points, then Finish room."
-      : "Room mode: click at least three corners, then Finish room.";
+      ? geometry.pendingRoom.length + " room vertices placed. Add more points, then Finish room." + snapNote
+      : "Room mode: click at least three corners, then Finish room." + snapNote;
   } else if (geometry.selectedRoomId) {
     $("#geometryStatus").textContent = "Selected " + geometry.selectedRoomId + ". Area is shown below.";
   } else if (geometry.selectedId) {
@@ -502,6 +503,7 @@ function setGeometryMode(mode) {
   }
   state.geometry.mode = mode;
   state.geometry.drag = null;
+  state.geometry.lastSnap = null;
   if (mode !== "draw_wall") state.geometry.pendingPoint = null;
   if (mode !== "draw_room") state.geometry.pendingRoom = [];
   if (mode !== "select") { state.geometry.selectedId = null; state.geometry.selectedRoomId = null; }
@@ -509,8 +511,39 @@ function setGeometryMode(mode) {
   if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
 }
 
+function snapPointToGeometry(point) {
+  if (!point || !$("#geometrySnap").checked) {
+    state.geometry.lastSnap = null;
+    return point;
+  }
+  const candidates = [];
+  state.geometry.segments.forEach((segment) => {
+    candidates.push({ id: segment.id, point: segment.start_px });
+    candidates.push({ id: segment.id, point: segment.end_px });
+  });
+  state.geometry.rooms.forEach((room) => {
+    room.vertices_px.forEach((vertex) => candidates.push({ id: room.id, point: vertex }));
+  });
+  let nearest = null;
+  let nearestDistance = 10;
+  candidates.forEach((candidate) => {
+    const distance = Math.hypot(point.x - candidate.point.x, point.y - candidate.point.y);
+    if (distance <= nearestDistance) {
+      nearest = candidate;
+      nearestDistance = distance;
+    }
+  });
+  if (!nearest) {
+    state.geometry.lastSnap = null;
+    return point;
+  }
+  state.geometry.lastSnap = { id: nearest.id, distance: nearestDistance };
+  return { x: nearest.point.x, y: nearest.point.y };
+}
+
 function addManualWallPoint(point) {
   if (!point) return;
+  point = snapPointToGeometry(point);
   if (!state.geometry.pendingPoint) {
     state.geometry.pendingPoint = point;
   } else {
@@ -560,6 +593,7 @@ function pointInPolygon(point, vertices) {
 
 function addManualRoomPoint(point) {
   if (!point) return;
+  point = snapPointToGeometry(point);
   state.geometry.pendingRoom.push({ x: Number(point.x.toFixed(2)), y: Number(point.y.toFixed(2)) });
   renderGeometryControls();
   if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
@@ -594,6 +628,11 @@ function finishManualRoom() {
   const vertices = state.geometry.pendingRoom;
   if (vertices.length < 3) return;
   const area = polygonAreaPx2(vertices);
+  const uniqueVertices = new Set(vertices.map((point) => point.x + "," + point.y));
+  if (uniqueVertices.size < 3) {
+    $("#geometryStatus").textContent = "A room needs at least three distinct corners.";
+    return;
+  }
   if (!isSimplePolygon(vertices)) {
     $("#geometryStatus").textContent = "This outline crosses itself. Cancel it and trace the room boundary without crossing edges.";
     return;
