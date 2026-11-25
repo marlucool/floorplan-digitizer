@@ -1068,6 +1068,21 @@ function renderDimensionTextReview(regions) {
     textInput.placeholder = "Enter the visible text";
     textLabel.append(textInput);
 
+    const interpretButton = document.createElement("button");
+    interpretButton.type = "button";
+    interpretButton.className = "toolbar-button interpret-dimension-button";
+    interpretButton.textContent = "Interpret dimension";
+    interpretButton.disabled = true;
+    const interpretation = document.createElement("output");
+    interpretation.className = "dimension-interpretation";
+    interpretation.setAttribute("aria-live", "polite");
+    textInput.addEventListener("input", () => {
+      interpretButton.disabled = !textInput.value.trim();
+      interpretation.textContent = "";
+      updateDatasetCaptureButtons();
+    });
+    interpretButton.addEventListener("click", () => interpretDimensionForRow(textInput, interpretation, interpretButton));
+
     const styleLabel = document.createElement("label");
     styleLabel.textContent = "Writing style";
     const styleSelect = document.createElement("select");
@@ -1200,7 +1215,7 @@ function renderDimensionTextReview(regions) {
     textInput.addEventListener("input", updateDatasetCaptureButtons);
     verifiedInput.addEventListener("change", updateDatasetCaptureButtons);
 
-    fields.append(meta, textLabel, styleLabel, verifiedLabel, associationPanel, saveCropButton);
+    fields.append(meta, textLabel, interpretButton, interpretation, styleLabel, verifiedLabel, associationPanel, saveCropButton);
     row.append(fields);
     container.append(row);
   });
@@ -1225,12 +1240,49 @@ function showOcrSuggestion(row, prediction) {
   useButton.disabled = !prediction.text;
   useButton.addEventListener("click", () => {
     row.querySelector(".dimension-text-value").value = prediction.text;
+    row.querySelector(".dimension-text-value").dispatchEvent(new Event("input", { bubbles: true }));
     row.querySelector(".dimension-text-verified-input").checked = false;
     showNotice("OCR suggestion inserted", "It is still unverified. Check every character against the original crop before marking it verified.");
   });
   wrapper.append(text, useButton);
   const association = fields.querySelector(".dimension-association");
   fields.insertBefore(wrapper, association || null);
+}
+
+async function interpretDimensionForRow(input, output, button) {
+  const text = input.value.trim();
+  if (!text) return;
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "Interpreting…";
+  output.textContent = "Checking explicit dimension syntax…";
+  try {
+    const response = await fetch("/api/interpret-dimension", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.detail || "Dimension interpretation failed.");
+    if (result.status === "parsed") {
+      output.textContent = "Interpretation: " + result.value_mm + " mm (" + result.dimension_type +
+        ", source unit " + result.unit + "). Check this against the original drawing; it is not verified.";
+    } else if (result.status === "unit_missing") {
+      output.textContent = "Number detected: " + (result.value || text) +
+        ". No unit is written, so Planline has not converted it to millimetres.";
+    } else if (result.status === "ambiguous") {
+      output.textContent = "Ambiguous number format. Planline will not guess whether the separator is decimal or thousands.";
+    } else {
+      output.textContent = "No supported dimension format recognised. " + (result.reason || "Review the text manually.");
+    }
+    output.dataset.status = result.status;
+  } catch (error) {
+    output.textContent = "Could not interpret dimension: " + (error.message || "Local API unavailable.");
+    output.dataset.status = "error";
+  } finally {
+    button.textContent = originalText;
+    button.disabled = !input.value.trim();
+  }
 }
 
 function renderDrawingDatasetOptions() {

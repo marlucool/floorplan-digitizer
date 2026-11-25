@@ -21,6 +21,7 @@ import numpy as np
 from PIL import Image, UnidentifiedImageError
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
+from pydantic import BaseModel, Field
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__, updater
@@ -28,6 +29,7 @@ from . import __version__, updater
 from .association import associate_dimensions
 from .constraints import DimensionChainRequest, validate_dimension_chain
 from .dxf_export import ManualGeometryDXFRequest, export_manual_geometry_dxf
+from .dimensions import interpret_dimension_text
 from .ocr_studio_api import router as ocr_studio_router
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -319,6 +321,16 @@ def install_update() -> dict[str, str]:
         return updater.stage_and_launch_update()
     except updater.UpdateError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class DimensionTextRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=128)
+
+
+@app.post("/api/interpret-dimension")
+def interpret_dimension_endpoint(request: DimensionTextRequest) -> dict[str, Any]:
+    """Interpret explicitly written dimension syntax without assuming missing units."""
+    return interpret_dimension_text(request.text)
 
 
 @app.post("/api/validate-dimension-chain")
