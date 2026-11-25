@@ -23,6 +23,17 @@ The important problem is not tracing pixels. Survey drawings can be skewed, fade
 | Optional OCR | Standalone PaddleOCR recognition runner for saved dimension crops; raw results remain unverified |
 | OCR evaluation | Compare predictions against verified review labels or curated crop datasets using exact-match rate, coverage and character error rate |
 | Crop dataset curation | Export verified full-string crops or import manual crops; validate manifests and create source/writer-safe splits |
+| OCR dataset quality | Read-only audit of label quality, character coverage, duplicate crops, source/writer counts and split leakage |
+
+### Audit an OCR dataset before training
+
+Run a read-only quality report after collecting and splitting crops:
+
+```bash
+python -m planline.ocr_quality --dataset datasets/handwriting --output datasets/handwriting/quality-report.json
+```
+
+The report flags duplicate images, conflicting labels, suspicious transcription formatting, weak source/writer coverage and split problems. It also reports character frequencies so the recogniser's supported character set can be checked. See [the OCR dataset quality guide](docs/OCR_DATASET_QUALITY.md). A clean report is only a data-hygiene check; it does not prove the dataset is large or representative enough to train a reliable model.
 
 ### Start collecting handwritten dimension samples
 
