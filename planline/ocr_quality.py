@@ -14,16 +14,20 @@ from typing import Any
 
 from .dataset import SPLITS_NAME, _read_manifest, validate_dataset
 
-SPLITS = ("train", "validation", "test")
-
 
 def audit_dataset(dataset_dir: Path) -> dict[str, Any]:
     """Return a deterministic quality report without modifying the dataset."""
     dataset_dir = dataset_dir.expanduser().resolve()
-    validation = validate_dataset(dataset_dir)
     entries = _read_manifest(dataset_dir)
     warnings: list[dict[str, str]] = []
     notes: list[str] = []
+    try:
+        validation = validate_dataset(dataset_dir)
+        dataset_valid = True
+    except (OSError, ValueError) as exc:
+        validation = {"error": str(exc)}
+        dataset_valid = False
+        warnings.append({"code": "dataset_validation_failed", "message": str(exc)})
 
     def warn(code: str, message: str) -> None:
         warnings.append({"code": code, "message": message})
@@ -79,8 +83,17 @@ def audit_dataset(dataset_dir: Path) -> dict[str, Any]:
     split_summary: dict[str, Any] = {"present": False, "counts": {}, "groups": {}}
     split_path = dataset_dir / SPLITS_NAME
     if split_path.is_file():
-        split_data = json.loads(split_path.read_text(encoding="utf-8"))
+        try:
+            split_data = json.loads(split_path.read_text(encoding="utf-8"))
+            if not isinstance(split_data, dict):
+                raise ValueError("Split file must contain a JSON object.")
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            split_data = {}
+            warn("invalid_splits_file", f"Could not read split assignments: {exc}")
         assignments = split_data.get("assignments", {})
+        if not isinstance(assignments, dict):
+            assignments = {}
+            warn("invalid_splits_file", "Split assignments must be a JSON object.")
         split_summary = {
             "present": True,
             "counts": split_data.get("sample_counts", {}),
@@ -110,7 +123,7 @@ def audit_dataset(dataset_dir: Path) -> dict[str, Any]:
     report = {
         "schema": "planline-ocr-quality-report/v1",
         "dataset": dataset_dir.name,
-        "valid": True,
+        "valid": dataset_valid,
         "sample_count": len(entries),
         "verified_count": sum(item.get("verified") is True for item in entries),
         "source_count": len(sources),
