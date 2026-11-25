@@ -33,12 +33,15 @@ def _recognition_fields(result: Any) -> tuple[str, float | None]:
     if not isinstance(text, str):
         text = ""
     score = payload.get("rec_score")
-    if isinstance(score, bool) or not isinstance(score, (int, float)):
-        score = None
-    elif not math.isfinite(float(score)) or not 0 <= float(score) <= 1:
+    if isinstance(score, bool):
         score = None
     else:
-        score = float(score)
+        try:
+            score = float(score)
+        except (TypeError, ValueError, OverflowError):
+            score = None
+        if score is not None and (not math.isfinite(score) or not 0 <= score <= 1):
+            score = None
     return text, score
 
 
