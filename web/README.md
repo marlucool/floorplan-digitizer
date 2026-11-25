@@ -151,7 +151,7 @@ Dataset predictions are keyed by crop_id. This recognises the whole dataset; it 
 
 ## OCR benchmark evaluation
 
-The manual transcription export can serve as ground truth for comparing OCR engines. The evaluator does not run OCR; it compares a predictions JSON file against **verified** entries in a Planline review export and reports exact-string rate, prediction coverage and character error rate (CER), overall and by printed/handwritten/unclear style.
+The manual transcription export or curated crop dataset can serve as ground truth for comparing OCR engines. The evaluator does not run OCR; it compares a predictions JSON file against **verified** labels and reports exact-string rate, prediction coverage and character error rate (CER), overall and by printed/handwritten/unclear style.
 
 Prediction file format:
 
@@ -180,6 +180,17 @@ python -m planline.ocr_eval \\
 
 Only manually verified, non-empty reference strings are scored. Missing predictions count as empty strings. Only leading/trailing whitespace is trimmed; punctuation, decimal separators and units are compared exactly. Keep the review export and predictions file together so each result can be traced to its source detection.
 
+For a curated local crop dataset, score the held-out test split (the default) by crop_id. The dataset split is grouped by source drawing and writer, so related scans or handwriting stay together:
+
+~~~bash
+python -m planline.ocr_eval \
+  --dataset datasets/handwriting \
+  --predictions handwriting-predictions.json \
+  --output handwriting-metrics.json
+~~~
+
+Use --split validation or --split train only for diagnostics. Use --split all only for a non-held-out summary, not as your final benchmark.
+
 ## Handwritten-dimension crop dataset
 
 Your own manually cropped dimension images can be used directly. Planline can also extract verified crops from its review export.
@@ -191,18 +202,7 @@ Your own manually cropped dimension images can be used directly. Planline can al
 3. Export the review JSON. Keep the exact raster image used for analysis; the JSON contains crop coordinates and labels, not image pixels.
 4. From the repository root, run:
 
-~~~ 
-
-For the curated crop dataset, score the held-out test split (the default) by crop_id. The split is source/writer grouped, so related drawings or handwriting are not mixed across training and test:
-
 ~~~bash
-python -m planline.ocr_eval \
-  --dataset datasets/handwriting \
-  --predictions handwriting-predictions.json \
-  --output handwriting-metrics.json
-~~~
-
-Use --split validation or --split train only for diagnostics. Use --split all only for a non-held-out summary, not as your final benchmark.bash
 python -m planline.dataset export-review \
   --review planline-review.json \
   --image original-scan.png \
@@ -239,6 +239,18 @@ python -m planline.dataset split --dataset datasets/handwriting --seed 42
 ~~~
 
 The dataset contains images/, manifest.jsonl and splits.json. Splits target 80/10/10, but actual proportions depend on how many independent source/writer groups you have. At least three independent groups are required. Crops connected by either source_id or writer_id are kept together to prevent near-duplicate drawing or handwriting leakage. Adding samples invalidates the old split file; regenerate it after curation. Use --force only when you deliberately want to replace an existing split plan.
+
+### Run and benchmark OCR on the crop dataset
+
+Once the dataset is curated, you can run the optional PaddleOCR recogniser across its crops:
+
+~~~bash
+python -m planline.ocr_paddle \
+  --dataset datasets/handwriting \
+  --output handwriting-predictions.json
+~~~
+
+The runner checks the dataset manifest and crop checksums before inference. It emits raw, unverified predictions keyed by crop_id. It does not train the recogniser or alter your labels. The evaluation command above uses the held-out test split by default.
 
 ### Cropping guidance
 
