@@ -35,6 +35,7 @@ def _metrics(samples: list[dict[str, Any]]) -> dict[str, Any]:
             "predicted_count": 0,
             "exact_matches": 0,
             "exact_match_rate": None,
+            "prediction_coverage_rate": None,
             "character_error_rate": None,
         }
     predicted = sum(bool(sample["prediction"]) for sample in samples)
@@ -46,6 +47,7 @@ def _metrics(samples: list[dict[str, Any]]) -> dict[str, Any]:
         "predicted_count": predicted,
         "exact_matches": exact,
         "exact_match_rate": exact / len(samples),
+        "prediction_coverage_rate": predicted / len(samples),
         "character_error_rate": edit_distance / max(1, reference_chars),
     }
 
@@ -99,9 +101,12 @@ def evaluate_ocr(review: dict[str, Any], predictions: dict[str, Any]) -> dict[st
         prediction_item = prediction_map.get(detection_id)
         prediction = prediction_item.get("text", "").strip() if prediction_item else ""
         distance = levenshtein_distance(reference, prediction)
+        text_style = item.get("text_style", "unknown")
+        if text_style not in {"unknown", "printed", "handwritten", "unclear"}:
+            text_style = "unknown"
         samples.append({
             "detection_id": detection_id,
-            "text_style": item.get("text_style", "unknown"),
+            "text_style": text_style,
             "reference": reference,
             "prediction": prediction,
             "confidence": prediction_item.get("confidence") if prediction_item else None,
