@@ -20,6 +20,9 @@ function resetWorkspace() {
   if ($("#detectionSort")) $("#detectionSort").value = "original";
   $("#fileInput").value = "";
   $("#fileCard").classList.add("hidden");
+  $("#pdfPageControl").classList.add("hidden");
+  $("#pdfPageNumber").value = "1";
+  $("#pdfPageCount").textContent = "Page count will be confirmed after analysis.";
   $("#dropzone").classList.remove("hidden");
   $("#analyzeButton").disabled = true;
   $("#exportReview").disabled = true;
@@ -91,6 +94,10 @@ function setFile(file) {
   $("#previewImage").style.height = "";
   $("#fileName").textContent = file.name;
   $("#fileMeta").textContent = formatBytes(file.size) + " · selected locally";
+  const isPdf = /\.pdf$/i.test(file.name);
+  $("#pdfPageControl").classList.toggle("hidden", !isPdf);
+  $("#pdfPageNumber").value = "1";
+  $("#pdfPageCount").textContent = "Page count will be confirmed after analysis.";
   $("#fileCard").classList.remove("hidden");
   $("#dropzone").classList.add("hidden");
   $("#analyzeButton").disabled = false;
@@ -201,6 +208,16 @@ function drawDetections(previewUrl, detections, imageSize) {
 }
 function renderResults(payload) {
   const detections = payload.detections || [];
+  if (payload.source?.source_type === "pdf") {
+    const pageNumber = Number(payload.source.page_index || 0) + 1;
+    const pageCount = Number(payload.source.page_count || 1);
+    $("#pdfPageControl").classList.remove("hidden");
+    $("#pdfPageNumber").value = String(pageNumber);
+    $("#pdfPageNumber").max = String(pageCount);
+    $("#pdfPageCount").textContent = `Page ${pageNumber} of ${pageCount}`;
+  } else {
+    $("#pdfPageControl").classList.add("hidden");
+  }
   $("#exportReview").disabled = false;
   $("#sourceState").textContent = "Analysed";
   $("#viewTag").textContent = "DETECTION OVERLAY";
@@ -253,7 +270,11 @@ function renderResults(payload) {
   renderDimensionTextReview(payload.dimension_regions || []);
   const notes = (payload.notes || []).join(" ");
   showNotice(detections.length ? "Detection finished — OCR has not run" : "No candidate regions detected", detections.length ? notes : "The model returned no boxes at its current confidence threshold. This does not prove that the drawing contains no walls or dimensions. " + notes);
-  if (payload.source && payload.source.note) showNotice("Detection finished — first PDF page only", notes + " " + payload.source.note);
+  if (payload.source?.source_type === "pdf") {
+    const pageNumber = Number(payload.source.page_index || 0) + 1;
+    const pageCount = Number(payload.source.page_count || 1);
+    showNotice(`PDF page ${pageNumber} of ${pageCount} analysed`, notes + " Select another page above and analyse it without uploading the PDF again.");
+  }
   if (payload.preview_data_url) drawDetections(payload.preview_data_url, detections, payload.image);
 }
 
@@ -513,6 +534,19 @@ $("#overlayToggle").addEventListener("click", () => {
 async function analyse() {
   if (!state.file) return;
   const file = state.file;
+  const isPdf = /\.pdf$/i.test(file.name);
+  const pageNumber = Number($("#pdfPageNumber").value);
+  if (isPdf && (!Number.isInteger(pageNumber) || pageNumber < 1)) {
+    showNotice("Choose a valid PDF page", "Enter a whole page number starting at 1.");
+    $("#pdfPageNumber").focus();
+    return;
+  }
+  const knownPageCount = Number($("#pdfPageNumber").max || 0);
+  if (isPdf && knownPageCount && pageNumber > knownPageCount) {
+    showNotice("Page is outside this PDF", `This PDF has ${knownPageCount} pages. Choose a page from 1 to ${knownPageCount}.`);
+    $("#pdfPageNumber").focus();
+    return;
+  }
   const controller = new AbortController();
   state.controller = controller;
   const button = $("#analyzeButton");
@@ -536,6 +570,7 @@ async function analyse() {
     const form = new FormData();
     form.append("file", file);
     form.append("confidence_threshold", $("#confidenceThreshold").value);
+    form.append("page_index", String(isPdf ? pageNumber - 1 : 0));
     const response = await fetch("/api/analyze", { method: "POST", body: form, signal: controller.signal });
     const payload = await response.json().catch(() => ({}));
     if (state.controller !== controller) return;
