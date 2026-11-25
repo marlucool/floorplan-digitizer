@@ -202,7 +202,8 @@
           "verified",
           "detector_confidence",
           "bbox",
-          "crop_bbox"
+          "crop_bbox",
+          "text_style"
         ],
         "properties": {
           "detection_id": {
@@ -301,6 +302,15 @@
               {
                 "type": "null"
               }
+            ]
+          },
+          "text_style": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "printed",
+              "handwritten",
+              "unclear"
             ]
           }
         }
