@@ -29,7 +29,15 @@ The current web integration is intentionally a detection-and-review slice:
 
 ### Portable project files
 
-The Drawing workspace supports explicit save/open of versioned `.planline` JSON project files. A project embeds the original source file (up to the existing 25 MB source limit), current analysis payload, manual dimension transcriptions, association selections and scale calibration. Saving is user-initiated; there is no background project upload or server-side project storage. Project import validates the format version and source byte count before replacing the current workspace. Keep project files in a trusted local location because they contain the source drawing.
+The Drawing workspace supports explicit save/open of versioned `.planline` JSON project files. A project embeds the original source file (up to the existing 25 MB source limit), current analysis payload, manual dimension transcriptions, association selections, scale calibration and user-drawn wall segments. Saving is user-initiated; there is no background project upload or server-side project storage. Project import validates the format version and source byte count before replacing the current workspace. Keep project files in a trusted local location because they contain the source drawing.
+
+### Manual wall geometry
+
+The Drawing workspace includes a user-driven wall-segment layer. The reviewer selects Draw wall and clicks a start and end point in source-image coordinates. Segments can be selected, deleted, undone or cleared, and exported as SVG. These lines are explicitly user-created; detector boxes are never promoted to walls automatically. SVG physical sizing uses the user-supplied scale reference when present and records that it is not verified geometry. This is not DXF export or automatic topology reconstruction.
+
+### Manual wall geometry
+
+The Drawing workspace includes a user-driven wall-segment layer. The reviewer selects Draw wall and clicks a start and end point in source-image coordinates. Segments can be selected, deleted, undone or cleared, and exported as SVG. These lines are explicitly user-created; detector boxes are never promoted to walls automatically. SVG physical sizing uses the user-supplied scale reference when present and records that it is not verified geometry. This is not DXF export or automatic topology reconstruction.
 
 ### Image intensity preparation
 

@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, "feat/planline-web-integration"]
   pull_request:
-    branches: [main, "feat/image-cleanup-controls"]
+    branches: [main, "feat/manual-wall-geometry"]
 
 permissions:
   contents: read

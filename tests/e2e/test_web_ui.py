@@ -185,6 +185,25 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.locator("#applyCalibration").click()
             assert "0.085714" in page.locator("#calibrationResult").inner_text()
             assert page.locator("#calibrationState").inner_text() == "Applied"
+            page.locator("#drawWallTool").click()
+            page.locator("#previewImage").click(position={"x": 60, "y": 200})
+            page.locator("#previewImage").click(position={"x": 300, "y": 200})
+            assert page.locator("#geometryCount").inner_text() == "1 manual wall"
+            page.locator("#selectWallTool").click()
+            page.locator("#previewImage").click(position={"x": 180, "y": 200})
+            assert page.locator("#deleteWall").is_enabled()
+            page.locator("#deleteWall").click()
+            assert page.locator("#geometryCount").inner_text() == "0 manual walls"
+            page.locator("#drawWallTool").click()
+            page.locator("#previewImage").click(position={"x": 60, "y": 220})
+            page.locator("#previewImage").click(position={"x": 300, "y": 220})
+            assert page.locator("#geometryCount").inner_text() == "1 manual wall"
+            with page.expect_download() as svg_download_info:
+                page.locator("#exportGeometry").click()
+            svg_download = svg_download_info.value
+            assert svg_download.suggested_filename == "plan-manual-geometry.svg"
+            svg_text = Path(svg_download.path()).read_text()
+            assert "<svg" in svg_text and 'id="manual-wall-002"' in svg_text
             page.locator("#detectionSearch").fill("dimension_value")
             assert page.locator(".detection-row:visible").count() == 1
             page.locator("#detectionSearch").fill("does-not-exist")
@@ -271,6 +290,8 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert project_payload["format_version"] == 1
             assert project_payload["source"]["filename"] == "plan.png"
             assert project_payload["analysis_result"]["image"] == {"width": 400, "height": 300}
+            assert len(project_payload["geometry"]) == 1
+            assert project_payload["geometry"][0]["id"] == "manual-wall-002"
             project_schema = json.loads(
                 (Path(__file__).resolve().parents[2] / "schemas" / "planline-project-v1.schema.json").read_text()
             )
@@ -293,6 +314,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert page.locator("#fileName").inner_text() == "plan.png"
             assert page.locator("#brightnessControl").input_value() == "20"
             assert page.locator("#contrastControl").input_value() == "1.25"
+            assert page.locator("#geometryCount").inner_text() == "1 manual wall"
 
             page.locator("#fitView").click()
             assert page.locator("#zoomLevel").inner_text() == "100%"
