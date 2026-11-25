@@ -297,6 +297,23 @@ function renderDimensionTextReview(regions) {
     textInput.placeholder = "Enter the visible text";
     textLabel.append(textInput);
 
+    const styleLabel = document.createElement("label");
+    styleLabel.textContent = "Writing style";
+    const styleSelect = document.createElement("select");
+    styleSelect.className = "dimension-text-style";
+    [
+      ["unknown", "Not classified"],
+      ["printed", "Printed"],
+      ["handwritten", "Handwritten"],
+      ["unclear", "Unclear / mixed"]
+    ].forEach(([value, label]) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      styleSelect.append(option);
+    });
+    styleLabel.append(styleSelect);
+
     const verifiedLabel = document.createElement("label");
     verifiedLabel.className = "dimension-text-verified";
     const verifiedInput = document.createElement("input");
@@ -304,7 +321,7 @@ function renderDimensionTextReview(regions) {
     verifiedInput.type = "checkbox";
     verifiedLabel.append(verifiedInput, document.createTextNode(" I checked this transcription"));
 
-    fields.append(meta, textLabel, verifiedLabel);
+    fields.append(meta, textLabel, styleLabel, verifiedLabel);
     row.append(fields);
     container.append(row);
   });
@@ -428,6 +445,7 @@ function exportReviewJson() {
       return {
         detection_id: region.id,
         raw_text: textInputs[index]?.value || "",
+        text_style: document.querySelectorAll(".dimension-text-style")[index]?.value || "unknown",
         verified: verifiedInputs[index]?.checked || false,
         detector_confidence: region.confidence,
         bbox: region.bbox,
