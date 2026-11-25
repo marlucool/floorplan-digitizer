@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, "feat/planline-web-integration"]
   pull_request:
-    branches: [main, "feat/project-save-open"]
+    branches: [main, "feat/image-cleanup-controls"]
 
 permissions:
   contents: read

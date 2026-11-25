@@ -3,7 +3,7 @@
 The bundled YOLO model detects candidate regions. A geometric ranking stage
 proposes value-to-line and line-to-wall-span hypotheses for human review; it
 does not read dimensions or create measured geometry. The application does not intentionally persist source drawings
-as project files; multipart parsing may spool uploads to temporary storage.
+automatically; users can explicitly save portable project files. Multipart parsing may spool uploads to temporary storage.
 """
 from __future__ import annotations
 
@@ -74,6 +74,23 @@ def _check_dimensions(width: int, height: int) -> None:
 def _check_image_size(image: np.ndarray) -> None:
     height, width = image.shape[:2]
     _check_dimensions(width, height)
+
+
+def apply_image_adjustments(
+    image: np.ndarray,
+    brightness: float = 0.0,
+    contrast: float = 1.0,
+) -> np.ndarray:
+    """Adjust pixel intensity without changing image dimensions or coordinates."""
+    if not math.isfinite(brightness) or not -100.0 <= brightness <= 100.0:
+        raise ValueError("Brightness must be between -100 and 100.")
+    if not math.isfinite(contrast) or not 0.5 <= contrast <= 2.0:
+        raise ValueError("Contrast must be between 0.5 and 2.0.")
+    return np.clip(
+        image.astype(np.float32) * float(contrast) + float(brightness),
+        0,
+        255,
+    ).astype(np.uint8)
 
 
 def _decode_raster(data: bytes) -> np.ndarray:
@@ -316,6 +333,8 @@ async def analyze_drawing(
     file: UploadFile = File(...),
     confidence_threshold: float = Form(0.25),
     page_index: int = Form(0),
+    brightness: float = Form(0.0),
+    contrast: float = Form(1.0),
 ) -> dict[str, Any]:
     """Detect candidate regions after multipart parsing and bounded in-memory decoding."""
     if not math.isfinite(confidence_threshold) or not 0.0 < confidence_threshold <= 1.0:
@@ -323,6 +342,10 @@ async def analyze_drawing(
             status_code=422,
             detail="confidence_threshold must be greater than 0 and at most 1.",
         )
+    if not math.isfinite(brightness) or not -100.0 <= brightness <= 100.0:
+        raise HTTPException(status_code=422, detail="brightness must be between -100 and 100.")
+    if not math.isfinite(contrast) or not 0.5 <= contrast <= 2.0:
+        raise HTTPException(status_code=422, detail="contrast must be between 0.5 and 2.0.")
 
     filename = (file.filename or "").strip()
     if not filename:
@@ -350,6 +373,8 @@ async def analyze_drawing(
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    processed_image = apply_image_adjustments(image, brightness=brightness, contrast=contrast)
+
     try:
         # Serialize lazy model construction as well as inference. lru_cache
         # protects its cache bookkeeping, but concurrent first calls can still
@@ -357,7 +382,7 @@ async def analyze_drawing(
         with _model_lock:
             detector = get_detector()
             predictions = detector.predict(
-                source=image, conf=confidence_threshold, imgsz=640, verbose=False
+                source=processed_image, conf=confidence_threshold, imgsz=640, verbose=False
             )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -370,7 +395,7 @@ async def analyze_drawing(
         ) from exc
 
     result = predictions[0] if predictions else None
-    detections = serialise_detections(result, image.shape) if result is not None else []
+    detections = serialise_detections(result, processed_image.shape) if result is not None else []
     counts: dict[str, int] = {}
     for detection in detections:
         label = detection["class_name"]
@@ -391,11 +416,11 @@ async def analyze_drawing(
             {"dimension_value_id": item["id"], "status": "unmatched", "candidate_lines": [], "confirmed": False},
         )
         if index < MAX_DIMENSION_CROPS:
-            crop = make_region_crop(image, item["bbox"])
+            crop = make_region_crop(processed_image, item["bbox"])
             if crop is not None:
                 region.update(crop)
         dimension_regions.append(region)
-    height, width = image.shape[:2]
+    height, width = processed_image.shape[:2]
     notes = [
         "Detected boxes are candidate regions, not recognised measurements.",
         "OCR has not run. Read and verify every dimension against the source drawing.",
@@ -416,7 +441,8 @@ async def analyze_drawing(
         "filename": Path(filename).name,
         "source": source_info,
         "image": {"width": width, "height": height},
-        "preview_data_url": make_preview_data_url(image),
+        "preprocessing": {"brightness": brightness, "contrast": contrast, "method": "linear_intensity_only"},
+        "preview_data_url": make_preview_data_url(processed_image),
         "counts": counts,
         "confidence_threshold": confidence_threshold,
         "detections": detections,
