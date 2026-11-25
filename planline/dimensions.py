@@ -128,7 +128,7 @@ def interpret_dimension_text(text: str) -> dict[str, Any]:
         r"""(?P<feet>\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')
         (?:\s*(?:-\s*)?(?P<inches>\d+(?:\.\d+)?|\d+\s+\d+/\d+|\d+/\d+)\s*(?:in|inch(?:es)?|")?)?""",
         value,
-        re.IGNORECASE,
+        re.IGNORECASE | re.VERBOSE,
     )
     if feet_inches:
         feet = Decimal(feet_inches.group("feet"))
@@ -139,6 +139,17 @@ def interpret_dimension_text(text: str) -> dict[str, Any]:
         if millimetres > Decimal("1000000000"):
             return _result(raw, "unrecognized", dimension_type, reason="The dimension exceeds the supported range.")
         return _result(raw, "parsed", dimension_type, value_mm=_format_mm(millimetres), unit="ft/in")
+
+    # Whole or fractional inches, including the architectural double-quote mark.
+    quoted_inches = re.fullmatch(r"(?P<number>\\d+(?:[.,]\\d+)?)\\s*(?:in|inch(?:es)?|\")", value, re.IGNORECASE)
+    if quoted_inches:
+        number, error = _normalise_number(quoted_inches.group("number"))
+        if error or number is None or number <= 0:
+            return _result(raw, "unrecognized", dimension_type, reason=error or "The inch value is invalid.")
+        millimetres = number * UNIT_TO_MM["in"]
+        if millimetres > Decimal("1000000000"):
+            return _result(raw, "unrecognized", dimension_type, reason="The dimension exceeds the supported range.")
+        return _result(raw, "parsed", dimension_type, value_mm=_format_mm(millimetres), value=format(number.normalize(), "f"), unit="in")
 
     # Standalone fractional inches: 1/2", 2 1/2 in.
     fractional_inches = re.fullmatch(
