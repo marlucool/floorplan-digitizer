@@ -231,3 +231,8 @@ html[data-theme="dark"] .ocr-assist-controls{background:#202620;border-color:var
 .dataset-capture-fields input,.dataset-capture-fields select{width:100%;min-width:0;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit}
 #datasetCaptureStatus{display:block;margin-top:10px;font-size:11px;line-height:1.5;color:var(--muted)}
 .save-dimension-crop{margin-top:10px}
+
+.dimension-interpreter-note{font-size:11px;line-height:1.55;color:var(--muted);margin:10px 0}
+.interpret-dimension-button{margin:8px 0 4px}
+.dimension-interpretation{display:block;padding:8px 10px;border-left:2px solid var(--accent);background:var(--panel);font-size:11px;line-height:1.55;color:var(--ink);margin-bottom:8px}
+.dimension-interpretation[data-status="ambiguous"],.dimension-interpretation[data-status="unit_missing"]{border-left-color:var(--warning,#b88736)}
