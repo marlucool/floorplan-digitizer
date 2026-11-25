@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 import re
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,12 @@ from .dataset import (
 )
 from .ocr_training import cancel_job, get_job, start_benchmark_job, start_training_job
 from .ocr_quality import audit_dataset
+
+_OCR_INFERENCE_LOCK = threading.Lock()
+BASE_RECOGNITION_MODELS = {
+    "base:PP-OCRv5_mobile_rec": "PP-OCRv5_mobile_rec",
+    "base:PP-OCRv5_server_rec": "PP-OCRv5_server_rec",
+}
 
 def _get_ocr_dataset_root() -> Path:
     """Use user data storage for installed builds, repo-local storage in development."""
@@ -185,6 +192,128 @@ def ocr_studio_status() -> dict[str, Any]:
         "dataset_root": str(OCR_DATASET_ROOT),
         "training_supported": True,
         "training_note": "Fine-tuning requires a local PaddleOCR source checkout and a matching .pdparams checkpoint.",
+    }
+
+
+@router.get("/models")
+def list_ocr_recognition_models() -> dict[str, Any]:
+    """List supported base recognisers and exported models from local datasets."""
+    models = [
+        {"model_id": model_id, "label": model_name.replace("_", " "), "kind": "base"}
+        for model_id, model_name in BASE_RECOGNITION_MODELS.items()
+    ]
+    if OCR_DATASET_ROOT.is_dir():
+        for dataset_dir in sorted(OCR_DATASET_ROOT.iterdir(), key=lambda path: path.name.lower()):
+            if not dataset_dir.is_dir() or not DATASET_ID_RE.fullmatch(dataset_dir.name):
+                continue
+            runs_dir = dataset_dir / "training_runs"
+            if not runs_dir.is_dir():
+                continue
+            for run_dir in sorted(runs_dir.iterdir(), key=lambda path: path.name):
+                inference_dir = run_dir / "inference"
+                if run_dir.is_dir() and re.fullmatch(r"[a-f0-9]{12}", run_dir.name) and inference_dir.is_dir() and any(inference_dir.glob("*.pdiparams")):
+                    models.append({
+                        "model_id": f"trained:{dataset_dir.name}:{run_dir.name}",
+                        "label": f"{dataset_dir.name} · {run_dir.name}",
+                        "kind": "trained",
+                    })
+    return {"models": models}
+
+
+@router.post("/recognize-review")
+def recognize_review_crops(
+    file: UploadFile = File(...),
+    review_json: str = Form(...),
+    model_id: str = Form("base:PP-OCRv5_mobile_rec"),
+    device: str = Form("cpu"),
+) -> dict[str, Any]:
+    """Run optional PaddleOCR recognition on the dimension crops in a review export."""
+    if device not in {"cpu", "gpu:0"}:
+        raise HTTPException(status_code=422, detail="device must be cpu or gpu:0.")
+    if len(review_json.encode("utf-8")) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Review JSON limit is 2 MB.")
+    if file.size is not None and file.size > MAX_CROP_BYTES:
+        file.file.close()
+        raise HTTPException(status_code=413, detail="Source drawing limit is 25 MB.")
+    try:
+        source_bytes = file.file.read(MAX_CROP_BYTES + 1)
+    finally:
+        file.file.close()
+    if len(source_bytes) > MAX_CROP_BYTES:
+        raise HTTPException(status_code=413, detail="Source drawing limit is 25 MB.")
+    try:
+        review = json.loads(review_json)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=422, detail="Review JSON is not valid.") from exc
+    if not isinstance(review, dict) or review.get("schema_version") != "planline-detection-review/v1":
+        raise HTTPException(status_code=422, detail="Unsupported Planline review format.")
+    source = review.get("source") if isinstance(review.get("source"), dict) else {}
+    page_index = source.get("page_index", 0)
+    if isinstance(page_index, bool) or not isinstance(page_index, int) or page_index < 0:
+        raise HTTPException(status_code=422, detail="Review source page index is invalid.")
+
+    try:
+        from .api import apply_image_adjustments, decode_upload
+        from .ocr_paddle import recognize_review_crops
+
+        filename = (file.filename or source.get("filename") or "drawing.png").strip()
+        image, _source_info = decode_upload(source_bytes, filename, page_index=page_index)
+        analysis = review.get("analysis", {})
+        if not isinstance(analysis, dict):
+            raise ValueError("Review analysis section is invalid.")
+        preprocessing = analysis.get("preprocessing", {})
+        if not isinstance(preprocessing, dict):
+            preprocessing = {}
+        try:
+            brightness = float(preprocessing.get("brightness", 0.0))
+            contrast = float(preprocessing.get("contrast", 1.0))
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("Review image preprocessing settings are invalid.") from exc
+        image = apply_image_adjustments(image, brightness=brightness, contrast=contrast)
+
+        model_dir: Path | None = None
+        model_name: str | None = None
+        if model_id in BASE_RECOGNITION_MODELS:
+            model_name = BASE_RECOGNITION_MODELS[model_id]
+        elif model_id.startswith("trained:"):
+            parts = model_id.split(":")
+            if len(parts) != 3 or not re.fullmatch(r"[a-f0-9]{12}", parts[2]):
+                raise ValueError("Selected fine-tuned model ID is invalid.")
+            dataset_dir = _dataset_dir(parts[1])
+            training_root = (dataset_dir / "training_runs").resolve()
+            model_dir = (training_root / parts[2] / "inference").resolve()
+            if not model_dir.is_relative_to(training_root) or not model_dir.is_dir() or not any(model_dir.glob("*.pdiparams")):
+                raise ValueError("Selected fine-tuned model is missing or is outside this dataset's training_runs folder.")
+        else:
+            raise ValueError("Select a supported base recogniser or a local fine-tuned model.")
+
+        from paddleocr import TextRecognition
+        with _OCR_INFERENCE_LOCK:
+            if model_dir is not None:
+                recognizer = TextRecognition(model_dir=str(model_dir), device=device)
+            else:
+                recognizer = TextRecognition(model_name=model_name, device=device)
+            predictions, skipped = recognize_review_crops(review, image, recognizer)
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="PaddleOCR is optional. Install a compatible PaddlePaddle runtime and PaddleOCR in the Planline Python environment.",
+        ) from exc
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="OCR recognition failed. Check the local server log.") from exc
+
+    return {
+        "engine": "PaddleOCR",
+        "model": model_name or str(model_dir),
+        "device": device,
+        "predictions": predictions,
+        "skipped_crops": skipped,
+        "notes": [
+            "Predictions are unverified suggestions. Check every character against the source drawing.",
+            "No unit parsing, dimension correction, wall association or geometry inference is performed.",
+        ],
     }
 
 

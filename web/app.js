@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, ocrReady: false, ocrModels: [], ocrPredictions: {}, ocrRunning: false, ocrModelId: null, ocrDevice: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -1139,7 +1139,121 @@ function renderDimensionTextReview(regions) {
     row.append(fields);
     container.append(row);
   });
+  updateOcrControls();
 }
+
+function showOcrSuggestion(row, prediction) {
+  const fields = row.querySelector(".dimension-text-fields");
+  if (!fields) return;
+  fields.querySelector(".ocr-suggestion")?.remove();
+  const wrapper = document.createElement("div");
+  wrapper.className = "ocr-suggestion";
+  const text = document.createElement("span");
+  const confidence = Number.isFinite(prediction.confidence)
+    ? " · " + Math.round(prediction.confidence * 100) + "% recogniser score"
+    : " · confidence unavailable";
+  text.textContent = "OCR suggestion: " + (prediction.text || "(no text recognised)") + confidence + " · unverified";
+  const useButton = document.createElement("button");
+  useButton.type = "button";
+  useButton.className = "toolbar-button";
+  useButton.textContent = "Use suggestion";
+  useButton.disabled = !prediction.text;
+  useButton.addEventListener("click", () => {
+    row.querySelector(".dimension-text-value").value = prediction.text;
+    row.querySelector(".dimension-text-verified-input").checked = false;
+    showNotice("OCR suggestion inserted", "It is still unverified. Check every character against the original crop before marking it verified.");
+  });
+  wrapper.append(text, useButton);
+  const association = fields.querySelector(".dimension-association");
+  fields.insertBefore(wrapper, association || null);
+}
+
+function updateOcrControls() {
+  if (!$("#runOcrButton")) return;
+  const hasCandidates = Boolean(state.result?.dimension_regions?.length);
+  $("#runOcrButton").disabled = !state.ocrReady || !hasCandidates || state.ocrRunning || !$("#ocrModelSelect").value;
+  if (!state.ocrReady) {
+    $("#ocrAssistStatus").textContent = "Optional PaddleOCR runtime not detected. Manual transcription and dataset tools remain available.";
+  } else if (state.ocrRunning) {
+    $("#ocrAssistStatus").textContent = "Recognising dimension crops…";
+  } else if (!hasCandidates) {
+    $("#ocrAssistStatus").textContent = "Analyse a drawing with dimension candidates to run OCR.";
+  } else {
+    $("#ocrAssistStatus").textContent = "OCR suggestions are unverified. Review each result before accepting it.";
+  }
+}
+
+async function loadOcrCapabilities() {
+  try {
+    const [statusResponse, modelsResponse] = await Promise.all([
+      fetch("/api/ocr/status"),
+      fetch("/api/ocr/models")
+    ]);
+    if (!statusResponse.ok || !modelsResponse.ok) throw new Error("OCR status endpoint unavailable.");
+    const status = await statusResponse.json();
+    const modelPayload = await modelsResponse.json();
+    state.ocrReady = Boolean(status.paddle_installed && status.paddleocr_installed);
+    state.ocrModels = Array.isArray(modelPayload.models) ? modelPayload.models : [];
+    const select = $("#ocrModelSelect");
+    select.replaceChildren();
+    state.ocrModels.forEach((model) => {
+      const option = document.createElement("option");
+      option.value = model.model_id;
+      option.textContent = model.label + (model.kind === "trained" ? " · fine-tuned" : " · base");
+      select.append(option);
+    });
+    if (state.ocrModelId && state.ocrModels.some((model) => model.model_id === state.ocrModelId)) {
+      select.value = state.ocrModelId;
+    }
+    if (!state.ocrModels.length) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "No recognisers available";
+      select.append(option);
+    }
+  } catch (error) {
+    state.ocrReady = false;
+    $("#ocrAssistStatus").textContent = error.message || "OCR status unavailable.";
+  }
+  updateOcrControls();
+}
+
+async function runOcrOnCandidates() {
+  if (!state.file || !state.result || !state.ocrReady || state.ocrRunning || !$("#ocrModelSelect").value) return;
+  state.ocrRunning = true;
+  document.querySelectorAll(".ocr-suggestion").forEach((node) => node.remove());
+  updateOcrControls();
+  state.ocrModelId = $("#ocrModelSelect").value;
+  state.ocrDevice = $("#ocrDeviceSelect").value;
+  const form = new FormData();
+  form.append("file", state.file);
+  form.append("review_json", JSON.stringify(buildReviewObject()));
+  form.append("model_id", state.ocrModelId);
+  form.append("device", state.ocrDevice);
+  try {
+    const response = await fetch("/api/ocr/recognize-review", { method: "POST", body: form });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || "OCR failed (HTTP " + response.status + ").");
+    state.ocrPredictions = {};
+    (payload.predictions || []).forEach((prediction) => {
+      state.ocrPredictions[prediction.detection_id] = prediction;
+      const row = [...document.querySelectorAll(".dimension-text-item")]
+        .find((item) => item.dataset.detectionId === prediction.detection_id);
+      if (row) showOcrSuggestion(row, prediction);
+    });
+    const recognised = Object.values(state.ocrPredictions).filter((item) => item.text).length;
+    $("#ocrAssistStatus").textContent = recognised + " text suggestions returned. None are verified automatically.";
+    showNotice("OCR suggestions ready", recognised + " candidates returned text. Check the original crops before accepting or verifying them.");
+  } catch (error) {
+    showNotice("OCR could not complete", error.message || "Check the optional PaddleOCR runtime.");
+    $("#ocrAssistStatus").textContent = error.message || "OCR failed.";
+  } finally {
+    state.ocrRunning = false;
+    updateOcrControls();
+  }
+}
+
+$("#runOcrButton").addEventListener("click", runOcrOnCandidates);
 
 function renderDetectionRows(detections) {
   const container = $("#detectionList");
@@ -1245,6 +1359,7 @@ async function analyse() {
   $("#selectedDetection").classList.add("hidden");
   $("#noDetectionMatches").classList.add("hidden");
   clearDimensionTextReview();
+  state.ocrPredictions = {};
   $("#resultStatus").textContent = "ANALYSING";
   $("#detectionCount").textContent = "Analysis in progress";
   showNotice("Analysis in progress", "The previous result has been cleared. Candidate detections will appear when this run finishes.");
@@ -1288,6 +1403,7 @@ function buildReviewObject() {
     generated_at: new Date().toISOString(),
     source: {
       filename: state.file?.name || null,
+      page_index: result.source?.page_index ?? 0,
       image_width_px: result.image.width,
       image_height_px: result.image.height
     },
@@ -1297,6 +1413,8 @@ function buildReviewObject() {
       confidence_threshold: result.confidence_threshold ?? 0.25,
       status: "candidate_detection_only",
       preprocessing: result.preprocessing || { brightness: 0, contrast: 1, method: "linear_intensity_only" },
+      ocr_model_id: state.ocrModelId,
+      ocr_device: state.ocrDevice,
       coordinate_system: "pixel coordinates; origin at top-left; x increases right; y increases down"
     },
     counts: {
@@ -1312,7 +1430,6 @@ function buildReviewObject() {
       centre: detection.centre
     })),
     manual_geometry: state.geometry.segments.map((segment) => ({ ...segment })),
-    manual_rooms: state.geometry.rooms.map((room) => ({ ...room })),
     manual_rooms: state.geometry.rooms.map((room) => ({ ...room })),
     manual_dimension_text_review: (result.dimension_regions || []).map((region, index) => {
       const textInputs = document.querySelectorAll(".dimension-text-value");
@@ -1335,6 +1452,7 @@ function buildReviewObject() {
         detector_confidence: region.confidence,
         bbox: region.bbox,
         crop_bbox: region.crop_bbox || null,
+        ocr_suggestion: state.ocrPredictions[region.id] || null,
         association: {
           status: association.status || "unmatched",
           dimension_line_id: selectedLine?.dimension_line_id || null,
@@ -1368,7 +1486,9 @@ function buildReviewObject() {
       };
     }),
     limitations: [
-      "No OCR has been performed; manual transcription entries are user-entered and not machine-verified.",
+      Object.keys(state.ocrPredictions).length
+        ? "OCR suggestions are machine-generated and remain unverified until a user checks the original crop."
+        : "No OCR has been performed; manual transcription entries are user-entered and not machine-verified.",
       "Geometric association suggestions are axis-aligned box hypotheses; only explicitly confirmed line and wall-pair selections are marked as reviewed.",
       state.calibration.applied
         ? "A two-point scale was supplied by the user and recorded as pixels per millimetre; it is not an independently verified measurement or validated geometry."
@@ -1455,6 +1575,14 @@ async function saveProject() {
 
 function restoreProjectReview(review) {
   const entries = review?.manual_dimension_text_review || [];
+  state.ocrModelId = review?.analysis?.ocr_model_id || null;
+  state.ocrDevice = review?.analysis?.ocr_device || null;
+  if (state.ocrModelId && [...$("#ocrModelSelect").options].some((option) => option.value === state.ocrModelId)) {
+    $("#ocrModelSelect").value = state.ocrModelId;
+  }
+  if (state.ocrDevice && [...$("#ocrDeviceSelect").options].some((option) => option.value === state.ocrDevice)) {
+    $("#ocrDeviceSelect").value = state.ocrDevice;
+  }
   entries.forEach((entry, index) => {
     const textInput = document.querySelectorAll(".dimension-text-value")[index];
     const styleInput = document.querySelectorAll(".dimension-text-style")[index];
@@ -1465,6 +1593,12 @@ function restoreProjectReview(review) {
     if (textInput) textInput.value = entry.raw_text || "";
     if (styleInput) styleInput.value = entry.text_style || "unknown";
     if (verifiedInput) verifiedInput.checked = Boolean(entry.verified);
+    if (entry.ocr_suggestion && typeof entry.ocr_suggestion === "object") {
+      state.ocrPredictions[entry.detection_id] = entry.ocr_suggestion;
+      const row = [...document.querySelectorAll(".dimension-text-item")]
+        .find((item) => item.dataset.detectionId === entry.detection_id);
+      if (row) showOcrSuggestion(row, entry.ocr_suggestion);
+    }
     const association = entry.association || {};
     if (lineSelect && association.dimension_line_id) {
       lineSelect.value = association.dimension_line_id;
@@ -1797,3 +1931,5 @@ fetch("/api/health").then((r) => r.json()).then((health) => {
   $("#apiStatus").textContent = "API unavailable";
   showNotice("API unavailable", "Start the local Planline API to enable drawing analysis.");
 });
+
+loadOcrCapabilities();

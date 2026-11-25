@@ -207,3 +207,12 @@ html[data-theme="dark"] .geometry-tools button.active-tool{background:#263c2c;co
 
 .geometry-snap{display:flex;align-items:flex-start;gap:7px;font:9px/1.5 'DM Mono';color:var(--muted)}
 .geometry-snap input{margin:1px 0 0;accent-color:var(--green)}
+
+.ocr-assist-controls{margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);display:grid;gap:7px}
+.ocr-assist-controls label{font:9px 'DM Mono';color:var(--muted);text-transform:uppercase}
+.ocr-assist-controls select{width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:11px 'DM Mono'}
+.ocr-assist-controls output{font:9px/1.5 'DM Mono';color:var(--muted)}
+.ocr-suggestion{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.ocr-suggestion span{font:10px/1.5 'DM Mono';color:var(--ink);overflow-wrap:anywhere}
+.ocr-suggestion button{flex-shrink:0;font-size:9px}
+html[data-theme="dark"] .ocr-assist-controls{background:#202620;border-color:var(--line)}

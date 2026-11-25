@@ -45,6 +45,10 @@
         "image_height_px": {
           "type": "integer",
           "minimum": 1
+        },
+        "page_index": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -97,6 +101,23 @@
               "const": "linear_intensity_only"
             }
           }
+        },
+        "ocr_model_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ocr_device": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "cpu",
+            "gpu:0",
+            null
+          ]
         }
       }
     },
@@ -509,6 +530,35 @@
                     }
                   }
                 }
+              }
+            }
+          },
+          "ocr_suggestion": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "detection_id",
+              "text",
+              "confidence"
+            ],
+            "properties": {
+              "detection_id": {
+                "type": "string",
+                "pattern": "^det-[0-9]{3,}$"
+              },
+              "text": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
               }
             }
           }

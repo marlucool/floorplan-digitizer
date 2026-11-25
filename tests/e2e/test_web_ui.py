@@ -60,6 +60,16 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                     }
                 ),
             )
+            page.route(
+                "**/api/ocr/status",
+                lambda route: route.fulfill(json={"paddle_installed": True, "paddleocr_installed": True}),
+            )
+            page.route(
+                "**/api/ocr/models",
+                lambda route: route.fulfill(json={"models": [
+                    {"model_id": "base:PP-OCRv5_mobile_rec", "label": "PP-OCRv5 mobile", "kind": "base"}
+                ]}),
+            )
             sample_png = make_png(400, 300)
             preview_data_url = "data:image/png;base64," + base64.b64encode(sample_png).decode("ascii")
 
@@ -129,6 +139,21 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                 )
 
             page.route("**/api/analyze", analyse)
+            def recognise_review(route) -> None:
+                body = route.request.post_data or ""
+                assert "base:PP-OCRv5_mobile_rec" in body
+                assert '"page_index":0' in body
+                assert '"ocr_model_id":"base:PP-OCRv5_mobile_rec"' in body
+                route.fulfill(json={
+                    "engine": "PaddleOCR",
+                    "model": "PP-OCRv5_mobile_rec",
+                    "device": "cpu",
+                    "predictions": [{"detection_id": "det-004", "text": "4,200 mm", "confidence": 0.93}],
+                    "skipped_crops": 0,
+                    "notes": ["Predictions are unverified suggestions."],
+                })
+
+            page.route("**/api/ocr/recognize-review", recognise_review)
             submitted: dict[str, object] = {}
 
             def validate_chain(route) -> None:
@@ -176,6 +201,15 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.wait_for_function(
                 "!document.querySelector('#overlay').classList.contains('hidden')"
             )
+            page.wait_for_function("!document.querySelector('#runOcrButton').disabled")
+            page.locator("#runOcrButton").click()
+            page.wait_for_selector(".ocr-suggestion")
+            assert "4,200 mm" in page.locator(".ocr-suggestion").inner_text()
+            assert "93%" in page.locator(".ocr-suggestion").inner_text()
+            assert "unverified" in page.locator(".ocr-suggestion").inner_text()
+            page.locator(".ocr-suggestion .toolbar-button").click()
+            assert page.locator(".dimension-text-value").input_value() == "4,200 mm"
+            assert not page.locator(".dimension-text-verified-input").is_checked()
             page.locator("#fitView").click()
             page.locator("#startCalibration").click()
             page.locator("#previewImage").click(position={"x": 50, "y": 100})
