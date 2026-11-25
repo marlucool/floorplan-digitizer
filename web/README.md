@@ -115,6 +115,37 @@ PLANLINE_RUN_MODEL_SMOKE=1 PLANLINE_SMOKE_IMAGE=/path/to/representative-scan.png
 
 Set `PLANLINE_SMOKE_DEVICE=cpu` to force CPU inference, or use the Ultralytics device value appropriate to the local installation. The test checks model loading, class names, output shape and finite in-bounds boxes. It does **not** measure detection accuracy or validate OCR, dimensions, scale or geometry. Use a representative scan that you are permitted to test.
 
+## OCR benchmark evaluation
+
+The manual transcription export can serve as ground truth for comparing OCR engines. The evaluator does not run OCR; it compares a predictions JSON file against **verified** entries in a Planline review export and reports exact-string rate and character error rate (CER), overall and by printed/handwritten/unclear style.
+
+Prediction file format:
+
+```json
+{
+  "engine": "PaddleOCR",
+  "model": "PP-OCRv5_server_rec",
+  "predictions": [
+    {
+      "detection_id": "det-001",
+      "text": "4200",
+      "confidence": 0.91
+    }
+  ]
+}
+```
+
+Run:
+
+```bash
+python -m planline.ocr_eval \\
+  --review planline-review.json \\
+  --predictions paddleocr-predictions.json \\
+  --output ocr-metrics.json
+```
+
+Only manually verified, non-empty reference strings are scored. Missing predictions count as empty strings. Only leading/trailing whitespace is trimmed; punctuation, decimal separators and units are compared exactly. Keep the review export and predictions file together so each result can be traced to its source detection.
+
 ## Development checks
 
 ```bash
