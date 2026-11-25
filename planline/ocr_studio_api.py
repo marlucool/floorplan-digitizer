@@ -58,7 +58,7 @@ class StartTrainingRequest(BaseModel):
 
 
 class StartBenchmarkRequest(BaseModel):
-    model: str = Field(default="en_PP-OCRv5_mobile_rec", max_length=128)
+    model: str = Field(default="PP-OCRv5_mobile_rec", max_length=128)
     model_dir: str | None = Field(default=None, max_length=2048)
     device: str = "cpu"
 
