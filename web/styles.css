@@ -165,3 +165,11 @@ html[data-theme="dark"] .pdf-page-control{background:#202620;border-color:var(--
 .calibration-panel output{font:9px/1.5 'DM Mono';color:var(--muted)}
 .calibration-picking{cursor:crosshair!important}
 html[data-theme="dark"] .calibration-panel{background:#202620;border-color:var(--line)}
+
+/* Portable local project save/open controls */
+.project-controls{display:grid;gap:7px;margin:12px 0;padding:11px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.project-controls button{width:100%;text-align:center}
+.project-controls small{font-size:9px;line-height:1.5;color:var(--muted)}
+#saveProject{border-color:#9eb49a;color:var(--green-dark)}
+html[data-theme="dark"] .project-controls{background:#202620;border-color:var(--line)}
+@media(max-width:600px){#saveProject{flex:1 1 100%}}

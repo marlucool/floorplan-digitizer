@@ -28,6 +28,7 @@ function resetWorkspace() {
   $("#dropzone").classList.remove("hidden");
   $("#analyzeButton").disabled = true;
   $("#exportReview").disabled = true;
+  $("#saveProject").disabled = true;
   $("#analyzeButton").innerHTML = 'Analyse drawing <span>→</span>';
   $("#detectStep").classList.remove("complete");
   $("#sourceState").textContent = "Waiting";
@@ -352,6 +353,7 @@ function renderResults(payload) {
     $("#pdfPageControl").classList.add("hidden");
   }
   $("#exportReview").disabled = false;
+  $("#saveProject").disabled = false;
   $("#startCalibration").disabled = false;
   renderCalibrationStatus();
   $("#sourceState").textContent = "Analysed";
@@ -690,6 +692,7 @@ async function analyse() {
   // Do not leave results from an earlier run visible if this run fails.
   state.result = null; state.previewUrl = null; state.detections = []; state.selectedId = null;
   $("#exportReview").disabled = true;
+  $("#saveProject").disabled = true;
   $("#overlay").classList.add("hidden");
   $("#summary").classList.add("hidden");
   $("#detectionList").innerHTML = "";
@@ -729,12 +732,8 @@ async function analyse() {
   }
 }
 
-function exportReviewJson() {
-  if (!state.result) return;
-  const safeStem = (state.file?.name || "drawing")
-    .replace(/\.[^.]+$/, "")
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .slice(0, 60) || "drawing";
+function buildReviewObject() {
+  if (!state.result) return null;
   const result = state.result;
   const review = {
     schema_version: "planline-detection-review/v1",
@@ -826,6 +825,16 @@ function exportReviewJson() {
       "No measured DXF geometry is included."
     ]
   };
+  return review;
+}
+
+function exportReviewJson() {
+  const review = buildReviewObject();
+  if (!review) return;
+  const safeStem = (state.file?.name || "drawing")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .slice(0, 60) || "drawing";
   const blob = new Blob([JSON.stringify(review, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -836,6 +845,152 @@ function exportReviewJson() {
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+async function encodeFileBase64(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  return btoa(binary);
+}
+
+function decodeFileBase64(value) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+async function saveProject() {
+  if (!state.file || !state.result) return;
+  const review = buildReviewObject();
+  if (!review) return;
+  const project = {
+    format: "planline-project",
+    format_version: 1,
+    created_at: new Date().toISOString(),
+    source: {
+      filename: state.file.name,
+      mime_type: state.file.type || "application/octet-stream",
+      last_modified: state.file.lastModified || Date.now(),
+      size_bytes: state.file.size,
+      data_base64: await encodeFileBase64(state.file)
+    },
+    analysis_result: state.result,
+    review
+  };
+  const safeStem = (state.file.name || "drawing")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .slice(0, 60) || "drawing";
+  const blob = new Blob([JSON.stringify(project)], { type: "application/vnd.planline.project+json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = safeStem + ".planline";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+  showNotice("Project saved", "The source file, analysis, manual review and scale reference were packaged into a local .planline file. Nothing was uploaded.");
+}
+
+function restoreProjectReview(review) {
+  const entries = review?.manual_dimension_text_review || [];
+  entries.forEach((entry, index) => {
+    const textInput = document.querySelectorAll(".dimension-text-value")[index];
+    const styleInput = document.querySelectorAll(".dimension-text-style")[index];
+    const verifiedInput = document.querySelectorAll(".dimension-text-verified-input")[index];
+    const lineSelect = document.querySelectorAll(".dimension-line-select")[index];
+    const spanSelect = document.querySelectorAll(".dimension-wall-span-select")[index];
+    const associationVerified = document.querySelectorAll(".dimension-association-verified-input")[index];
+    if (textInput) textInput.value = entry.raw_text || "";
+    if (styleInput) styleInput.value = entry.text_style || "unknown";
+    if (verifiedInput) verifiedInput.checked = Boolean(entry.verified);
+    const association = entry.association || {};
+    if (lineSelect && association.dimension_line_id) {
+      lineSelect.value = association.dimension_line_id;
+      lineSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      const candidate = (association.candidate_lines || []).find(
+        (item) => item.dimension_line_id === association.dimension_line_id
+      );
+      const targetWallIds = JSON.stringify(association.wall_ids || []);
+      const spanIndex = (candidate?.wall_spans || []).findIndex(
+        (span) => JSON.stringify(span.wall_ids || []) === targetWallIds
+      );
+      if (spanSelect && spanIndex >= 0) {
+        spanSelect.value = String(spanIndex);
+        spanSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        if (associationVerified) associationVerified.checked = Boolean(association.confirmed);
+      }
+    }
+  });
+  if (review?.calibration) {
+    state.calibration = {
+      points: (review.calibration.points_px || []).map((point) => ({ x: point.x, y: point.y })),
+      picking: false,
+      applied: { ...review.calibration }
+    };
+    $("#calibrationDistance").value = String(review.calibration.known_distance);
+    $("#calibrationUnit").value = review.calibration.input_unit;
+    $("#calibrationResult").textContent =
+      Number(review.calibration.pixel_distance).toFixed(1) + " px / " +
+      Number(review.calibration.known_distance_mm).toLocaleString(undefined, { maximumFractionDigits: 3 }) +
+      " mm = " + Number(review.calibration.pixels_per_mm).toFixed(6) +
+      " px/mm. Restored user-supplied reference.";
+    renderCalibrationStatus();
+    drawDetections(state.previewUrl, state.detections, state.result.image);
+  } else {
+    clearCalibration();
+  }
+}
+
+async function openProjectFile(file) {
+  if (!file) return;
+  if (file.size > 100 * 1024 * 1024) {
+    showNotice("Project file is too large", "Planline project files are limited to 100 MB.");
+    return;
+  }
+  try {
+    const project = JSON.parse(await file.text());
+    if (project.format !== "planline-project" || project.format_version !== 1 ||
+        !project.source?.filename || !project.source?.data_base64 ||
+        !project.analysis_result?.image || !Array.isArray(project.analysis_result.detections) ||
+        !project.analysis_result.preview_data_url || !project.review ||
+        !Array.isArray(project.review.manual_dimension_text_review) ||
+        !/\\.(png|jpe?g|webp|tiff?|pdf)$/i.test(project.source.filename) ||
+        !Number.isInteger(project.source.size_bytes) || project.source.size_bytes < 1 || project.source.size_bytes > 25 * 1024 * 1024 ||
+        !Number.isFinite(project.analysis_result.image.width) || project.analysis_result.image.width < 1 ||
+        !Number.isFinite(project.analysis_result.image.height) || project.analysis_result.image.height < 1) {
+      throw new Error("This is not a supported Planline project file.");
+    }
+    const bytes = decodeFileBase64(project.source.data_base64);
+    if (project.source.size_bytes && bytes.byteLength !== project.source.size_bytes) {
+      throw new Error("The embedded source drawing failed its size check.");
+    }
+    const sourceFile = new File([bytes], project.source.filename, {
+      type: project.source.mime_type || "application/octet-stream",
+      lastModified: project.source.last_modified || Date.now()
+    });
+    setFile(sourceFile);
+    state.result = project.analysis_result;
+    state.previewUrl = project.analysis_result.preview_data_url;
+    state.detections = project.analysis_result.detections || [];
+    renderResults(state.result);
+    restoreProjectReview(project.review);
+    $("#saveProject").disabled = false;
+    showNotice("Project opened", "The source drawing, previous analysis, manual transcriptions, associations and calibration were restored locally.");
+  } catch (error) {
+    showNotice("Could not open project", error.message || "The project file is damaged or uses an unsupported version.");
+  } finally {
+    $("#projectInput").value = "";
+  }
+}
+
+$("#saveProject").addEventListener("click", saveProject);
+$("#openProject").addEventListener("click", () => $("#projectInput").click());
+$("#projectInput").addEventListener("change", (event) => openProjectFile(event.target.files?.[0]));
 
 $("#exportReview").addEventListener("click", exportReviewJson);
 $("#confidenceThreshold").addEventListener("input", () => {
