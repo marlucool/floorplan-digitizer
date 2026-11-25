@@ -369,6 +369,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
 
             page.locator("#selectWallTool").click()
             page.locator("#previewImage").click(position={"x": 185, "y": 225})
+            page.locator("#wallDimensionSelect").select_option("det-004")
             assert page.locator("#wallDimensionSelect").input_value() == "det-004"
             assert page.locator("#checkWallDimension").is_enabled()
             page.locator("#checkWallDimension").click()
