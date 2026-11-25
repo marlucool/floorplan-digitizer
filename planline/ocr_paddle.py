@@ -1,0 +1,160 @@
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import sys
+from pathlib import Path
+from typing import Any
+
+import cv2
+import numpy as np
+
+
+MODEL_DEFAULT = "PP-OCRv5_server_rec"
+
+
+def _result_payload(result: Any) -> dict[str, Any]:
+    payload = getattr(result, "json", None)
+    if callable(payload):
+        payload = payload()
+    if isinstance(payload, str):
+        payload = json.loads(payload)
+    if isinstance(payload, dict) and isinstance(payload.get("res"), dict):
+        payload = payload["res"]
+    if not isinstance(payload, dict):
+        return {}
+    return payload
+
+
+def _recognition_fields(result: Any) -> tuple[str, float | None]:
+    payload = _result_payload(result)
+    text = payload.get("rec_text", "")
+    if not isinstance(text, str):
+        text = ""
+    score = payload.get("rec_score")
+    if isinstance(score, bool) or not isinstance(score, (int, float)):
+        score = None
+    elif not math.isfinite(float(score)) or not 0 <= float(score) <= 1:
+        score = None
+    else:
+        score = float(score)
+    return text, score
+
+
+def recognize_review_crops(
+    review: dict[str, Any],
+    image: np.ndarray,
+    recognizer: Any,
+) -> tuple[list[dict[str, Any]], int]:
+    """Run a supplied text recognizer on bounded crops from a review export."""
+    if not isinstance(review, dict) or review.get("schema_version") != "planline-detection-review/v1":
+        raise ValueError("Unsupported Planline review JSON.")
+    items = review.get("manual_dimension_text_review")
+    if not isinstance(items, list):
+        raise ValueError("Review JSON is missing manual_dimension_text_review.")
+
+    height, width = image.shape[:2]
+    source = review.get("source")
+    if isinstance(source, dict):
+        expected_width = source.get("image_width_px")
+        expected_height = source.get("image_height_px")
+        if expected_width is not None and expected_width != width:
+            raise ValueError("Source image width does not match the review export.")
+        if expected_height is not None and expected_height != height:
+            raise ValueError("Source image height does not match the review export.")
+
+    predictions: list[dict[str, Any]] = []
+    skipped = 0
+    for item in items:
+        if not isinstance(item, dict) or not isinstance(item.get("detection_id"), str):
+            skipped += 1
+            continue
+        crop_bbox = item.get("crop_bbox")
+        if not isinstance(crop_bbox, dict):
+            skipped += 1
+            continue
+        try:
+            x1, y1, x2, y2 = (
+                int(crop_bbox["x1"]),
+                int(crop_bbox["y1"]),
+                int(crop_bbox["x2"]),
+                int(crop_bbox["y2"]),
+            )
+        except (KeyError, TypeError, ValueError):
+            skipped += 1
+            continue
+        if x1 < 0 or y1 < 0 or x2 > width or y2 > height or x2 <= x1 or y2 <= y1:
+            skipped += 1
+            continue
+        crop = image[y1:y2, x1:x2]
+        if crop.size == 0:
+            skipped += 1
+            continue
+
+        results = recognizer.predict(input=crop, batch_size=1)
+        if not results:
+            text, confidence = "", None
+        else:
+            text, confidence = _recognition_fields(results[0])
+        predictions.append({
+            "detection_id": item["detection_id"],
+            "text": text,
+            "confidence": confidence,
+        })
+    return predictions, skipped
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Run optional PaddleOCR text recognition on Planline dimension crops."
+    )
+    parser.add_argument("--review", required=True, type=Path, help="Planline review JSON export.")
+    parser.add_argument("--image", required=True, type=Path, help="Exact raster image used for the review.")
+    parser.add_argument("--output", required=True, type=Path, help="Output predictions JSON path.")
+    parser.add_argument("--model", default=MODEL_DEFAULT, help=f"PaddleOCR recognition model (default: {MODEL_DEFAULT}).")
+    parser.add_argument("--device", default="cpu", help="Paddle device, for example cpu or gpu:0 (default: cpu).")
+    args = parser.parse_args(argv)
+
+    try:
+        review = json.loads(args.review.read_text(encoding="utf-8"))
+        encoded = np.fromfile(args.image, dtype=np.uint8)
+        image = cv2.imdecode(encoded, cv2.IMREAD_COLOR)
+        if image is None:
+            raise ValueError(f"Could not decode raster image: {args.image}")
+        from paddleocr import TextRecognition
+
+        recognizer = TextRecognition(model_name=args.model, device=args.device)
+        predictions, skipped = recognize_review_crops(review, image, recognizer)
+        output = {
+            "engine": "PaddleOCR",
+            "model": args.model,
+            "source_filename": review.get("source", {}).get("filename")
+            if isinstance(review.get("source"), dict)
+            else None,
+            "predictions": predictions,
+            "skipped_crops": skipped,
+            "notes": [
+                "Raw recognizer output only; no unit parsing, correction or geometry inference is performed.",
+                "All predictions are unverified and must be checked by a person.",
+            ],
+        }
+        args.output.write_text(
+            json.dumps(output, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+    except ImportError as exc:
+        print(
+            "PaddleOCR is optional. Install a compatible PaddlePaddle package and "
+            "requirements-ocr-paddle.txt before running this command.",
+            file=sys.stderr,
+        )
+        return 2
+    except (OSError, json.JSONDecodeError, ValueError, RuntimeError) as exc:
+        print(f"planline PaddleOCR: {exc}", file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
