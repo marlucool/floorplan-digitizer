@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import sys
 import types
 from pathlib import Path
@@ -75,6 +76,19 @@ def test_local_ocr_studio_requires_verified_labels(tmp_path: Path, monkeypatch) 
         data={"text": "4200", "source_id": "plan-1", "verified": "false"},
     )
     assert response.status_code == 422
+
+    verified = client.post(
+        f"/api/ocr/datasets/{created['dataset_id']}/samples",
+        files={"file": ("verified.png", _png(), "image/png")},
+        data={"text": "4200 mm", "source_id": "plan-1", "verified": "true"},
+    )
+    assert verified.status_code == 201, verified.text
+    crop_id = verified.json()["crop_id"]
+    omitted_verification = client.patch(
+        f"/api/ocr/datasets/{created['dataset_id']}/samples/{crop_id}",
+        json={"text": "4300 mm", "source_id": "plan-1"},
+    )
+    assert omitted_verification.status_code == 422
 
 
 def test_ocr_model_list_includes_base_and_local_fine_tuned_models(tmp_path: Path, monkeypatch) -> None:
@@ -187,3 +201,54 @@ def test_ocr_status_exposes_runtime_compatibility() -> None:
     assert "training_runtime_ready" in payload
     assert "inference_runtime_ready" in payload
     assert payload["training_note"]
+
+
+
+def test_windows_installer_uses_ocr_compatible_python_runtime() -> None:
+    """The bundled interpreter must remain inside PaddlePaddle's supported range."""
+    repository_root = Path(__file__).resolve().parents[1]
+    installer_source = (
+        repository_root / "packaging" / "windows" / "Program.cs"
+    ).read_text(encoding="utf-8")
+
+    match = re.search(
+        r'private const string PythonVersion = "(\d+)\.(\d+)\.(\d+)";',
+        installer_source,
+    )
+    assert match is not None, "Windows installer must declare one pinned PythonVersion."
+    version = tuple(int(part) for part in match.groups())
+
+    assert ocr_studio_api.paddle_python_supported(version), (
+        f"Bundled Python {version} is outside the supported PaddlePaddle range."
+    )
+    assert "python_version = PythonVersion" in installer_source
+    assert "python-{PythonVersion}-amd64.exe" in installer_source
+    assert "await IsCompatiblePythonRuntimeAsync(python)" in installer_source
+    assert "3.14.10" not in installer_source
+    checksum = re.search(
+        r'private const string PythonSha256 =\s*"([0-9a-f]{64})";',
+        installer_source,
+    )
+    assert checksum is not None, "Installer must pin a valid 64-character SHA-256."
+
+
+
+def test_ocr_jobs_reject_unsupported_python_before_starting(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(ocr_studio_api, "paddle_python_supported", lambda: False)
+    app = FastAPI()
+    app.include_router(ocr_studio_api.router)
+    client = TestClient(app)
+
+    training = client.post(
+        "/api/ocr/datasets/example/train",
+        json={"paddleocr_dir": str(tmp_path), "pretrained_model": str(tmp_path / "model.pdparams")},
+    )
+    benchmark = client.post(
+        "/api/ocr/datasets/example/benchmark",
+        json={},
+    )
+
+    assert training.status_code == 422
+    assert "CPython 3.9" in training.json()["detail"]
+    assert benchmark.status_code == 422
+    assert "CPython 3.9" in benchmark.json()["detail"]

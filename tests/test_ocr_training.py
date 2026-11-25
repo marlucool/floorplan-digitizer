@@ -38,3 +38,81 @@ def test_build_training_command_rejects_unsafe_settings(tmp_path: Path) -> None:
         build_training_command(tmp_path, tmp_path / "config", tmp_path / "weights", tmp_path, tmp_path, epochs=0)
     with pytest.raises(ValueError, match="batch_size"):
         build_training_command(tmp_path, tmp_path / "config", tmp_path / "weights", tmp_path, tmp_path, batch_size=3)
+
+
+
+def test_quiet_training_process_is_cancelled_without_waiting_for_output(tmp_path: Path) -> None:
+    """Cancellation must work even when the child process never writes to stdout."""
+    import sys
+    import threading
+    import time
+    import uuid
+
+    from planline import ocr_training
+
+    job_id = uuid.uuid4().hex
+    cancel_event = threading.Event()
+    with ocr_training._JOB_LOCK:
+        ocr_training._JOBS[job_id] = {
+            "job_id": job_id,
+            "status": "queued",
+            "cancel_event": cancel_event,
+            "_log_lines": [],
+        }
+
+    result: dict[str, int] = {}
+    runner = threading.Thread(
+        target=lambda: result.setdefault(
+            "return_code",
+            ocr_training._run_process(
+                job_id,
+                [sys.executable, "-c", "import time; time.sleep(30)"],
+                tmp_path,
+                "quiet-process-test",
+            ),
+        ),
+        daemon=True,
+    )
+    runner.start()
+
+    try:
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            with ocr_training._JOB_LOCK:
+                process_started = job_id in ocr_training._PROCESSES
+            if process_started:
+                break
+            time.sleep(0.01)
+        assert process_started, "The child process did not start."
+
+        cancel_event.set()
+        runner.join(timeout=5)
+        assert not runner.is_alive(), "Cancellation waited for output from a silent process."
+        assert result["return_code"] != 0
+        with ocr_training._JOB_LOCK:
+            assert job_id not in ocr_training._PROCESSES
+    finally:
+        with ocr_training._JOB_LOCK:
+            process = ocr_training._PROCESSES.get(job_id)
+        if process is not None and process.poll() is None:
+            process.kill()
+        runner.join(timeout=5)
+        with ocr_training._JOB_LOCK:
+            ocr_training._PROCESSES.pop(job_id, None)
+            ocr_training._JOBS.pop(job_id, None)
+
+
+
+def test_exported_inference_model_requires_nonempty_parameter_file(tmp_path: Path) -> None:
+    from planline.ocr_training import _has_exported_inference_weights
+
+    inference_dir = tmp_path / "inference"
+    assert not _has_exported_inference_weights(inference_dir)
+
+    inference_dir.mkdir()
+    weights = inference_dir / "inference.pdiparams"
+    weights.write_bytes(b"")
+    assert not _has_exported_inference_weights(inference_dir)
+
+    weights.write_bytes(b"model-weights")
+    assert _has_exported_inference_weights(inference_dir)
