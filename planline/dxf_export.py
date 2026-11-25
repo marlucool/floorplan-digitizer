@@ -71,10 +71,10 @@ class ManualGeometryDXFRequest(BaseModel):
         for room in self.rooms:
             for point in room.vertices_px:
                 check_point(point)
-            if _polygon_area(room.vertices_px) <= 1e-9:
-                raise ValueError(f"Room {room.id} has zero area.")
             if _polygon_self_intersects(room.vertices_px):
                 raise ValueError(f"Room {room.id} self-intersects.")
+            if _polygon_area(room.vertices_px) <= 1e-9:
+                raise ValueError(f"Room {room.id} has zero area.")
         return self
 
 
@@ -133,7 +133,7 @@ def _number(value: float) -> str:
 
 
 def _pair(code: int, value: object) -> str:
-    return f"{code}\\n{value}\\n"
+    return f"{code}\n{value}\n"
 
 
 def export_manual_geometry_dxf(request: ManualGeometryDXFRequest) -> bytes:
