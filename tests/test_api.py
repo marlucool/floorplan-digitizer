@@ -105,6 +105,44 @@ def test_analyse_returns_regions_without_fabricating_ocr(monkeypatch) -> None:
     assert any("OCR has not run" in note for note in payload["notes"])
 
 
+def make_pdf_bytes() -> bytes:
+    import fitz
+
+    document = fitz.open()
+    document.new_page(width=100, height=200)
+    document.new_page(width=200, height=100)
+    data = document.tobytes()
+    document.close()
+    return data
+
+
+def test_decode_upload_rasterises_selected_pdf_page() -> None:
+    image, source = api.decode_upload(make_pdf_bytes(), "plans.pdf", page_index=1)
+    assert source["source_type"] == "pdf"
+    assert source["page_count"] == 2
+    assert source["page_index"] == 1
+    assert image.shape[1] > image.shape[0]
+
+
+def test_decode_upload_rejects_pdf_page_out_of_range() -> None:
+    with pytest.raises(ValueError, match="Choose a page from 1 to 2"):
+        api.decode_upload(make_pdf_bytes(), "plans.pdf", page_index=2)
+
+
+def test_analyse_accepts_selected_pdf_page(monkeypatch) -> None:
+    monkeypatch.setattr(api, "get_detector", lambda: FakeDetector())
+    response = TestClient(api.app).post(
+        "/api/analyze",
+        data={"page_index": "1"},
+        files={"file": ("plans.pdf", make_pdf_bytes(), "application/pdf")},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source"]["page_index"] == 1
+    assert payload["source"]["page_count"] == 2
+    assert payload["image"]["width"] > payload["image"]["height"]
+
+
 def test_dimension_review_crops_are_bounded(monkeypatch) -> None:
     class ManyBoxes:
         xyxy = np.tile(np.array([[20, 20, 50, 40]], dtype=float), (35, 1))
