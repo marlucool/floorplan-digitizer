@@ -206,13 +206,13 @@ def _build_update_script(installer_path: Path, install_directory: str, parent_pi
     installer = _powershell_literal(str(installer_path))
     install_dir = _powershell_literal(install_directory)
     return f"""$ErrorActionPreference = 'Stop'
-$parentPid = {int(parent_pid)}
+$planlineParentPid = {int(parent_pid)}
 $installerPath = {installer}
 $installDirectory = {install_dir}
 try {{
-    Wait-Process -Id $parentPid -Timeout 300 -ErrorAction Stop
+    Wait-Process -Id $planlineParentPid -Timeout 300 -ErrorAction Stop
 }} catch {{
-    if (Get-Process -Id $parentPid -ErrorAction SilentlyContinue) {{
+    if (Get-Process -Id $planlineParentPid -ErrorAction SilentlyContinue) {{
         exit 42
     }}
 }}

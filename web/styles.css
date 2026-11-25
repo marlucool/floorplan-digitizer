@@ -134,3 +134,10 @@ html[data-theme="dark"] .selected-detection{background:#263329;border-color:#4b6
 .dimension-association-verified{display:flex!important;align-items:flex-start;gap:7px!important;text-transform:none!important;letter-spacing:0!important;line-height:1.5}
 .dimension-association-verified input{margin-top:2px;accent-color:var(--accent);flex:none}
 html[data-theme="dark"] .dimension-association{background:#202620;border-color:var(--line)}
+
+/* Global page navigation shared by the drawing and OCR workspaces. */
+.topbar{height:auto;min-height:66px}
+.top-links{margin-left:auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.top-links .repo-link{margin-left:0;white-space:nowrap}
+.top-links a[aria-current=page]{color:var(--green-dark);font-weight:700}
+@media(max-width:700px){.topbar{flex-wrap:wrap;padding-top:10px;padding-bottom:10px;gap:9px}.top-links{width:100%;margin:0;justify-content:flex-start;gap:12px}.top-links .repo-link{font-size:10px}}
