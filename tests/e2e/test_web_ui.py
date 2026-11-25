@@ -335,11 +335,13 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert page.locator("#roomCount").inner_text() == "1 room"
             assert "m²" in page.locator("#roomArea").inner_text()
             assert "not verified" in page.locator("#roomArea").inner_text()
+            page.locator("#selectWallTool").click()
             room_box = page.locator("#previewImage").bounding_box()
             page.mouse.move(room_box["x"] + 50, room_box["y"] + 40)
             page.mouse.down()
-            page.mouse.move(room_box["x"] + 60, room_box["y"] + 45, steps=4)
+            page.mouse.move(room_box["x"] + 60, room_box["y"] + 45, steps=10)
             page.mouse.up()
+            page.wait_for_timeout(100)
             assert "m²" in page.locator("#roomArea").inner_text()
             with page.expect_download() as room_svg_download_info:
                 page.locator("#exportGeometry").click()
