@@ -220,3 +220,5 @@ html[data-theme="dark"] .ocr-assist-controls{background:#202620;border-color:var
 .chain-candidate{margin-top:14px;padding:12px;border:1px solid var(--accent);border-radius:8px;background:var(--panel)}
 .chain-candidate p{margin:0 0 10px;line-height:1.55}
 .chain-candidate button{min-height:36px}
+
+.geometry-export-note{font-size:11px;line-height:1.55;color:var(--muted);margin:8px 0}
