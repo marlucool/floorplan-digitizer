@@ -167,7 +167,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.locator("#detectionSort").select_option("confidence")
             page.locator('.detection-row[data-detection-id="det-002"]').click()
             assert page.locator("#selectedDetection").is_visible()
-            assert "det-002" in page.locator("#selectedDetection").inner_text().lower()
+            assert "det-002" in page.locator("#selectedDetection").inner_text().lower().lower()
             page.locator("#themeToggle").click()
             assert page.locator("html").get_attribute("data-theme") == "dark"
             page.locator("#themeToggle").click()
