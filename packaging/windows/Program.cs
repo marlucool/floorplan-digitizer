@@ -710,6 +710,7 @@ internal sealed class SetupForm : Form
     private async Task InstallAsync()
     {
         _installButton.Enabled = false;
+        _installButton.Text = "Installing…";
         _gpuOption.Enabled = false;
         _cpuOption.Enabled = false;
         _installPath.Enabled = false;
@@ -1008,9 +1009,12 @@ internal sealed class SetupForm : Form
                 MessageBoxIcon.Error
             );
             _installButton.Enabled = true;
+            _installButton.Text = "Retry";
             _gpuOption.Enabled = true;
             _cpuOption.Enabled = true;
             _installPath.Enabled = true;
+            _workPanel.Visible = false;
+            _setupOptions.Visible = true;
         }
     }
 
