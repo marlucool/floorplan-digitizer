@@ -326,7 +326,7 @@ def test_settings_page_and_global_workspace_navigation_are_available() -> None:
     settings = client.get("/settings")
     assert settings.status_code == 200
     assert "Updates" in settings.text
-    assert 'href="/"'>Drawing workspace</a>' in settings.text
+    assert 'href="/">Drawing workspace</a>' in settings.text
     drawing = client.get("/")
     assert 'href="/settings">Settings</a>' in drawing.text
     ocr = client.get("/ocr")
