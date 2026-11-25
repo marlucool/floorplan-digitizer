@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import io
+import json
+import sys
+import types
 from pathlib import Path
+
+import numpy as np
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -69,3 +74,85 @@ def test_local_ocr_studio_requires_verified_labels(tmp_path: Path, monkeypatch) 
         data={"text": "4200", "source_id": "plan-1", "verified": "false"},
     )
     assert response.status_code == 422
+
+
+def test_ocr_model_list_includes_base_and_local_fine_tuned_models(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "ocr"
+    monkeypatch.setattr(ocr_studio_api, "OCR_DATASET_ROOT", root)
+    app = FastAPI()
+    app.include_router(ocr_studio_api.router)
+    client = TestClient(app)
+    created = client.post("/api/ocr/datasets", json={"name": "handwriting"}).json()
+    dataset_id = created["dataset_id"]
+    inference_dir = root / dataset_id / "training_runs" / "012345abcdef" / "inference"
+    inference_dir.mkdir(parents=True)
+    (inference_dir / "inference.pdiparams").write_bytes(b"test")
+    response = client.get("/api/ocr/models")
+    assert response.status_code == 200
+    models = response.json()["models"]
+    assert any(item["model_id"] == "base:PP-OCRv5_mobile_rec" for item in models)
+    assert any(item["model_id"] == f"trained:{dataset_id}:012345abcdef" for item in models)
+
+
+def test_review_recognition_returns_unverified_crop_predictions(monkeypatch) -> None:
+    from planline import api as planline_api
+
+    image = np.full((16, 28, 3), 255, dtype=np.uint8)
+    monkeypatch.setattr(
+        planline_api,
+        "decode_upload",
+        lambda data, filename, page_index=0: (image.copy(), {"page_index": page_index}),
+    )
+
+    class FakeResult:
+        def json(self):
+            return {"res": {"rec_text": "4,200 mm", "rec_score": 0.93}}
+
+    class FakeTextRecognition:
+        def __init__(self, model_name=None, device=None):
+            assert model_name == "PP-OCRv5_mobile_rec"
+            assert device == "cpu"
+
+        def predict(self, input, batch_size=1):
+            assert input.shape == (16, 28, 3)
+            assert batch_size == 1
+            return [FakeResult()]
+
+    fake_module = types.ModuleType("paddleocr")
+    fake_module.TextRecognition = FakeTextRecognition
+    monkeypatch.setitem(sys.modules, "paddleocr", fake_module)
+
+    app = FastAPI()
+    app.include_router(ocr_studio_api.router)
+    client = TestClient(app)
+    review = {
+        "schema_version": "planline-detection-review/v1",
+        "source": {
+            "filename": "plan.png",
+            "page_index": 0,
+            "image_width_px": 28,
+            "image_height_px": 16,
+        },
+        "analysis": {"preprocessing": {"brightness": 0, "contrast": 1}},
+        "manual_dimension_text_review": [
+            {
+                "detection_id": "det-001",
+                "crop_bbox": {"x1": 0, "y1": 0, "x2": 28, "y2": 16},
+            }
+        ],
+    }
+    response = client.post(
+        "/api/ocr/recognize-review",
+        data={
+            "review_json": json.dumps(review),
+            "model_id": "base:PP-OCRv5_mobile_rec",
+            "device": "cpu",
+        },
+        files={"file": ("plan.png", _png(), "image/png")},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["predictions"] == [
+        {"detection_id": "det-001", "text": "4,200 mm", "confidence": 0.93}
+    ]
+    assert any("unverified suggestions" in note for note in payload["notes"])

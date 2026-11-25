@@ -420,6 +420,7 @@ def test_web_ui_assets_and_architecture_notes_are_served() -> None:
     assert "polygonAreaPx2" in script.text
     assert "function beginWallEndpointDrag" in script.text
     assert "function snapPointToGeometry" in script.text
+    assert "runOcrOnCandidates" in script.text
     assert "function moveWallEndpointDrag" in script.text
     assert script.status_code == 200
     assert "renderDetectionRows" in script.text
@@ -430,6 +431,9 @@ def test_web_ui_assets_and_architecture_notes_are_served() -> None:
     assert 'id="addSegment"' in page.text
     assert 'id="checkChain"' in page.text
     assert 'id="dimensionTextReview"' in page.text
+    assert 'id="runOcrButton"' in page.text
+    assert 'id="ocrModelSelect"' in page.text
+    assert 'id="ocrDeviceSelect"' in page.text
     assert 'id="exportReview"' in page.text
     assert 'id="confidenceThreshold"' in page.text
     assert "exportReviewJson" in script.text
