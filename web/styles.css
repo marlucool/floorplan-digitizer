@@ -222,3 +222,12 @@ html[data-theme="dark"] .ocr-assist-controls{background:#202620;border-color:var
 .chain-candidate button{min-height:36px}
 
 .geometry-export-note{font-size:11px;line-height:1.55;color:var(--muted);margin:8px 0}
+
+.dataset-capture-panel{margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.dataset-capture-heading{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px;font-size:12px}
+.dataset-capture-heading a{font-size:11px;color:var(--accent)}
+.dataset-capture-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.dataset-capture-fields label{display:grid;gap:5px;font-size:11px;color:var(--muted)}
+.dataset-capture-fields input,.dataset-capture-fields select{width:100%;min-width:0;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit}
+#datasetCaptureStatus{display:block;margin-top:10px;font-size:11px;line-height:1.5;color:var(--muted)}
+.save-dimension-crop{margin-top:10px}
