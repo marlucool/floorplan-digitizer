@@ -89,6 +89,7 @@ function setFile(file) {
   $("#previewImage").onerror = null;
   state.file = file;
   if ($("#drawingSourceId")) $("#drawingSourceId").value = (file.name.replace(/\\.[^.]+$/, "") || "drawing").slice(0, 128);
+  updateDatasetCaptureButtons();
   $("#brightnessControl").value = "0";
   $("#contrastControl").value = "1";
   $("#brightnessValue").textContent = "0";
@@ -1249,7 +1250,11 @@ function renderDrawingDatasetOptions() {
   });
   if (state.ocrDatasets.some((dataset) => dataset.dataset_id === previous)) select.value = previous;
   select.disabled = state.ocrDatasets.length === 0;
-  select.addEventListener("change", updateDatasetCaptureButtons);
+  if (!state.ocrDatasets.length) {
+    $("#datasetCaptureStatus").textContent = "Create an OCR dataset in OCR Studio before saving crops. Only verified crops are copied; the full drawing is not uploaded.";
+  } else {
+    $("#datasetCaptureStatus").textContent = "Choose a dataset, keep the source ID consistent across pages from the same drawing, and save only transcriptions you have checked.";
+  }
   updateDatasetCaptureButtons();
 }
 
@@ -2116,4 +2121,6 @@ fetch("/api/health").then((r) => r.json()).then((health) => {
   showNotice("API unavailable", "Start the local Planline API to enable drawing analysis.");
 });
 
+$("#drawingDatasetSelect").addEventListener("change", updateDatasetCaptureButtons);
+$("#drawingSourceId").addEventListener("input", updateDatasetCaptureButtons);
 loadOcrCapabilities();
