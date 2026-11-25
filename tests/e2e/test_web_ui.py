@@ -87,7 +87,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                                 "association": {
                                     "dimension_value_id": "det-004",
                                     "status": "candidate",
-                                    "confirmed": false,
+                                    "confirmed": False,
                                     "candidate_lines": [
                                         {
                                             "dimension_line_id": "det-002",
