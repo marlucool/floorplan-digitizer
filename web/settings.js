@@ -1,0 +1,107 @@
+const $ = (selector) => document.querySelector(selector);
+const CHECK_KEY = "planline-auto-check-updates";
+
+const themeButton = $("#themeToggle");
+function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const dark = theme === "dark";
+  themeButton.textContent = dark ? "Light mode" : "Dark mode";
+  themeButton.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
+  try { localStorage.setItem("planline-theme", theme); } catch (_) {}
+}
+let theme = "light";
+try { theme = localStorage.getItem("planline-theme") || "light"; } catch (_) {}
+setTheme(theme === "dark" ? "dark" : "light");
+themeButton.addEventListener("click", () => {
+  setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+});
+
+const autoCheck = $("#autoCheckUpdates");
+try { autoCheck.checked = localStorage.getItem(CHECK_KEY) !== "false"; } catch (_) {}
+autoCheck.addEventListener("change", () => {
+  try { localStorage.setItem(CHECK_KEY, String(autoCheck.checked)); } catch (_) {}
+});
+
+let latest = null;
+function setUpdateState(kind, title, message) {
+  $("#updateIndicator").textContent = title;
+  $("#updateIndicator").dataset.state = kind;
+  $("#updateTitle").textContent = title;
+  $("#updateMessage").textContent = message;
+}
+function showReleaseNotes(text) {
+  const wrap = $("#releaseNotesWrap");
+  if (!text || !text.trim()) {
+    wrap.classList.add("hidden");
+    $("#releaseNotes").textContent = "";
+    return;
+  }
+  $("#releaseNotes").textContent = text;
+  wrap.classList.remove("hidden");
+}
+
+async function checkUpdates() {
+  const button = $("#checkUpdates");
+  button.disabled = true;
+  button.textContent = "Checking GitHub…";
+  setUpdateState("checking", "Checking for updates", "Contacting the Planline GitHub Releases API…");
+  $("#installUpdate").hidden = true;
+  $("#viewRelease").classList.add("hidden");
+  try {
+    const response = await fetch("/api/updates/check", { cache: "no-store" });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.detail || "GitHub could not be checked.");
+    latest = result;
+    $("#currentVersion").textContent = "v" + result.current_version;
+    $("#viewRelease").href = result.release_url || "https://github.com/marlucool/floorplan-digitizer/releases";
+    $("#viewRelease").classList.remove("hidden");
+    showReleaseNotes(result.release_notes || "");
+    if (result.status === "update_available" && result.install_available) {
+      setUpdateState("available", "Update available · v" + result.latest_version,
+        result.message + (result.installer_size ? " Installer size: " + (result.installer_size / (1024 * 1024)).toFixed(1) + " MB." : ""));
+      $("#installUpdate").hidden = false;
+      $("#installUpdate").disabled = false;
+    } else if (result.status === "update_available") {
+      setUpdateState("warning", "Release found · installer unavailable", result.message);
+    } else if (result.status === "no_release") {
+      setUpdateState("neutral", "No release published yet", result.message);
+      showReleaseNotes("");
+    } else {
+      setUpdateState("current", "You're up to date · v" + result.current_version, result.message);
+    }
+  } catch (error) {
+    setUpdateState("error", "Update check failed", error.message || "GitHub could not be reached.");
+    showReleaseNotes("");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Check for updates";
+  }
+}
+
+$("#checkUpdates").addEventListener("click", checkUpdates);
+$("#installUpdate").addEventListener("click", async () => {
+  const button = $("#installUpdate");
+  button.disabled = true;
+  button.textContent = "Downloading and verifying…";
+  setUpdateState("checking", "Preparing update", "Downloading the release installer and validating its SHA-256 checksum…");
+  try {
+    const response = await fetch("/api/updates/install", { method: "POST" });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.detail || "The update could not be prepared.");
+    setUpdateState("available", "Installing v" + result.version, result.message);
+    button.textContent = "Closing Planline…";
+    window.setTimeout(async () => {
+      try {
+        if (window.pywebview?.api?.close_window) await window.pywebview.api.close_window();
+        else window.close();
+      } catch (_) { window.close(); }
+    }, 900);
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = "Download and install update →";
+    setUpdateState("error", "Update failed", error.message || "The update could not be installed.");
+  }
+});
+
+$("#currentVersion").textContent = "v0.1.1";
+if (autoCheck.checked) checkUpdates();

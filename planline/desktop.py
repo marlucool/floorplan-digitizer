@@ -13,6 +13,15 @@ def _available_local_port() -> int:
         return int(listener.getsockname()[1])
 
 
+class DesktopBridge:
+    """Small pywebview bridge for desktop-only actions."""
+
+    def close_window(self) -> None:
+        import webview
+        if webview.windows:
+            webview.windows[0].destroy()
+
+
 def main() -> int:
     try:
         import webview
@@ -53,11 +62,12 @@ def main() -> int:
     try:
         webview.create_window(
             "Planline — Floor-plan and OCR Studio",
-            f"http://127.0.0.1:{port}/ocr",
+            f"http://127.0.0.1:{port}/",
             width=1500,
             height=980,
             min_size=(1024, 700),
             background_color="#fbfaf6",
+            js_api=DesktopBridge(),
         )
         webview.start(debug=False)
     finally:

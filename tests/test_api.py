@@ -318,3 +318,39 @@ def test_web_ui_assets_and_architecture_notes_are_served() -> None:
     notes = client.get("/architecture")
     assert notes.status_code == 200
     assert "dimension-chain" in notes.text
+
+
+
+def test_settings_page_and_global_workspace_navigation_are_available() -> None:
+    client = TestClient(api.app)
+    settings = client.get("/settings")
+    assert settings.status_code == 200
+    assert "Updates" in settings.text
+    assert 'href="/">Drawing workspace</a>' in settings.text
+    drawing = client.get("/")
+    assert 'href="/settings">Settings</a>' in drawing.text
+    ocr = client.get("/ocr")
+    assert 'href="/settings">Settings</a>' in ocr.text
+
+
+def test_update_check_endpoint_returns_current_release_metadata(monkeypatch) -> None:
+    monkeypatch.setattr(
+        api.updater,
+        "check_for_updates",
+        lambda: {
+            "status": "update_available",
+            "current_version": "0.1.1",
+            "latest_version": "0.1.2",
+            "update_available": True,
+            "install_available": True,
+            "release_url": "https://github.com/marlucool/floorplan-digitizer/releases/tag/planline-v0.1.2",
+            "release_notes": "Fixes and improvements",
+            "published_at": "2026-11-25T00:00:00Z",
+            "installer_size": 10_000_000,
+            "message": "A verified installer is available.",
+        },
+    )
+    response = TestClient(api.app).get("/api/updates/check")
+    assert response.status_code == 200
+    assert response.json()["latest_version"] == "0.1.2"
+    assert response.json()["install_available"] is True

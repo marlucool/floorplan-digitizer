@@ -15,7 +15,7 @@ internal static class Program
     internal const string ProductName = "Planline";
     internal const string InstallMarker = ".planline-installed.json";
     internal const string DataDirectoryName = "Planline";
-    internal const string Version = "0.1.0";
+    internal const string Version = "0.1.1";
 
     [STAThread]
     private static int Main(string[] args)
@@ -41,6 +41,20 @@ internal static class Program
             return 0;
         }
 
+        if (args.Contains("--update-install", StringComparer.OrdinalIgnoreCase))
+        {
+            string? installPath = ArgumentValue(args, "--install-path");
+            if (string.IsNullOrWhiteSpace(installPath))
+            {
+                MessageBox.Show("The update installer requires an installation path.", "Planline Update",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return 2;
+            }
+            using var updateForm = new SetupForm(installPath, autoInstall: true);
+            Application.Run(updateForm);
+            return 0;
+        }
+
         if (File.Exists(Path.Combine(executableDirectory, InstallMarker)))
         {
             return InstalledLauncher.Run(executableDirectory);
@@ -49,11 +63,64 @@ internal static class Program
         Application.Run(new SetupForm());
         return 0;
     }
+
+    private static string? ArgumentValue(string[] args, string name)
+    {
+        for (int index = 0; index < args.Length - 1; index++)
+        {
+            if (args[index].Equals(name, StringComparison.OrdinalIgnoreCase))
+                return args[index + 1];
+        }
+        return null;
+    }
 }
 
 internal static class InstalledLauncher
 {
+    // A named, per-session mutex prevents two launcher processes from opening
+    // the shared desktop.log or starting competing local API instances.
+    private const string InstanceMutexName = @"Local\Planline.Desktop";
+
     public static int Run(string installDirectory)
+    {
+        using var instanceMutex = new Mutex(initiallyOwned: false, name: InstanceMutexName);
+        bool ownsMutex = false;
+        try
+        {
+            try
+            {
+                ownsMutex = instanceMutex.WaitOne(0);
+            }
+            catch (AbandonedMutexException)
+            {
+                // The previous launcher exited without releasing the mutex.
+                // WaitOne has acquired ownership in this case.
+                ownsMutex = true;
+            }
+
+            if (!ownsMutex)
+            {
+                MessageBox.Show(
+                    "Planline is already starting or running. Switch to the existing Planline window instead of opening another copy.",
+                    "Planline",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+                return 0;
+            }
+
+            return RunSingleInstance(installDirectory);
+        }
+        finally
+        {
+            if (ownsMutex)
+            {
+                instanceMutex.ReleaseMutex();
+            }
+        }
+    }
+
+    private static int RunSingleInstance(string installDirectory)
     {
         string python = Path.Combine(installDirectory, "python", "python.exe");
         string appDirectory = Path.Combine(installDirectory, "app");
@@ -73,8 +140,10 @@ internal static class InstalledLauncher
             return 1;
         }
 
-        Directory.CreateDirectory(Path.Combine(dataDirectory, "logs"));
-        string logPath = Path.Combine(dataDirectory, "logs", "desktop.log");
+        string logDirectory = Path.Combine(dataDirectory, "logs");
+        Directory.CreateDirectory(logDirectory);
+        string logPath = Path.Combine(logDirectory, "desktop.log");
+        string actualLogPath = logPath;
 
         var startInfo = new ProcessStartInfo
         {
@@ -88,6 +157,8 @@ internal static class InstalledLauncher
         startInfo.ArgumentList.Add("-m");
         startInfo.ArgumentList.Add("planline.desktop");
         startInfo.Environment["PLANLINE_DATA_DIR"] = dataDirectory;
+        startInfo.Environment["PLANLINE_INSTALL_DIR"] = installDirectory;
+        startInfo.Environment["PLANLINE_LAUNCHER_PID"] = Environment.ProcessId.ToString();
         startInfo.Environment["PYTHONPATH"] = appDirectory;
         startInfo.Environment["PYTHONUTF8"] = "1";
         startInfo.Environment["PYTHONUNBUFFERED"] = "1";
@@ -97,7 +168,15 @@ internal static class InstalledLauncher
             using var process = new Process { StartInfo = startInfo };
             object logLock = new();
 
-            using var log = new StreamWriter(logPath, append: true) { AutoFlush = true };
+            using var log = OpenLogWriter(logPath, out actualLogPath);
+            if (!string.Equals(actualLogPath, logPath, StringComparison.OrdinalIgnoreCase))
+            {
+                log.WriteLine(
+                    $"[launcher] The shared desktop.log was locked by another process. " +
+                    $"This session is writing to {actualLogPath}."
+                );
+            }
+
             process.OutputDataReceived += (_, eventArgs) =>
             {
                 if (eventArgs.Data is not null)
@@ -127,7 +206,7 @@ internal static class InstalledLauncher
             {
                 MessageBox.Show(
                     $"Planline closed with an error (exit code {process.ExitCode}).\n\n" +
-                    $"The startup log is saved at:\n{logPath}",
+                    $"The startup log is saved at:\n{actualLogPath}",
                     "Planline",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error
@@ -139,12 +218,39 @@ internal static class InstalledLauncher
         catch (Exception exception)
         {
             MessageBox.Show(
-                $"Planline could not start.\n\n{exception.Message}\n\nLog: {logPath}",
+                $"Planline could not start.\n\n{exception.Message}\n\nLog: {actualLogPath}",
                 "Planline",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error
             );
             return 1;
+        }
+    }
+
+    private static StreamWriter OpenLogWriter(string logPath, out string actualLogPath)
+    {
+        actualLogPath = logPath;
+        try
+        {
+            // Permit log viewers/readers while the single-instance mutex
+            // protects against competing Planline writers.
+            return new StreamWriter(
+                new FileStream(logPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)
+            ) { AutoFlush = true };
+        }
+        catch (IOException)
+        {
+            // A stale process or an external tool may still hold the shared
+            // log with exclusive access. Do not let that prevent the app opening.
+            string directory = Path.GetDirectoryName(logPath)
+                ?? throw new IOException("Could not determine the Planline log directory.");
+            actualLogPath = Path.Combine(
+                directory,
+                $"desktop-{DateTime.Now:yyyyMMdd-HHmmss-fff}-{Environment.ProcessId}.log"
+            );
+            return new StreamWriter(
+                new FileStream(actualLogPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read)
+            ) { AutoFlush = true };
         }
     }
 }
@@ -265,10 +371,12 @@ internal sealed class SetupForm : Form
     private readonly Button _installButton = new();
     private readonly CheckBox _desktopShortcut = new();
     private readonly CheckBox _launchAfterInstall = new();
+    private readonly bool _autoInstall;
 
-    public SetupForm()
+    public SetupForm(string? initialInstallDirectory = null, bool autoInstall = false)
     {
-        Text = "Planline Setup";
+        _autoInstall = autoInstall;
+        Text = autoInstall ? "Planline Update" : "Planline Setup";
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -279,6 +387,42 @@ internal sealed class SetupForm : Form
 
         BuildInterface();
         DetectNvidia();
+
+        if (!string.IsNullOrWhiteSpace(initialInstallDirectory))
+        {
+            _installPath.Text = Path.GetFullPath(initialInstallDirectory);
+            RestoreInstalledRuntimeChoice(_installPath.Text);
+        }
+
+        if (_autoInstall)
+        {
+            _launchAfterInstall.Checked = true;
+            Shown += async (_, _) =>
+            {
+                await Task.Delay(350);
+                await InstallAsync();
+            };
+        }
+    }
+
+    private void RestoreInstalledRuntimeChoice(string installDirectory)
+    {
+        try
+        {
+            string marker = Path.Combine(installDirectory, Program.InstallMarker);
+            if (!File.Exists(marker)) return;
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(marker));
+            if (!document.RootElement.TryGetProperty("accelerator", out JsonElement value)) return;
+            string accelerator = value.GetString() ?? "";
+            if (accelerator.StartsWith("cpu", StringComparison.OrdinalIgnoreCase))
+                _cpuOption.Checked = true;
+            else if (accelerator.StartsWith("cuda", StringComparison.OrdinalIgnoreCase) && _gpuOption.Enabled)
+                _gpuOption.Checked = true;
+        }
+        catch
+        {
+            // Keep the detected default if an older install marker is unreadable.
+        }
     }
 
     private void BuildInterface()
@@ -565,10 +709,13 @@ internal sealed class SetupForm : Form
             }
 
             string? driveRoot = Path.GetPathRoot(installDirectory);
-            if (driveRoot is null || new DriveInfo(driveRoot).AvailableFreeSpace < 12L * 1024 * 1024 * 1024)
+            long minimumFreeSpace = existingInstall ? 3L * 1024 * 1024 * 1024 : 12L * 1024 * 1024 * 1024;
+            if (driveRoot is null || new DriveInfo(driveRoot).AvailableFreeSpace < minimumFreeSpace)
             {
                 throw new InvalidOperationException(
-                    "At least 12 GB of free space is recommended for the application and its machine-learning runtime."
+                    existingInstall
+                        ? "At least 3 GB of free space is required to update Planline safely."
+                        : "At least 12 GB of free space is recommended for the application and its machine-learning runtime."
                 );
             }
 
@@ -578,41 +725,45 @@ internal sealed class SetupForm : Form
             string pythonInstaller = Path.Combine(tempDirectory, "python-3.14.10-amd64.exe");
             string webViewInstaller = Path.Combine(tempDirectory, "MicrosoftEdgeWebView2Setup.exe");
 
-            await SetStatusAsync("Downloading the private Python runtime…");
-            await DownloadFileAsync(PythonUrl, pythonInstaller);
-            await VerifySha256Async(pythonInstaller, PythonSha256);
-
             string pythonDirectory = Path.Combine(installDirectory, "python");
-            if (Directory.Exists(pythonDirectory))
-            {
-                Directory.Delete(pythonDirectory, recursive: true);
-            }
-
-            await SetStatusAsync("Installing Planline's private Python runtime…");
-            Directory.CreateDirectory(pythonDirectory);
-            await RunProcessAsync(
-                pythonInstaller,
-                new[]
-                {
-                    "/quiet",
-                    "InstallAllUsers=0",
-                    "PrependPath=0",
-                    "Include_pip=1",
-                    "Include_launcher=0",
-                    "InstallLauncherAllUsers=0",
-                    "Include_test=0",
-                    "Include_doc=0",
-                    "Shortcuts=0",
-                    $"TargetDir={pythonDirectory}",
-                },
-                installDirectory
-            );
-
             string python = Path.Combine(pythonDirectory, "python.exe");
-            if (!File.Exists(python))
+            bool reusePythonRuntime = existingInstall && File.Exists(python);
+            if (!reusePythonRuntime)
             {
-                throw new InvalidOperationException("The Python runtime installer completed but python.exe was not found.");
+                await SetStatusAsync("Downloading the private Python runtime…");
+                await DownloadFileAsync(PythonUrl, pythonInstaller);
+                await VerifySha256Async(pythonInstaller, PythonSha256);
+
+                if (Directory.Exists(pythonDirectory))
+                    Directory.Delete(pythonDirectory, recursive: true);
+
+                await SetStatusAsync("Installing Planline's private Python runtime…");
+                Directory.CreateDirectory(pythonDirectory);
+                await RunProcessAsync(
+                    pythonInstaller,
+                    new[]
+                    {
+                        "/quiet",
+                        "InstallAllUsers=0",
+                        "PrependPath=0",
+                        "Include_pip=1",
+                        "Include_launcher=0",
+                        "InstallLauncherAllUsers=0",
+                        "Include_test=0",
+                        "Include_doc=0",
+                        "Shortcuts=0",
+                        $"TargetDir={pythonDirectory}",
+                    },
+                    installDirectory
+                );
             }
+            else
+            {
+                await SetStatusAsync("Keeping your existing private Python and ML runtime…");
+            }
+
+            if (!File.Exists(python))
+                throw new InvalidOperationException("The private Python runtime is missing after setup.");
 
             if (!IsWebView2Installed())
             {
@@ -652,40 +803,45 @@ internal sealed class SetupForm : Form
                 throw new InvalidOperationException("The application archive is incomplete (model or desktop launcher missing).");
             }
 
-            await SetStatusAsync(useGpu
-                ? "Installing NVIDIA-enabled PyTorch (CUDA 12.6)…"
-                : "Installing the CPU PyTorch runtime…");
-
-            if (useGpu)
+            if (reusePythonRuntime)
             {
-                try
-                {
-                    await InstallTorchAsync(python, TorchCudaIndex);
-                    string cudaStatus = await RunProcessAsync(
-                        python,
-                        new[] { "-c", "import torch; print('CUDA_AVAILABLE=' + str(torch.cuda.is_available()))" },
-                        appDirectory
-                    );
-                    if (!cudaStatus.Contains("CUDA_AVAILABLE=True", StringComparison.Ordinal))
-                    {
-                        throw new InvalidOperationException("The installed CUDA runtime did not detect a usable NVIDIA GPU.");
-                    }
-                }
-                catch (Exception)
-                {
-                    cpuFallback = true;
-                    await SetStatusAsync("CUDA was unavailable. Installing the CPU-compatible runtime instead…");
-                    await RunProcessAsync(
-                        python,
-                        new[] { "-m", "pip", "uninstall", "-y", "torch", "torchvision" },
-                        appDirectory
-                    );
-                    await InstallTorchAsync(python, TorchCpuIndex);
-                }
+                await SetStatusAsync("Keeping your existing CPU/CUDA PyTorch runtime…");
             }
             else
             {
-                await InstallTorchAsync(python, TorchCpuIndex);
+                await SetStatusAsync(useGpu
+                    ? "Installing NVIDIA-enabled PyTorch (CUDA 12.6)…"
+                    : "Installing the CPU PyTorch runtime…");
+
+                if (useGpu)
+                {
+                    try
+                    {
+                        await InstallTorchAsync(python, TorchCudaIndex);
+                        string cudaStatus = await RunProcessAsync(
+                            python,
+                            new[] { "-c", "import torch; print('CUDA_AVAILABLE=' + str(torch.cuda.is_available()))" },
+                            appDirectory
+                        );
+                        if (!cudaStatus.Contains("CUDA_AVAILABLE=True", StringComparison.Ordinal))
+                            throw new InvalidOperationException("The installed CUDA runtime did not detect a usable NVIDIA GPU.");
+                    }
+                    catch (Exception)
+                    {
+                        cpuFallback = true;
+                        await SetStatusAsync("CUDA was unavailable. Installing the CPU-compatible runtime instead…");
+                        await RunProcessAsync(
+                            python,
+                            new[] { "-m", "pip", "uninstall", "-y", "torch", "torchvision" },
+                            appDirectory
+                        );
+                        await InstallTorchAsync(python, TorchCpuIndex);
+                    }
+                }
+                else
+                {
+                    await InstallTorchAsync(python, TorchCpuIndex);
+                }
             }
 
             await SetStatusAsync("Installing Planline's application libraries…");
@@ -771,12 +927,19 @@ internal sealed class SetupForm : Form
                     ? "Planline is installed with NVIDIA CUDA acceleration."
                     : "Planline is installed with the CPU runtime.";
 
-            MessageBox.Show(
-                result + "\n\nOpen Planline from the desktop or Start menu.",
-                "Planline Setup",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information
-            );
+            if (_autoInstall)
+            {
+                _status.Text = "Update complete. Restarting Planline…";
+            }
+            else
+            {
+                MessageBox.Show(
+                    result + "\n\nOpen Planline from the desktop or Start menu.",
+                    "Planline Setup",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+            }
 
             if (_launchAfterInstall.Checked)
             {
