@@ -224,11 +224,22 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert page.locator("#roomCount").inner_text() == "1 room"
             assert "m²" in page.locator("#roomArea").inner_text()
             assert "not verified" in page.locator("#roomArea").inner_text()
+            room_box = page.locator("#previewImage").bounding_box()
+            page.mouse.move(room_box["x"] + 50, room_box["y"] + 40)
+            page.mouse.down()
+            page.mouse.move(room_box["x"] + 60, room_box["y"] + 45, steps=4)
+            page.mouse.up()
+            assert "m²" in page.locator("#roomArea").inner_text()
             with page.expect_download() as room_svg_download_info:
                 page.locator("#exportGeometry").click()
             room_svg_download = room_svg_download_info.value
             room_svg_text = Path(room_svg_download.path()).read_text()
             assert 'id="manual-room-001"' in room_svg_text
+            room_polygon = next(line for line in room_svg_text.splitlines() if '<polygon id="manual-room-001"' in line)
+            room_points = room_polygon.split('points="', 1)[1].split('"', 1)[0].split()
+            moved_x, moved_y = (float(value) for value in room_points[0].split(","))
+            assert abs(moved_x - 60) < 1
+            assert abs(moved_y - 45) < 1
             page.locator("#detectionSearch").fill("dimension_value")
             assert page.locator(".detection-row:visible").count() == 1
             page.locator("#detectionSearch").fill("does-not-exist")
@@ -318,6 +329,8 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert len(project_payload["geometry"]) == 1
             assert len(project_payload["rooms"]) == 1
             assert project_payload["rooms"][0]["id"] == "manual-room-001"
+            assert abs(project_payload["rooms"][0]["vertices_px"][0]["x"] - 60) < 1
+            assert abs(project_payload["rooms"][0]["vertices_px"][0]["y"] - 45) < 1
             assert project_payload["geometry"][0]["id"] == "manual-wall-002"
             assert project_payload["geometry"][0]["start_px"] == {"x": 70, "y": 230}
             project_schema = json.loads(

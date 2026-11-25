@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null } };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false } };
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -664,6 +664,7 @@ function selectManualGeometry(point) {
 }
 
 function handleDrawingClick(event) {
+  if (state.geometry.suppressNextClick) { state.geometry.suppressNextClick = false; return; }
   if (!state.result) return;
   if (state.calibration.picking) return addCalibrationPoint(event);
   const point = getSourcePoint(event);
@@ -745,21 +746,51 @@ $("#exportGeometry").addEventListener("click", exportManualGeometrySvg);
 
 $("#previewImage").addEventListener("click", handleDrawingClick);
 function beginWallEndpointDrag(event) {
-  if (event.button !== 0 || !state.result || state.geometry.mode !== "select" || !state.geometry.selectedId) return;
-  const segment = state.geometry.segments.find((item) => item.id === state.geometry.selectedId);
+  if (event.button !== 0 || !state.result || state.geometry.mode !== "select") return;
   const point = getSourcePoint(event);
-  if (!segment || !point) return;
-  const endpoints = [
-    { key: "start_px", point: segment.start_px },
-    { key: "end_px", point: segment.end_px }
-  ];
-  endpoints.sort((a, b) =>
-    Math.hypot(point.x - a.point.x, point.y - a.point.y) -
-    Math.hypot(point.x - b.point.x, point.y - b.point.y)
-  );
-  const nearest = endpoints[0];
-  if (Math.hypot(point.x - nearest.point.x, point.y - nearest.point.y) > 14) return;
-  state.geometry.drag = { segmentId: segment.id, endpoint: nearest.key, pointerId: event.pointerId };
+  if (!point) return;
+
+  if (state.geometry.selectedRoomId) {
+    const room = state.geometry.rooms.find((item) => item.id === state.geometry.selectedRoomId);
+    if (!room) return;
+    let nearestIndex = -1;
+    let nearestDistance = 14;
+    room.vertices_px.forEach((vertex, index) => {
+      const distance = Math.hypot(point.x - vertex.x, point.y - vertex.y);
+      if (distance <= nearestDistance) {
+        nearestIndex = index;
+        nearestDistance = distance;
+      }
+    });
+    if (nearestIndex < 0) return;
+    state.geometry.drag = {
+      roomId: room.id,
+      vertexIndex: nearestIndex,
+      originalPoint: { ...room.vertices_px[nearestIndex] },
+      pointerId: event.pointerId
+    };
+  } else if (state.geometry.selectedId) {
+    const segment = state.geometry.segments.find((item) => item.id === state.geometry.selectedId);
+    if (!segment) return;
+    const endpoints = [
+      { key: "start_px", point: segment.start_px },
+      { key: "end_px", point: segment.end_px }
+    ];
+    endpoints.sort((a, b) =>
+      Math.hypot(point.x - a.point.x, point.y - a.point.y) -
+      Math.hypot(point.x - b.point.x, point.y - b.point.y)
+    );
+    const nearest = endpoints[0];
+    if (Math.hypot(point.x - nearest.point.x, point.y - nearest.point.y) > 14) return;
+    state.geometry.drag = {
+      segmentId: segment.id,
+      endpoint: nearest.key,
+      originalPoint: { ...nearest.point },
+      pointerId: event.pointerId
+    };
+  } else {
+    return;
+  }
   event.currentTarget.setPointerCapture(event.pointerId);
   event.preventDefault();
 }
@@ -767,17 +798,40 @@ function beginWallEndpointDrag(event) {
 function moveWallEndpointDrag(event) {
   const drag = state.geometry.drag;
   if (!drag || drag.pointerId !== event.pointerId) return;
-  const segment = state.geometry.segments.find((item) => item.id === drag.segmentId);
   const point = getSourcePoint(event);
-  if (!segment || !point) return;
-  segment[drag.endpoint] = { x: Number(point.x.toFixed(2)), y: Number(point.y.toFixed(2)) };
+  if (!point) return;
+  if (drag.roomId) {
+    const room = state.geometry.rooms.find((item) => item.id === drag.roomId);
+    if (!room) return;
+    room.vertices_px[drag.vertexIndex] = { x: Number(point.x.toFixed(2)), y: Number(point.y.toFixed(2)) };
+  } else {
+    const segment = state.geometry.segments.find((item) => item.id === drag.segmentId);
+    if (!segment) return;
+    segment[drag.endpoint] = { x: Number(point.x.toFixed(2)), y: Number(point.y.toFixed(2)) };
+  }
   renderGeometryControls();
   if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
 }
 
 function endWallEndpointDrag(event) {
-  if (!state.geometry.drag || state.geometry.drag.pointerId !== event.pointerId) return;
+  const drag = state.geometry.drag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  if (drag.roomId) {
+    const room = state.geometry.rooms.find((item) => item.id === drag.roomId);
+    if (room && (!isSimplePolygon(room.vertices_px) || polygonAreaPx2(room.vertices_px) < 9)) {
+      room.vertices_px[drag.vertexIndex] = { ...drag.originalPoint };
+      showNotice("Room corner not moved", "That edit would make the room outline invalid or self-crossing.");
+    }
+  } else {
+    const segment = state.geometry.segments.find((item) => item.id === drag.segmentId);
+    if (segment && Math.hypot(segment.end_px.x - segment.start_px.x, segment.end_px.y - segment.start_px.y) < 3) {
+      segment[drag.endpoint] = { ...drag.originalPoint };
+      showNotice("Wall endpoint not moved", "A wall segment must remain at least three source pixels long.");
+    }
+  }
   state.geometry.drag = null;
+  state.geometry.suppressNextClick = true;
+  window.setTimeout(() => { state.geometry.suppressNextClick = false; }, 250);
   renderGeometryControls();
   if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
 }

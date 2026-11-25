@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, "feat/planline-web-integration"]
   pull_request:
-    branches: [main, "feat/wall-endpoint-editing"]
+    branches: [main, "feat/room-vertex-editing"]
 
 permissions:
   contents: read
