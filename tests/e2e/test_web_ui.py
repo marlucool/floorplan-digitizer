@@ -95,15 +95,22 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                                             "score": 0.84,
                                             "assignment_score": 0.88,
                                             "wall_span_status": "candidate",
-                                            "globally_assigned": True,
-                                            "globally_assigned_to": "det-004",
                                             "wall_spans": [
                                                 {
                                                     "wall_ids": ["det-001", "det-003"],
                                                     "orientation": "horizontal",
                                                     "method": "between_vertical_walls",
                                                     "span_px": 180,
-                                                    "score": 0.91
+                                                    "score": 0.91,
+                                                    "assignment_score": 0.90,
+                                                    "globally_assigned": True,
+                                                    "globally_assigned_to": "det-004",
+                                                    "gap_center_px": 200,
+                                                    "text_center_offset_px": 0,
+                                                    "line_center_offset_px": 0,
+                                                    "endpoint_residual_px": 0,
+                                                    "perpendicular_offset_px": 0,
+                                                    "intervening_wall_count": 0
                                                 }
                                             ]
                                         }
@@ -230,6 +237,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert exported["manual_dimension_text_review"][0]["verified"] is True
             assert exported["manual_dimension_text_review"][0]["association"]["dimension_line_id"] == "det-002"
             assert exported["manual_dimension_text_review"][0]["association"]["wall_ids"] == ["det-001", "det-003"]
+            assert exported["manual_dimension_text_review"][0]["association"]["candidate_lines"][0]["wall_spans"][0]["globally_assigned"] is True
             assert exported["manual_dimension_text_review"][0]["association"]["confirmed"] is True
             assert "preview_data_url" not in exported
 

@@ -354,13 +354,8 @@ function renderDimensionTextReview(regions) {
     (association.candidate_lines || []).forEach((candidate) => {
       const option = document.createElement("option");
       option.value = candidate.dimension_line_id;
-      const globalHint = candidate.globally_assigned
-        ? " · unique global suggestion"
-        : candidate.globally_assigned_to
-          ? " · globally suggested for " + candidate.globally_assigned_to
-          : "";
       option.textContent = candidate.dimension_line_id + " · " + candidate.orientation +
-        " · rank " + Math.round((candidate.assignment_score ?? candidate.score) * 100) + globalHint;
+        " · rank " + Math.round((candidate.assignment_score ?? candidate.score) * 100);
       lineSelect.append(option);
     });
     lineLabel.append(lineSelect);
@@ -399,27 +394,40 @@ function renderDimensionTextReview(regions) {
       (selectedLine?.wall_spans || []).forEach((span, spanIndex) => {
         const option = document.createElement("option");
         option.value = String(spanIndex);
+        const globalHint = span.globally_assigned
+          ? " · global gap suggestion"
+          : span.globally_assigned_to
+            ? " · gap suggested for " + span.globally_assigned_to
+            : "";
         option.textContent = span.wall_ids.join(" ↔ ") + " · " +
-          Math.round(span.span_px) + " px · fit " + Math.round(span.score * 100) + "%";
+          Math.round(span.span_px) + " px · rank " +
+          Math.round((span.assignment_score ?? span.score) * 100) + globalHint;
         spanSelect.append(option);
       });
       spanSelect.disabled = !selectedLine || !(selectedLine.wall_spans || []).length;
       associationVerified.checked = false;
       associationVerified.disabled = true;
       associationHelp.textContent = !selectedLine
-        ? "Choose a dimension-line candidate. The global matching suggestion is advisory; nothing is selected automatically."
+        ? "Choose a dimension-line candidate. One detected line may serve multiple labels in a chained dimension."
         : !(selectedLine.wall_spans || []).length
-          ? "This line has no viable wall-pair candidate. Leave the association unresolved."
-          : selectedLine.globally_assigned_to && selectedLine.globally_assigned_to !== association.dimension_value_id
-            ? "Another text region has the stronger global assignment for this line. Choosing it here is an override; verify the source drawing carefully."
-            : selectedLine.globally_assigned
-              ? "This is the globally preferred one-to-one line match. Still check both wall faces and explicitly confirm."
-              : "Check that the line and both wall faces describe this dimension, then explicitly confirm.";
+          ? "This line has no viable wall-gap candidate. Leave the association unresolved."
+          : "Choose the wall gap that this dimension measures. The global recommendation is advisory and does not select anything automatically.";
     }
     lineSelect.addEventListener("change", updateWallSpanOptions);
     spanSelect.addEventListener("change", () => {
       associationVerified.checked = false;
       associationVerified.disabled = !lineSelect.value || !spanSelect.value;
+      const selectedLine = (association.candidate_lines || []).find(
+        (candidate) => candidate.dimension_line_id === lineSelect.value
+      );
+      const selectedSpan = selectedLine?.wall_spans?.[Number(spanSelect.value)];
+      associationHelp.textContent = !selectedSpan
+        ? "Choose a wall gap. A dimension-line detection may be shared by several labels in a chain."
+        : selectedSpan.globally_assigned
+          ? "This is the globally preferred one-to-one wall-gap match. Check the drawing and explicitly confirm."
+          : selectedSpan.globally_assigned_to
+            ? "This wall gap is globally preferred for another dimension label. Selecting it here is an override; verify carefully."
+            : "Check that this wall pair describes the written dimension, then explicitly confirm.";
     });
 
     associationPanel.append(associationHeading, associationHelp, lineLabel, spanLabel, associationVerifiedLabel);
@@ -617,14 +625,15 @@ function exportReviewJson() {
             score: candidate.score,
             assignment_score: candidate.assignment_score,
             wall_span_status: candidate.wall_span_status,
-            globally_assigned: candidate.globally_assigned,
-            globally_assigned_to: candidate.globally_assigned_to,
             wall_spans: (candidate.wall_spans || []).map((span) => ({
               wall_ids: span.wall_ids,
               orientation: span.orientation,
               method: span.method,
               span_px: span.span_px,
               score: span.score,
+              assignment_score: span.assignment_score,
+              globally_assigned: span.globally_assigned,
+              globally_assigned_to: span.globally_assigned_to,
               gap_center_px: span.gap_center_px,
               text_center_offset_px: span.text_center_offset_px,
               line_center_offset_px: span.line_center_offset_px,

@@ -131,18 +131,20 @@ def _wall_span_candidates(
     orientation: str,
     walls: list[tuple[dict[str, Any], dict[str, float]]],
 ) -> list[dict[str, Any]]:
-    """Rank spaces between parallel walls that the dimension line could measure.
+    """Rank wall gaps at the text's position along a possibly chained line.
 
-    This borrows the old implementation's gap-based reasoning but evaluates
-    the walls against this line's local perpendicular corridor. It can retain
-    an outer/overall span as an alternative, with a penalty for intervening
-    walls, instead of assuming that only globally adjacent walls are valid.
+    A dimension-line detection may cover an entire chain containing multiple
+    labels. The text coordinate therefore selects the local gap; the line box
+    supplies orientation, annotation-band and projected-overlap evidence.
     """
     line_centre, line_start, line_end = _axis_values(line_rect, orientation)
     text_centre, text_start, text_end = _axis_values(value_rect, orientation)
     line_perp, line_perp_start, line_perp_end = _perpendicular_values(line_rect, orientation)
+    _, text_perp_start, text_perp_end = _perpendicular_values(value_rect, orientation)
     line_length = max(line_end - line_start, 1.0)
     line_thickness = max(line_perp_end - line_perp_start, 1.0)
+    text_thickness = max(text_perp_end - text_perp_start, 1.0)
+    text_length = max(text_end - text_start, 1.0)
     required_wall_orientation = "vertical" if orientation == "horizontal" else "horizontal"
 
     eligible: list[tuple[dict[str, Any], dict[str, float], float, float, float, float]] = []
@@ -150,68 +152,77 @@ def _wall_span_candidates(
         if _orientation(rect) != required_wall_orientation:
             continue
         wall_axis_centre, _, _ = _axis_values(rect, orientation)
-        wall_perp_centre, wall_perp_start, wall_perp_end = _perpendicular_values(rect, orientation)
+        _, wall_perp_start, wall_perp_end = _perpendicular_values(rect, orientation)
+        # Thickness is the wall dimension normal to its long axis, not its run.
         wall_thickness = max(
             rect["width"] if orientation == "horizontal" else rect["height"], 1.0
         )
         perpendicular_gap = _point_interval_gap(line_perp, wall_perp_start, wall_perp_end)
-        # Local tolerance scales with the wall thickness (normal to the wall),
-        # not the wall segment length or the full image size.
-        local_tolerance = max(6.0, line_thickness * 3.0, wall_thickness * 1.5)
+        # Local corridor includes text height to allow normal extension-line offsets,
+        # but rejects unrelated distant wall fragments.
+        local_tolerance = max(
+            6.0, line_thickness * 3.0, wall_thickness * 1.5, text_thickness * 2.0
+        )
         if perpendicular_gap > local_tolerance:
             continue
 
         if orientation == "horizontal":
-            inner_face = rect["x2"] if wall_axis_centre < line_centre else rect["x1"]
+            inner_face = rect["x2"] if wall_axis_centre < text_centre else rect["x1"]
         else:
-            inner_face = rect["y2"] if wall_axis_centre < line_centre else rect["y1"]
+            inner_face = rect["y2"] if wall_axis_centre < text_centre else rect["y1"]
         eligible.append((wall, rect, wall_axis_centre, inner_face, perpendicular_gap, local_tolerance))
 
-    # The old implementation paired walls from globally sorted lists. Filtering
-    # to the current line corridor first avoids pairing unrelated wall fragments
-    # on different sides of a drawing.
     eligible.sort(key=lambda item: (item[2], str(item[0].get("id", ""))))
     if len(eligible) > MAX_ELIGIBLE_WALLS:
         eligible = sorted(
-            eligible,
-            key=lambda item: (abs(item[2] - line_centre), item[2]),
+            eligible, key=lambda item: (abs(item[2] - text_centre), item[2])
         )[:MAX_ELIGIBLE_WALLS]
         eligible.sort(key=lambda item: item[2])
 
-    before = [item for item in eligible if item[2] < line_centre]
-    after = [item for item in eligible if item[2] > line_centre]
+    # Use the label's position, not the centre of the complete dimension-line
+    # detection. This permits several labels on one chained line.
+    before = [item for item in eligible if item[2] < text_centre]
+    after = [item for item in eligible if item[2] > text_centre]
     candidates: list[dict[str, Any]] = []
 
     for first in before:
         for second in after:
             span_start, span_end = first[3], second[3]
             span_length = span_end - span_start
-            if span_length <= 0 or not (span_start < line_centre < span_end):
+            if span_length <= 0 or not (span_start < text_centre < span_end):
                 continue
 
-            margin = max((text_end - text_start) * 0.75, line_thickness * 3.0, span_length * 0.05, 6.0)
+            margin = max(text_length * 0.75, line_thickness * 3.0, 6.0)
             if text_centre < span_start - margin or text_centre > span_end + margin:
                 continue
 
             gap_centre = (span_start + span_end) / 2
-            centre_error = abs(text_centre - gap_centre) / max(span_length / 2 + margin, 1.0)
-            line_centre_error = abs(line_centre - gap_centre) / max(span_length / 2, 1.0)
-            endpoint_error = (
+            # Compare text offset to the label's own size, not the gap size.
+            # This favours the local gap around a label over an unrelated wider
+            # overall gap whose centre is only marginally closer in raw pixels.
+            centre_error = abs(text_centre - gap_centre) / max(text_length, 1.0)
+            line_overlap = max(0.0, min(span_end, line_end) - max(span_start, line_start))
+            line_overlap_ratio = min(1.0, line_overlap / max(span_length, 1.0))
+            if line_overlap_ratio <= 0:
+                continue
+
+            endpoint_residual = (
                 abs(span_start - line_start) + abs(span_end - line_end)
-            ) / (2.0 * max(span_length, line_length, 1.0))
-            overlap = max(0.0, min(span_end, line_end) - max(span_start, line_start))
-            overlap_ratio = min(1.0, overlap / max(min(span_length, line_length), 1.0))
+            ) / 2.0
+            endpoint_error = endpoint_residual / max(span_length, line_length, 1.0)
             perpendicular_tolerance = max(first[5], second[5], 1.0)
             perpendicular_error = max(first[4], second[4]) / perpendicular_tolerance
             intervening = sum(
                 1 for item in eligible if first[2] < item[2] < second[2]
             )
+            line_centre_offset = line_centre - gap_centre
 
+            # Text-to-gap position and line coverage dominate. Endpoint alignment
+            # is only a small factor so one chain line can support inner segments.
             score = exp(
-                -1.0 * centre_error
-                -0.8 * line_centre_error
-                -1.0 * endpoint_error
-                -0.65 * (1.0 - overlap_ratio)
+                -1.35 * centre_error
+                -0.65 * (1.0 - line_overlap_ratio)
+                -0.1 * endpoint_error
                 -0.6 * perpendicular_error
                 -0.12 * intervening
             )
@@ -227,17 +238,19 @@ def _wall_span_candidates(
                 "span_px": round(span_length, 2),
                 "gap_center_px": round(gap_centre, 2),
                 "text_center_offset_px": round(text_centre - gap_centre, 2),
-                "line_center_offset_px": round(line_centre - gap_centre, 2),
-                "endpoint_residual_px": round(
-                    (abs(span_start - line_start) + abs(span_end - line_end)) / 2.0, 2
-                ),
+                "line_center_offset_px": round(line_centre_offset, 2),
+                "endpoint_residual_px": round(endpoint_residual, 2),
                 "perpendicular_offset_px": round(max(first[4], second[4]), 2),
                 "intervening_wall_count": intervening,
+                "line_overlap_ratio": round(line_overlap_ratio, 4),
                 "score": round(max(0.0, min(1.0, score)), 4),
+                "assignment_score": 0.0,
+                "globally_assigned": False,
+                "globally_assigned_to": None,
                 "evidence": (
-                    "The text centre falls within the candidate gap; wall boxes "
-                    "overlap the dimension line's local perpendicular corridor. "
-                    "Line/gap centre and endpoint alignment rank the span."
+                    "The text centre falls within the candidate wall gap and the "
+                    "dimension-line projection covers the gap. Local corridor, "
+                    "gap-centre fit and intervening-wall count rank the span."
                 ),
             })
 
@@ -314,12 +327,10 @@ def _maximum_weight_assignment(weights: list[list[float]]) -> dict[int, int]:
 
 
 def associate_dimensions(detections: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Return globally ranked, unconfirmed value→line→wall-span hypotheses.
+    """Return unconfirmed value→line→wall-span hypotheses with global gap matching.
 
-    Each dimension-line detection can be globally recommended to at most one
-    dimension-value detection. Reviewers may still choose another visible
-    candidate, but the UI clearly distinguishes unique assignment suggestions
-    from lines already recommended for another text region.
+    Dimension-line detections may be shared by several labels in a chain.
+    Global one-to-one assignment is applied to wall-span gaps instead.
     """
     if not isinstance(detections, list):
         return []
@@ -343,13 +354,7 @@ def associate_dimensions(detections: list[dict[str, Any]]) -> list[dict[str, Any
         elif kind == "dimension_value":
             values.append((detection, rect))
 
-    # Preserve detection order for stable API/export output.
     value_records: list[dict[str, Any]] = []
-    unique_line_ids = list(dict.fromkeys(
-        line.get("id") for line, _, _ in lines if isinstance(line.get("id"), str)
-    ))
-    line_column = {line_id: index for index, line_id in enumerate(unique_line_ids)}
-
     for value, value_rect in values:
         value_id = value.get("id")
         if not isinstance(value_id, str):
@@ -366,26 +371,25 @@ def associate_dimensions(detections: list[dict[str, Any]]) -> list[dict[str, Any
             if line_score < MIN_LINE_SCORE:
                 continue
             spans = _wall_span_candidates(value_rect, line_rect, orientation, walls)
-            best_span_score = spans[0]["score"] if spans else 0.0
-            assignment_score = (
-                0.42 * line_score + 0.58 * best_span_score
-                if spans else 0.35 * line_score
+            for span in spans:
+                span["assignment_score"] = round(
+                    0.42 * line_score + 0.58 * span["score"], 4
+                )
+            best_assignment_score = max(
+                (span["assignment_score"] for span in spans), default=0.0
             )
             candidates.append({
                 "dimension_line_id": line_id,
                 "orientation": orientation,
                 "score": line_score,
-                "assignment_score": round(assignment_score, 4),
+                "assignment_score": best_assignment_score,
                 "evidence": line_evidence,
                 "wall_spans": spans,
                 "wall_span_status": _fit_status(
                     [item["score"] for item in spans], minimum=0.30
                 ),
-                "globally_assigned": False,
-                "globally_assigned_to": None,
             })
 
-        # Repeated box IDs should not produce duplicate line choices.
         deduplicated: dict[str, dict[str, Any]] = {}
         for candidate in candidates:
             previous = deduplicated.get(candidate["dimension_line_id"])
@@ -402,43 +406,66 @@ def associate_dimensions(detections: list[dict[str, Any]]) -> list[dict[str, Any
             "confirmed": False,
         })
 
+    # Globally match labels to unique wall gaps, not dimension-line detections.
+    # One dimension line can legitimately contain multiple chain segments.
+    span_keys: list[tuple[str, tuple[str, str]]] = []
+    span_column: dict[tuple[str, tuple[str, str]], int] = {}
+    for record in value_records:
+        for candidate in record["candidate_lines"]:
+            for span in candidate["wall_spans"]:
+                key = (span["orientation"], tuple(sorted(span["wall_ids"])))
+                if key not in span_column:
+                    span_column[key] = len(span_keys)
+                    span_keys.append(key)
+
     weights: list[list[float]] = []
     for record in value_records:
-        row = [0.0] * len(unique_line_ids)
+        row = [0.0] * len(span_keys)
         for candidate in record["candidate_lines"]:
-            row[line_column[candidate["dimension_line_id"]]] = (
-                candidate["assignment_score"] if candidate["wall_spans"] else 0.0
-            )
+            for span in candidate["wall_spans"]:
+                key = (span["orientation"], tuple(sorted(span["wall_ids"])))
+                column = span_column[key]
+                row[column] = max(row[column], span["assignment_score"])
         weights.append(row)
-    assignment = _maximum_weight_assignment(weights)
 
-    assigned_to: dict[str, str] = {}
+    assignment = _maximum_weight_assignment(weights)
+    assigned_to: dict[tuple[str, tuple[str, str]], str] = {}
     for row_index, column_index in assignment.items():
-        if row_index >= len(value_records) or column_index >= len(unique_line_ids):
+        if row_index >= len(value_records) or column_index >= len(span_keys):
             continue
-        score = weights[row_index][column_index]
-        if score >= MIN_GLOBAL_ASSIGNMENT_SCORE:
-            assigned_to[unique_line_ids[column_index]] = value_records[row_index]["dimension_value_id"]
+        if weights[row_index][column_index] >= MIN_GLOBAL_ASSIGNMENT_SCORE:
+            assigned_to[span_keys[column_index]] = value_records[row_index]["dimension_value_id"]
 
     results: list[dict[str, Any]] = []
     for record in value_records:
         value_id = record["dimension_value_id"]
-        candidates = record["candidate_lines"]
-        for candidate in candidates:
-            line_id = candidate["dimension_line_id"]
-            owner = assigned_to.get(line_id)
-            candidate["globally_assigned"] = owner == value_id
-            candidate["globally_assigned_to"] = owner
+        candidate_lines = record["candidate_lines"]
+        all_span_scores: list[float] = []
+        has_own_global_assignment = False
+        for candidate in candidate_lines:
+            for span in candidate["wall_spans"]:
+                key = (span["orientation"], tuple(sorted(span["wall_ids"])))
+                owner = assigned_to.get(key)
+                span["globally_assigned"] = owner == value_id
+                span["globally_assigned_to"] = owner
+                all_span_scores.append(span["assignment_score"])
+                if owner == value_id:
+                    has_own_global_assignment = True
 
-        candidates = candidates[:MAX_CANDIDATES]
-        eligible_scores = [
-            candidate["assignment_score"]
-            for candidate in candidates if candidate["wall_spans"]
-        ]
+        status = _fit_status(all_span_scores, minimum=MIN_GLOBAL_ASSIGNMENT_SCORE)
+        if all_span_scores and not has_own_global_assignment:
+            best_span = max(
+                (span for candidate in candidate_lines for span in candidate["wall_spans"]),
+                key=lambda item: item["assignment_score"],
+                default=None,
+            )
+            if best_span and best_span["globally_assigned_to"] not in (None, value_id):
+                status = "ambiguous"
+
         results.append({
             "dimension_value_id": value_id,
-            "status": _fit_status(eligible_scores, minimum=MIN_GLOBAL_ASSIGNMENT_SCORE),
-            "candidate_lines": candidates,
+            "status": status,
+            "candidate_lines": candidate_lines,
             "confirmed": False,
         })
 

@@ -123,8 +123,10 @@ def test_two_text_regions_are_not_globally_recommended_the_same_dimension_line()
     results = associate_dimensions(detections)
     assert len(results) == 2
     assert sum(
-        candidate["globally_assigned"]
-        for result in results for candidate in result["candidate_lines"]
+        span["globally_assigned"]
+        for result in results
+        for candidate in result["candidate_lines"]
+        for span in candidate["wall_spans"]
     ) == 1
 
 
@@ -148,3 +150,64 @@ def test_invalid_boxes_and_ambiguous_orientations_are_not_forced() -> None:
         {"id": "bad", "class_name": "wall", "bbox": {"x1": 2, "y1": 1}},
     ]
     assert associate_dimensions(detections)[0]["candidate_lines"] == []
+
+
+def test_one_dimension_line_can_serve_multiple_labels_in_a_chain() -> None:
+    detections = [
+        detection("value-left", "dimension_value", (45, 31, 65, 49)),
+        detection("value-right", "dimension_value", (135, 31, 155, 49)),
+        detection("line-chain", "dimension_line", (20, 54, 180, 58)),
+        detection("wall-left", "wall", (10, 60, 20, 300)),
+        detection("wall-middle", "wall", (90, 60, 100, 300)),
+        detection("wall-right", "wall", (180, 60, 190, 300)),
+    ]
+    results = associate_dimensions(detections)
+    assert len(results) == 2
+    left, right = results
+    assert left["candidate_lines"][0]["dimension_line_id"] == "line-chain"
+    assert right["candidate_lines"][0]["dimension_line_id"] == "line-chain"
+    left_span = left["candidate_lines"][0]["wall_spans"][0]
+    right_span = right["candidate_lines"][0]["wall_spans"][0]
+    assert left_span["wall_ids"] == ["wall-left", "wall-middle"]
+    assert right_span["wall_ids"] == ["wall-middle", "wall-right"]
+    assert left_span["globally_assigned"] is True
+    assert right_span["globally_assigned"] is True
+
+
+def test_global_assignment_reserves_a_wall_gap_for_only_one_label() -> None:
+    detections = [
+        detection("value-a", "dimension_value", (75, 31, 125, 49)),
+        detection("value-b", "dimension_value", (78, 31, 128, 49)),
+        detection("line", "dimension_line", (20, 54, 180, 58)),
+        detection("wall-left", "wall", (10, 60, 20, 180)),
+        detection("wall-right", "wall", (180, 60, 190, 180)),
+    ]
+    results = associate_dimensions(detections)
+    assert sum(
+        span["globally_assigned"]
+        for result in results
+        for candidate in result["candidate_lines"]
+        for span in candidate["wall_spans"]
+    ) == 1
+
+
+def test_dimension_corridor_uses_wall_thickness_not_wall_run_length() -> None:
+    detections = [
+        detection("value", "dimension_value", (75, 31, 125, 49)),
+        detection("line", "dimension_line", (20, 54, 180, 58)),
+        detection("wall-left-far", "wall", (10, 100, 20, 400)),
+        detection("wall-right-far", "wall", (180, 100, 190, 400)),
+    ]
+    result = associate_dimensions(detections)[0]
+    assert result["candidate_lines"][0]["wall_spans"] == []
+
+
+def test_dimension_text_height_allows_nearby_extension_band() -> None:
+    detections = [
+        detection("value", "dimension_value", (75, 31, 125, 49)),
+        detection("line", "dimension_line", (20, 54, 180, 58)),
+        detection("wall-left", "wall", (10, 80, 20, 380)),
+        detection("wall-right", "wall", (180, 80, 190, 380)),
+    ]
+    result = associate_dimensions(detections)[0]
+    assert result["candidate_lines"][0]["wall_spans"]
