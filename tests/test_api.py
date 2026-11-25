@@ -400,6 +400,7 @@ def test_web_ui_assets_and_architecture_notes_are_served() -> None:
     assert 'id="drawWallTool"' in page.text
     assert 'id="exportGeometry"' in page.text
     assert 'id="drawRoomTool"' in page.text
+    assert 'id="exportDxf"' in page.text
     assert 'id="wallLength"' in page.text
     assert 'id="geometrySnap"' in page.text
     assert 'id="finishRoom"' in page.text

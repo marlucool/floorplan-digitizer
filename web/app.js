@@ -452,6 +452,7 @@ function renderGeometryControls() {
   $("#deleteRoom").disabled = !geometry.selectedRoomId;
   $("#clearRooms").disabled = roomCount === 0;
   $("#exportGeometry").disabled = wallCount === 0 && roomCount === 0;
+  $("#exportDxf").disabled = wallCount === 0 && roomCount === 0;
   $("#drawWallTool").classList.toggle("active-tool", geometry.mode === "draw_wall");
   $("#drawRoomTool").classList.toggle("active-tool", geometry.mode === "draw_room");
   $("#selectWallTool").classList.toggle("active-tool", geometry.mode === "select");
@@ -736,6 +737,56 @@ function clearManualWalls() {
   if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
 }
 
+async function exportManualGeometryDxf() {
+  if (!state.result || (!state.geometry.segments.length && !state.geometry.rooms.length)) return;
+  const payload = {
+    source_width: state.result.image.width,
+    source_height: state.result.image.height,
+    pixels_per_mm: state.calibration.applied?.pixels_per_mm ?? null,
+    segments: state.geometry.segments.map((segment) => ({
+      id: segment.id,
+      start_px: segment.start_px,
+      end_px: segment.end_px
+    })),
+    rooms: state.geometry.rooms.map((room) => ({
+      id: room.id,
+      vertices_px: room.vertices_px
+    }))
+  };
+  const button = $("#exportDxf");
+  button.disabled = true;
+  const originalText = button.textContent;
+  button.textContent = "Preparing DXF…";
+  try {
+    const response = await fetch("/api/export-dxf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}));
+      throw new Error(detail.detail || "The DXF export could not be created.");
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = ((state.file?.name || "drawing").replace(/\.[^.]+$/, "") || "drawing") + "-manual-geometry.dxf";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    $("#geometryStatus").textContent = payload.pixels_per_mm
+      ? "DXF exported in millimetres using the user-supplied, unverified scale."
+      : "DXF exported with unitless source-pixel coordinates. Apply scale calibration for metric units.";
+  } catch (error) {
+    $("#geometryStatus").textContent = "DXF export failed: " + (error.message || "API unavailable");
+  } finally {
+    button.textContent = originalText;
+    button.disabled = state.geometry.segments.length === 0 && state.geometry.rooms.length === 0;
+  }
+}
+
 function exportManualGeometrySvg() {
   if (!state.result || (!state.geometry.segments.length && !state.geometry.rooms.length)) return;
   const width = state.result.image.width;
@@ -782,6 +833,7 @@ $("#undoWall").addEventListener("click", undoManualWall);
 $("#deleteWall").addEventListener("click", deleteSelectedManualWall);
 $("#clearWalls").addEventListener("click", clearManualWalls);
 $("#exportGeometry").addEventListener("click", exportManualGeometrySvg);
+$("#exportDxf").addEventListener("click", exportManualGeometryDxf);
 
 $("#previewImage").addEventListener("click", handleDrawingClick);
 function beginWallEndpointDrag(event) {

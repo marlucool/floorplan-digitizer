@@ -20,13 +20,14 @@ import cv2
 import numpy as np
 from PIL import Image, UnidentifiedImageError
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__, updater
 
 from .association import associate_dimensions
 from .constraints import DimensionChainRequest, validate_dimension_chain
+from .dxf_export import ManualGeometryDXFRequest, export_manual_geometry_dxf
 from .ocr_studio_api import router as ocr_studio_router
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -326,6 +327,22 @@ def validate_dimension_chain_endpoint(
 ) -> dict[str, object]:
     """Check a manually supplied dimension chain; this route does not run OCR."""
     return validate_dimension_chain(request)
+
+
+@app.post("/api/export-dxf")
+def export_manual_geometry_dxf_endpoint(
+    request: ManualGeometryDXFRequest,
+) -> Response:
+    """Export only user-authored wall segments and room outlines as DXF."""
+    try:
+        content = export_manual_geometry_dxf(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return Response(
+        content=content,
+        media_type="application/dxf",
+        headers={"Content-Disposition": 'attachment; filename="planline-manual-geometry.dxf"'},
+    )
 
 
 @app.post("/api/analyze")

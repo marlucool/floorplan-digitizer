@@ -15,7 +15,7 @@ Open http://127.0.0.1:8000. The default bind address is loopback-only. To make t
 
 1. Select a PNG, JPG, WEBP, TIFF or PDF file (maximum 25 MB).
 2. The browser uploads the source to `POST /api/analyze`.
-3. The API decodes the image or rasterises page one of a PDF in memory, then runs the repository's `yolo_floorplan.pt` detector.
+3. The API decodes the image or rasterises the explicitly selected PDF page in memory, then runs the repository's `yolo_floorplan.pt` detector.
 4. The API returns source pixel dimensions, class counts, candidate bounding boxes, detector scores and a reduced preview.
 5. The UI draws the returned boxes over the preview. Use the zoom controls to inspect small annotations, Fit to return to the fitted view, the detector-threshold slider to trade off candidate recall against false positives, the class filter to narrow the list, and a detection row to highlight its box. The overlay can be hidden or shown independently of the detection list. The review toolbar also supports text search by candidate ID/class and sorting by detector score or region area. The workspace has section navigation, a persistent light/dark theme preference, and keyboard shortcuts (`Ctrl/Cmd+O` to choose a drawing, `Ctrl/Cmd+Enter` to analyse, and `Esc` to clear the current drawing). After analysis, `Export JSON` downloads a versioned candidate-review file with source pixel dimensions, bounding boxes and detector scores; it does not include the uploaded image or claim to contain measurements. The manual dimension-chain checker validates entered values with decimal arithmetic. When exactly one segment is blank, it can propose the arithmetic remainder only if the overall dimension and every known segment are marked verified. The proposal is inserted only after an explicit click and remains unchecked for manual confirmation; it is not OCR and does not associate values with detected walls.
 
@@ -63,6 +63,10 @@ The first Windows installer does not yet provision the optional PaddlePaddle/Pad
 Build drawing-safe splits before training. Samples sharing a source drawing or writer ID are kept in one connected group so crops from one drawing/author cannot leak across train, validation and test. Fine-tuning receives train and validation data only; the held-out test split is excluded from optimisation. Benchmark runs generate predictions and calculate exact full-string match, prediction coverage and character error rate on the held-out test group.
 
 A small number of crops validates the workflow, not model quality. No claim of useful recognition accuracy is made until representative, independent drawings have been labelled and the model has been evaluated on a sufficiently varied held-out set. All OCR predictions remain candidates; this workbench does not associate a dimension with a wall, calibrate scale or generate measured CAD geometry.
+
+## Manual geometry export
+
+The Drawing workspace can export user-authored wall segments and closed room outlines as SVG or DXF. DXF is a 2D AutoCAD R2000-compatible ASCII file with separate `WALLS` and `ROOMS` layers. When a user-supplied two-point scale is present, coordinates are converted to millimetres and `$INSUNITS` is set accordingly; without calibration, the DXF is unitless and retains source-pixel distances. Image Y coordinates are flipped into CAD Cartesian coordinates. Only manual geometry is exported: detector boxes, OCR suggestions and calculated dimension candidates are never promoted to walls or rooms. This export is not a dimension-constrained or verified CAD reconstruction.
 
 ## API
 
