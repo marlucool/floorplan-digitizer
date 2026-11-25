@@ -361,6 +361,18 @@ function renderDetectionRows(detections) {
   sorted.forEach((row) => container.append(row));
   const visible = rows.filter((row) => !row.classList.contains("hidden")).length;
   if (state.result) $("#detectionCount").textContent = visible + " of " + rows.length + " regions shown";
+  const selected = byId.get(state.selectedId);
+  const inspector = $("#selectedDetection");
+  if (selected) {
+    $("#selectedDetectionName").textContent = selected.class_name.replaceAll("_", " ") + " · " + selected.id;
+    $("#selectedDetectionScore").textContent = Math.round(selected.confidence * 100) + "%";
+    $("#selectedDetectionPosition").textContent = Math.round(selected.bbox.x1) + ", " + Math.round(selected.bbox.y1) + " px";
+    $("#selectedDetectionSize").textContent = Math.round(selected.bbox.width) + " × " + Math.round(selected.bbox.height) + " px";
+    inspector.classList.remove("hidden");
+  } else {
+    inspector.classList.add("hidden");
+  }
+  $("#noDetectionMatches").classList.toggle("hidden", visible !== 0 || rows.length === 0);
 }
 
 $("#classFilter").addEventListener("change", (event) => {
