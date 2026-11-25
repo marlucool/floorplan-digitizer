@@ -65,6 +65,37 @@ def validate_dimension_chain(request: DimensionChainRequest) -> dict[str, object
         else None
     )
 
+    # A single missing segment can be calculated only when every other
+    # input is explicitly verified. The result remains a proposal: it is
+    # never written back or marked verified by this validation endpoint.
+    candidate_value: Decimal | None = None
+    candidate_index: int | None = None
+    candidate_reason: str | None = None
+    if len(unresolved_indices) == 1:
+        candidate_index = unresolved_indices[0]
+        if request.overall_value is None:
+            candidate_reason = "Enter the overall dimension first."
+        elif not request.overall_verified or any(
+            not request.segment_verified[index]
+            for index, value in enumerate(request.segment_values)
+            if value is not None
+        ):
+            candidate_reason = "Verify the overall dimension and every known segment first."
+        else:
+            known_total = sum(
+                (value for value in request.segment_values if value is not None),
+                Decimal(0),
+            )
+            proposed = request.overall_value - known_total
+            if proposed <= 0:
+                candidate_reason = "The known segments equal or exceed the overall dimension."
+            else:
+                candidate_value = proposed
+    elif len(unresolved_indices) > 1:
+        candidate_reason = "Exactly one segment must be missing; multiple unknowns are underdetermined."
+    elif not unresolved_indices:
+        candidate_reason = "No segment is missing."
+
     if unresolved_indices or request.overall_value is None:
         status = "unresolved"
     elif unverified_indices or not request.overall_verified:
@@ -85,4 +116,9 @@ def validate_dimension_chain(request: DimensionChainRequest) -> dict[str, object
         "overall_unresolved": request.overall_value is None,
         "unverified_indices": unverified_indices,
         "overall_verified": request.overall_verified,
+        "candidate_index": candidate_index,
+        "candidate_value": _decimal_text(candidate_value),
+        "candidate_available": candidate_value is not None,
+        "candidate_reason": candidate_reason,
+        "candidate_requires_confirmation": candidate_value is not None,
     }

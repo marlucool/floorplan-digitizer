@@ -86,3 +86,59 @@ def test_dimension_chain_rejects_inconsistent_flags_and_invalid_values() -> None
         request(segment_values=["3000", "0", "2500"])
     with pytest.raises(ValidationError):
         request(tolerance="-1")
+
+
+def test_single_missing_segment_is_proposed_from_verified_inputs() -> None:
+    result = validate_dimension_chain(
+        request(
+            segment_values=["3000", None, "2500"],
+            segment_verified=[True, False, True],
+            overall_value="10000",
+            overall_verified=True,
+        )
+    )
+    assert result["status"] == "unresolved"
+    assert result["candidate_available"] is True
+    assert result["candidate_index"] == 1
+    assert result["candidate_value"] == "4500"
+    assert result["candidate_requires_confirmation"] is True
+
+
+def test_single_missing_segment_is_not_proposed_from_unverified_inputs() -> None:
+    result = validate_dimension_chain(
+        request(
+            segment_values=["3000", None, "2500"],
+            segment_verified=[False, False, True],
+            overall_value="10000",
+            overall_verified=True,
+        )
+    )
+    assert result["candidate_available"] is False
+    assert result["candidate_value"] is None
+    assert "Verify" in result["candidate_reason"]
+
+
+def test_single_missing_segment_rejects_non_positive_remainder() -> None:
+    result = validate_dimension_chain(
+        request(
+            segment_values=["6000", None, "5000"],
+            segment_verified=[True, False, True],
+            overall_value="10000",
+            overall_verified=True,
+        )
+    )
+    assert result["candidate_available"] is False
+    assert result["candidate_value"] is None
+
+
+def test_multiple_missing_segments_are_underdetermined() -> None:
+    result = validate_dimension_chain(
+        request(
+            segment_values=["3000", None, None],
+            segment_verified=[True, False, False],
+            overall_value="10000",
+            overall_verified=True,
+        )
+    )
+    assert result["candidate_available"] is False
+    assert "multiple unknowns" in result["candidate_reason"]
