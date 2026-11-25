@@ -139,6 +139,16 @@ Use `--device gpu:0` only when a compatible PaddlePaddle GPU build is installed;
 
 The default Planline install does not include PaddleOCR or PaddlePaddle. The optional runner is tested with a fake recognizer in CI; actual PaddlePaddle installation and inference remain environment-specific.
 
+To run the same recogniser against your curated local crop dataset (after creating and validating its split file):
+
+~~~bash
+python -m planline.ocr_paddle \
+  --dataset datasets/handwriting \
+  --output handwriting-predictions.json
+~~~
+
+Dataset predictions are keyed by crop_id. This recognises the whole dataset; it does not train the model.
+
 ## OCR benchmark evaluation
 
 The manual transcription export can serve as ground truth for comparing OCR engines. The evaluator does not run OCR; it compares a predictions JSON file against **verified** entries in a Planline review export and reports exact-string rate, prediction coverage and character error rate (CER), overall and by printed/handwritten/unclear style.
@@ -181,7 +191,18 @@ Your own manually cropped dimension images can be used directly. Planline can al
 3. Export the review JSON. Keep the exact raster image used for analysis; the JSON contains crop coordinates and labels, not image pixels.
 4. From the repository root, run:
 
+~~~ 
+
+For the curated crop dataset, score the held-out test split (the default) by crop_id. The split is source/writer grouped, so related drawings or handwriting are not mixed across training and test:
+
 ~~~bash
+python -m planline.ocr_eval \
+  --dataset datasets/handwriting \
+  --predictions handwriting-predictions.json \
+  --output handwriting-metrics.json
+~~~
+
+Use --split validation or --split train only for diagnostics. Use --split all only for a non-held-out summary, not as your final benchmark.bash
 python -m planline.dataset export-review \
   --review planline-review.json \
   --image original-scan.png \

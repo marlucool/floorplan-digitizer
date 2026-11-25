@@ -21,7 +21,7 @@ The important problem is not tracing pixels. Survey drawings can be skewed, fade
 | Review export | Versioned planline-detection-review/v1 JSON export with source dimensions, bounding boxes, detector scores and limitations |
 | Dimension chain | Separate API endpoint checks explicitly supplied values, verification flags, units and tolerance using decimal arithmetic |
 | Optional OCR | Standalone PaddleOCR recognition runner for saved dimension crops; raw results remain unverified |
-| OCR evaluation | Tool to compare predictions against manually verified transcriptions using exact-match rate, prediction coverage and character error rate |
+| OCR evaluation | Compare predictions against verified review labels or curated crop datasets using exact-match rate, coverage and character error rate |
 | Crop dataset curation | Export verified full-string crops or import manual crops; validate manifests and create source/writer-safe splits |
 
 ### Start collecting handwritten dimension samples
@@ -78,7 +78,7 @@ The target is a reviewable 2D digitisation pipeline:
 
 The OCR direction is deliberately numeric-first. General English room-label and note recognition is not an initial dependency unless evaluation shows it materially improves the dimension workflow. The optional PaddleOCR recogniser is a baseline to measure, not a claim that OCR is solved.
 
-The first dataset-capture and validation utilities are now implemented. Full model training and a browser-integrated OCR stage remain future work. Evaluation must be split by original drawing and writer, not by individual crops. Measure exact full-dimension accuracy, prediction coverage, dimension association, chain consistency, topology/export correctness and human correction time.
+The first dataset-capture, validation and grouped-split utilities are implemented. The optional PaddleOCR runner can recognise the curated crops, and the evaluator can score the held-out test split. Full model training and a browser-integrated OCR stage remain future work. Evaluation must be split by original drawing and writer, not by individual crops. Measure exact full-dimension accuracy, prediction coverage, dimension association, chain consistency, topology/export correctness and human correction time.
 
 The existing RTX 2080 Ti (11 GB VRAM) is the initial local development target. Compact models, tiled inference, conservative batch sizes and staged processing are preferred over a large end-to-end model. Model selection should follow representative-plan evaluation.
 

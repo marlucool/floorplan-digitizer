@@ -108,33 +108,87 @@ def recognize_review_crops(
     return predictions, skipped
 
 
+def recognize_dataset_crops(
+    dataset_dir: Path,
+    recognizer: Any,
+) -> tuple[list[dict[str, Any]], int]:
+    """Recognise every validated crop in a curated Planline dataset."""
+    from .dataset import _read_manifest, validate_dataset
+
+    validate_dataset(dataset_dir)
+    entries = _read_manifest(dataset_dir)
+    predictions: list[dict[str, Any]] = []
+    skipped = 0
+    for item in entries:
+        crop_id = item.get("crop_id")
+        image_rel = item.get("image_path")
+        if not isinstance(crop_id, str) or not isinstance(image_rel, str):
+            skipped += 1
+            continue
+        image_path = (dataset_dir / image_rel).resolve()
+        if not image_path.is_relative_to(dataset_dir.resolve()):
+            raise ValueError(f"Crop image path escapes dataset directory: {image_rel}")
+        encoded = np.fromfile(str(image_path), dtype=np.uint8)
+        crop = cv2.imdecode(encoded, cv2.IMREAD_COLOR)
+        if crop is None:
+            raise ValueError(f"Could not decode dataset crop: {image_path}")
+        results = recognizer.predict(input=crop, batch_size=1)
+        if not results:
+            text, confidence = "", None
+        else:
+            text, confidence = _recognition_fields(results[0])
+        predictions.append({
+            "crop_id": crop_id,
+            "text": text,
+            "confidence": confidence,
+        })
+    return predictions, skipped
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Run optional PaddleOCR text recognition on Planline dimension crops."
     )
-    parser.add_argument("--review", required=True, type=Path, help="Planline review JSON export.")
-    parser.add_argument("--image", required=True, type=Path, help="Exact raster image used for the review.")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--review", type=Path, help="Planline review JSON export.")
+    source.add_argument("--dataset", type=Path, help="Curated Planline OCR crop dataset directory.")
+    parser.add_argument("--image", type=Path, help="Exact raster image used for the review (required with --review).")
     parser.add_argument("--output", required=True, type=Path, help="Output predictions JSON path.")
     parser.add_argument("--model", default=MODEL_DEFAULT, help=f"PaddleOCR recognition model (default: {MODEL_DEFAULT}).")
     parser.add_argument("--device", default="cpu", help="Paddle device, for example cpu or gpu:0 (default: cpu).")
     args = parser.parse_args(argv)
 
     try:
-        review = json.loads(args.review.read_text(encoding="utf-8"))
-        encoded = np.fromfile(args.image, dtype=np.uint8)
-        image = cv2.imdecode(encoded, cv2.IMREAD_COLOR)
-        if image is None:
-            raise ValueError(f"Could not decode raster image: {args.image}")
+        if args.review is not None and args.image is None:
+            raise ValueError("--image is required when using --review.")
+        if args.dataset is not None and args.image is not None:
+            raise ValueError("--image is only used with --review.")
+
         from paddleocr import TextRecognition
 
         recognizer = TextRecognition(model_name=args.model, device=args.device)
-        predictions, skipped = recognize_review_crops(review, image, recognizer)
+        if args.dataset is not None:
+            predictions, skipped = recognize_dataset_crops(args.dataset, recognizer)
+            input_kind = "planline-handwriting-crops/v1"
+            source_info = {"dataset_dir": str(args.dataset)}
+        else:
+            review = json.loads(args.review.read_text(encoding="utf-8"))
+            encoded = np.fromfile(str(args.image), dtype=np.uint8)
+            image = cv2.imdecode(encoded, cv2.IMREAD_COLOR)
+            if image is None:
+                raise ValueError(f"Could not decode raster image: {args.image}")
+            predictions, skipped = recognize_review_crops(review, image, recognizer)
+            input_kind = "planline-detection-review/v1"
+            source_info = {
+                "source_filename": review.get("source", {}).get("filename")
+                if isinstance(review.get("source"), dict)
+                else None
+            }
         output = {
             "engine": "PaddleOCR",
             "model": args.model,
-            "source_filename": review.get("source", {}).get("filename")
-            if isinstance(review.get("source"), dict)
-            else None,
+            "input_kind": input_kind,
+            **source_info,
             "predictions": predictions,
             "skipped_crops": skipped,
             "notes": [

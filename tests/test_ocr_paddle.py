@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import csv
+import json
+
 import numpy as np
 import pytest
+from PIL import Image
 
-from planline.ocr_paddle import recognize_review_crops
+from planline.dataset import import_crop_csv
+from planline.ocr_paddle import recognize_dataset_crops, recognize_review_crops
 
 
 class FakeResult:
@@ -78,3 +83,38 @@ def test_recognize_review_crops_handles_empty_recognizer_result() -> None:
         {"detection_id": "det-001", "text": "", "confidence": None}
     ]
     assert skipped == 0
+
+
+def test_recognize_dataset_crops_uses_crop_ids_and_validated_images(tmp_path) -> None:
+    crop_path = tmp_path / "handwritten.png"
+    Image.new("RGB", (24, 12), "white").save(crop_path)
+    annotations = tmp_path / "labels.csv"
+    with annotations.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=["image", "text", "source_id", "writer_id", "text_style", "verified"],
+        )
+        writer.writeheader()
+        writer.writerow({
+            "image": crop_path.name,
+            "text": "4,200 mm",
+            "source_id": "plan-A",
+            "writer_id": "writer-01",
+            "text_style": "handwritten",
+            "verified": "true",
+        })
+
+    dataset_dir = tmp_path / "dataset"
+    import_crop_csv(annotations, dataset_dir)
+    manifest_entry = json.loads((dataset_dir / "manifest.jsonl").read_text().splitlines()[0])
+    recognizer = FakeRecognizer()
+
+    predictions, skipped = recognize_dataset_crops(dataset_dir, recognizer)
+
+    assert predictions == [{
+        "crop_id": manifest_entry["crop_id"],
+        "text": "4200",
+        "confidence": 0.91,
+    }]
+    assert skipped == 0
+    assert recognizer.seen_shapes == [(12, 24, 3)]

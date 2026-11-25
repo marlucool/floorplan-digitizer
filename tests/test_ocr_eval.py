@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import csv
 import json
 
 import pytest
+from PIL import Image
 
-from planline.ocr_eval import evaluate_ocr, levenshtein_distance, main
+from planline.dataset import create_grouped_splits, import_crop_csv
+from planline.ocr_eval import evaluate_dataset, evaluate_ocr, levenshtein_distance, main
 
 
 def _review() -> dict:
@@ -119,3 +122,88 @@ def test_ocr_evaluation_cli_writes_metrics_json(tmp_path) -> None:
     report = json.loads(output_path.read_text(encoding="utf-8"))
     assert report["engine"] == "test-engine"
     assert report["metrics"]["exact_match_rate"] == 1.0
+
+
+def test_evaluate_dataset_scores_only_the_grouped_test_split(tmp_path) -> None:
+    crop_path = tmp_path / "crop.png"
+    Image.new("RGB", (24, 12), "white").save(crop_path)
+    annotations = tmp_path / "labels.csv"
+    rows = [
+        ("plan-A", "writer-A", "4,200 mm"),
+        ("plan-B", "writer-B", "2500"),
+        ("plan-C", "writer-C", "3.5m"),
+        ("plan-D", "writer-D", "1800"),
+    ]
+    with annotations.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=["image", "text", "source_id", "writer_id", "text_style", "verified"],
+        )
+        writer.writeheader()
+        for source_id, writer_id, text in rows:
+            writer.writerow({
+                "image": crop_path.name,
+                "text": text,
+                "source_id": source_id,
+                "writer_id": writer_id,
+                "text_style": "handwritten",
+                "verified": "true",
+            })
+
+    dataset_dir = tmp_path / "dataset"
+    import_crop_csv(annotations, dataset_dir)
+    split_data = create_grouped_splits(dataset_dir, seed=21)
+    manifest = [
+        json.loads(line)
+        for line in (dataset_dir / "manifest.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    predictions = {
+        "engine": "fake",
+        "model": "fixture",
+        "predictions": [
+            {"crop_id": item["crop_id"], "text": item["text"], "confidence": 0.99}
+            for item in manifest
+        ],
+    }
+
+    report = evaluate_dataset(dataset_dir, predictions)
+
+    expected_test_ids = {
+        crop_id for crop_id, split in split_data["assignments"].items() if split == "test"
+    }
+    assert report["split"] == "test"
+    assert {sample["crop_id"] for sample in report["samples"]} == expected_test_ids
+    assert report["metrics"]["exact_match_rate"] == 1.0
+    assert report["by_text_style"]["handwritten"]["sample_count"] == len(expected_test_ids)
+
+
+def test_evaluate_dataset_rejects_duplicate_crop_predictions(tmp_path) -> None:
+    crop_path = tmp_path / "crop.png"
+    Image.new("RGB", (24, 12), "white").save(crop_path)
+    annotations = tmp_path / "labels.csv"
+    with annotations.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=["image", "text", "source_id", "text_style", "verified"],
+        )
+        writer.writeheader()
+        for index in range(3):
+            writer.writerow({
+                "image": crop_path.name,
+                "text": str(3000 + index),
+                "source_id": f"plan-{index}",
+                "text_style": "handwritten",
+                "verified": "true",
+            })
+    dataset_dir = tmp_path / "dataset"
+    import_crop_csv(annotations, dataset_dir)
+    create_grouped_splits(dataset_dir)
+    crop_id = json.loads((dataset_dir / "manifest.jsonl").read_text().splitlines()[0])["crop_id"]
+
+    with pytest.raises(ValueError, match="Duplicate prediction"):
+        evaluate_dataset(dataset_dir, {
+            "predictions": [
+                {"crop_id": crop_id, "text": "3000"},
+                {"crop_id": crop_id, "text": "3000"},
+            ]
+        })

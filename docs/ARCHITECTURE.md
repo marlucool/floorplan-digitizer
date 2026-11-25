@@ -21,7 +21,8 @@ The active application is served from the root web/ directory by the local FastA
 | Manual dimension transcription | Implemented as reviewer-entered text associated with a detector candidate; this is not OCR |
 | Dimension-chain arithmetic | Implemented as a separate API endpoint for explicit values, verification flags, units and tolerance |
 | OCR runner | Optional standalone PaddleOCR crop recogniser; not wired into the web analysis endpoint |
-| OCR evaluation | Implemented for predictions compared with manually verified transcriptions |
+| OCR evaluation | Implemented for review exports and curated crop datasets; dataset mode scores the held-out split by default |
+| Dataset inference | Optional PaddleOCR runner can recognise crops from a validated local manifest |
 | Handwriting crop curation | Implemented as a local CLI for verified review crops or manually cropped images, manifest validation and source/writer-grouped splits |
 | Dimension association | Not implemented |
 | Metric reconstruction | Not implemented |
@@ -65,7 +66,7 @@ The current data flow intentionally stops before dimension-to-wall association a
 
 The first OCR target is dimension numerals and numeric annotations, not every English word on the page. Room names, title blocks and general notes can be deferred until there is an evaluated reason to include them.
 
-The optional PaddleOCR runner currently provides a recognition-only baseline on crops produced by the detector. Its output remains raw and unverified. Compare it with other compact printed-numeral and handwriting recognisers on the same held-out crops. Do not allow contextual reasoning to silently overwrite the characters read from the source image.
+The optional PaddleOCR runner provides a recognition-only baseline on review crops and curated dataset images. The evaluator can score review-export detection IDs or dataset crop IDs; curated-dataset evaluation defaults to the source/writer-grouped held-out test split. Output remains raw and unverified until a person checks it. Compare it with other compact printed-numeral and handwriting recognisers on the same held-out crops. Do not allow contextual reasoning to silently overwrite the characters read from the source image.
 
 ## Data and evaluation
 
