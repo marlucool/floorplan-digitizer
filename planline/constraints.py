@@ -75,7 +75,11 @@ def validate_dimension_chain(request: DimensionChainRequest) -> dict[str, object
         candidate_index = unresolved_indices[0]
         if request.overall_value is None:
             candidate_reason = "Enter the overall dimension first."
-        elif not request.overall_verified or unverified_indices:
+        elif not request.overall_verified or any(
+            not request.segment_verified[index]
+            for index, value in enumerate(request.segment_values)
+            if value is not None
+        ):
             candidate_reason = "Verify the overall dimension and every known segment first."
         else:
             known_total = sum(
