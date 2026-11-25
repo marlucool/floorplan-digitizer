@@ -70,7 +70,8 @@ function resetWorkspace() {
 
 function setFile(file) {
   if (!file) return;
-  const allowed = /\.(png|jpe?g|webp|tiff?)$/i.test(file.name) || /\.pdf$/i.test(file.name);
+  const allowed = /\.(png|jpe?g|webp|tiff?)$/i.test(file.name) || /\.pdf$/i.test(file.name) ||
+    (PREVIEW_MODE && /\.svg$/i.test(file.name));
   if (!allowed) {
     resetWorkspace();
     return showNotice("Unsupported file type", "Choose a PNG, JPG, WEBP, TIFF or PDF drawing.");
