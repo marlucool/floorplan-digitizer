@@ -197,3 +197,8 @@ html[data-theme="dark"] .image-cleanup-panel{background:#202620;border-color:var
 .geometry-drawing{cursor:crosshair!important}
 html[data-theme="dark"] .geometry-panel{background:#202620;border-color:var(--line)}
 html[data-theme="dark"] .geometry-tools button.active-tool{background:#263c2c;color:#b9d8bd}
+
+.room-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:5px}
+.room-heading strong{font:600 11px Manrope;color:var(--ink)}
+.room-heading span{font:9px 'DM Mono';color:var(--green)}
+#roomArea{font:10px/1.5 'DM Mono';color:var(--ink);padding:8px;background:var(--panel);border-radius:6px}

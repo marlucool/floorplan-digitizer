@@ -399,6 +399,9 @@ def test_web_ui_assets_and_architecture_notes_are_served() -> None:
     assert 'id="contrastControl"' in page.text
     assert 'id="drawWallTool"' in page.text
     assert 'id="exportGeometry"' in page.text
+    assert 'id="drawRoomTool"' in page.text
+    assert 'id="finishRoom"' in page.text
+    assert 'id="roomArea"' in page.text
 
     script = client.get("/app.js")
     assert "user_two_point_reference" in script.text
@@ -411,6 +414,8 @@ def test_web_ui_assets_and_architecture_notes_are_served() -> None:
     assert "contrast" in script.text
     assert "exportManualGeometrySvg" in script.text
     assert "manual_geometry" in script.text
+    assert "manual_rooms" in script.text
+    assert "polygonAreaPx2" in script.text
     assert script.status_code == 200
     assert "renderDetectionRows" in script.text
     assert "applyImageScale" in script.text

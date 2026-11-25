@@ -210,6 +210,62 @@
     "geometry_next_id": {
       "type": "integer",
       "minimum": 1
+    },
+    "rooms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "type",
+          "vertices_px",
+          "source_page_index",
+          "created_by_user"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "const": "room_polygon"
+          },
+          "vertices_px": {
+            "type": "array",
+            "minItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "x",
+                "y"
+              ],
+              "properties": {
+                "x": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "y": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "source_page_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "created_by_user": {
+            "const": true
+          }
+        }
+      }
+    },
+    "room_next_id": {
+      "type": "integer",
+      "minimum": 1
     }
   }
 }

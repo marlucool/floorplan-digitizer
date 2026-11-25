@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], mode: "select", pendingPoint: null, selectedId: null, nextId: 1 } };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1 } };
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -16,7 +16,7 @@ function resetWorkspace() {
   state.detections = []; state.selectedId = null; state.activeFilter = "all";
   state.overlayVisible = true; state.resizeObserver = null; state.resizeHandler = null; state.zoom = 1;
   state.searchQuery = ""; state.sortMode = "original";
-  state.geometry = { segments: [], mode: "select", pendingPoint: null, selectedId: null, nextId: 1 };
+  state.geometry = { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1 };
   clearCalibration();
   renderGeometryControls();
   if ($("#detectionSearch")) $("#detectionSearch").value = "";
@@ -96,7 +96,7 @@ function setFile(file) {
   state.result = null;
   state.previewUrl = null;
   clearCalibration();
-  state.geometry = { segments: [], mode: "select", pendingPoint: null, selectedId: null, nextId: 1 };
+  state.geometry = { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1 };
   renderGeometryControls();
   state.selectedId = null;
   state.detections = [];
@@ -251,6 +251,43 @@ function drawDetections(previewUrl, detections, imageSize) {
         ctx.fill();
       });
     });
+    (state.geometry.rooms || []).forEach((room) => {
+      const selected = room.id === state.geometry.selectedRoomId;
+      const vertices = room.vertices_px.map((point) => ({ x: point.x * sx, y: point.y * sy }));
+      if (vertices.length < 3) return;
+      ctx.beginPath();
+      ctx.moveTo(vertices[0].x, vertices[0].y);
+      vertices.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
+      ctx.closePath();
+      ctx.fillStyle = selected ? "rgba(211, 78, 62, 0.16)" : "rgba(36, 132, 100, 0.12)";
+      ctx.strokeStyle = selected ? "#d34e3e" : "#248464";
+      ctx.lineWidth = selected ? Math.max(5, canvas.width / 350) : Math.max(3, canvas.width / 500);
+      ctx.fill();
+      ctx.stroke();
+      vertices.forEach((point) => {
+        ctx.beginPath();
+        ctx.fillStyle = selected ? "#d34e3e" : "#248464";
+        ctx.arc(point.x, point.y, Math.max(4, canvas.width / 450), 0, Math.PI * 2);
+        ctx.fill();
+      });
+    });
+    if (state.geometry.pendingRoom?.length) {
+      const vertices = state.geometry.pendingRoom.map((point) => ({ x: point.x * sx, y: point.y * sy }));
+      ctx.beginPath();
+      ctx.strokeStyle = "#c47734";
+      ctx.lineWidth = Math.max(3, canvas.width / 500);
+      ctx.setLineDash([9, 6]);
+      ctx.moveTo(vertices[0].x, vertices[0].y);
+      vertices.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
+      ctx.stroke();
+      ctx.setLineDash([]);
+      vertices.forEach((point) => {
+        ctx.beginPath();
+        ctx.fillStyle = "#c47734";
+        ctx.arc(point.x, point.y, Math.max(5, canvas.width / 350), 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
     if (state.geometry.pendingPoint) {
       ctx.beginPath();
       ctx.fillStyle = "#c47734";
@@ -286,6 +323,7 @@ function clearCalibration() {
   $("#clearCalibration").disabled = true;
   $("#previewImage").classList.remove("calibration-picking");
   if (state.result && state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+  if (state.geometry) renderGeometryControls();
 }
 
 function renderCalibrationStatus() {
@@ -307,6 +345,7 @@ function startCalibration() {
   if (!state.result) return;
   state.geometry.mode = "select";
   state.geometry.pendingPoint = null;
+  state.geometry.pendingRoom = [];
   renderGeometryControls();
   state.calibration = { points: [], picking: true, applied: null };
   $("#calibrationResult").textContent = "Click the first point, then the second point on the drawing.";
@@ -370,6 +409,7 @@ function applyCalibration() {
     " mm = " + state.calibration.applied.pixels_per_mm.toFixed(6) +
     " px/mm. User-supplied reference only.";
   renderCalibrationStatus();
+  renderGeometryControls();
 }
 
 $("#startCalibration").addEventListener("click", startCalibration);
@@ -396,24 +436,51 @@ function pointToSegmentDistance(point, start, end) {
 
 function renderGeometryControls() {
   const geometry = state.geometry;
-  const count = geometry?.segments?.length || 0;
+  const wallCount = geometry?.segments?.length || 0;
+  const roomCount = geometry?.rooms?.length || 0;
   if (!$("#geometryCount")) return;
-  $("#geometryCount").textContent = count + (count === 1 ? " manual wall" : " manual walls");
+  $("#geometryCount").textContent = wallCount + (wallCount === 1 ? " manual wall" : " manual walls");
+  $("#roomCount").textContent = roomCount + (roomCount === 1 ? " room" : " rooms");
   $("#drawWallTool").disabled = !state.result;
   $("#selectWallTool").disabled = !state.result;
-  $("#undoWall").disabled = count === 0;
+  $("#drawRoomTool").disabled = !state.result;
+  $("#finishRoom").disabled = geometry.pendingRoom.length < 3;
+  $("#cancelRoom").disabled = geometry.pendingRoom.length === 0;
+  $("#undoWall").disabled = wallCount === 0;
   $("#deleteWall").disabled = !geometry.selectedId;
-  $("#clearWalls").disabled = count === 0;
-  $("#exportGeometry").disabled = count === 0;
+  $("#clearWalls").disabled = wallCount === 0;
+  $("#deleteRoom").disabled = !geometry.selectedRoomId;
+  $("#clearRooms").disabled = roomCount === 0;
+  $("#exportGeometry").disabled = wallCount === 0 && roomCount === 0;
   $("#drawWallTool").classList.toggle("active-tool", geometry.mode === "draw_wall");
+  $("#drawRoomTool").classList.toggle("active-tool", geometry.mode === "draw_room");
   $("#selectWallTool").classList.toggle("active-tool", geometry.mode === "select");
-  $("#previewImage").classList.toggle("geometry-drawing", geometry.mode === "draw_wall");
+  $("#previewImage").classList.toggle("geometry-drawing", geometry.mode === "draw_wall" || geometry.mode === "draw_room");
   if (geometry.mode === "draw_wall") {
     $("#geometryStatus").textContent = geometry.pendingPoint ? "Start point set. Click the end point." : "Draw mode: click a wall start, then its end.";
+  } else if (geometry.mode === "draw_room") {
+    $("#geometryStatus").textContent = geometry.pendingRoom.length
+      ? geometry.pendingRoom.length + " room vertices placed. Add more points, then Finish room."
+      : "Room mode: click at least three corners, then Finish room.";
+  } else if (geometry.selectedRoomId) {
+    $("#geometryStatus").textContent = "Selected " + geometry.selectedRoomId + ". Area is shown below.";
   } else if (geometry.selectedId) {
     $("#geometryStatus").textContent = "Selected " + geometry.selectedId + ". Delete it or draw another wall.";
   } else {
-    $("#geometryStatus").textContent = "Manual only: detector boxes are not converted into walls.";
+    $("#geometryStatus").textContent = "Manual only: detector boxes are not converted into walls or rooms.";
+  }
+  const selectedRoom = geometry.rooms.find((room) => room.id === geometry.selectedRoomId);
+  if (selectedRoom) {
+    const areaPx = polygonAreaPx2(selectedRoom.vertices_px);
+    const pixelsPerMm = state.calibration.applied?.pixels_per_mm;
+    if (pixelsPerMm) {
+      const areaM2 = areaPx / (pixelsPerMm * pixelsPerMm) / 1000000;
+      $("#roomArea").textContent = areaM2.toFixed(3) + " m² (using user-supplied scale; not verified)";
+    } else {
+      $("#roomArea").textContent = areaPx.toFixed(1) + " px² · apply scale calibration for area units";
+    }
+  } else {
+    $("#roomArea").textContent = "Select a room to view its area.";
   }
 }
 
@@ -424,7 +491,9 @@ function setGeometryMode(mode) {
     renderCalibrationStatus();
   }
   state.geometry.mode = mode;
-  state.geometry.pendingPoint = null;
+  if (mode !== "draw_wall") state.geometry.pendingPoint = null;
+  if (mode !== "draw_room") state.geometry.pendingRoom = [];
+  if (mode !== "select") { state.geometry.selectedId = null; state.geometry.selectedRoomId = null; }
   renderGeometryControls();
   if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
 }
@@ -456,18 +525,129 @@ function addManualWallPoint(point) {
   if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
 }
 
-function selectManualWall(point) {
+function polygonAreaPx2(vertices) {
+  if (!Array.isArray(vertices) || vertices.length < 3) return 0;
+  let sum = 0;
+  vertices.forEach((point, index) => {
+    const next = vertices[(index + 1) % vertices.length];
+    sum += point.x * next.y - next.x * point.y;
+  });
+  return Math.abs(sum) / 2;
+}
+
+function pointInPolygon(point, vertices) {
+  let inside = false;
+  for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+    const a = vertices[i];
+    const b = vertices[j];
+    const crosses = ((a.y > point.y) !== (b.y > point.y)) &&
+      (point.x < ((b.x - a.x) * (point.y - a.y)) / ((b.y - a.y) || Number.EPSILON) + a.x);
+    if (crosses) inside = !inside;
+  }
+  return inside;
+}
+
+function addManualRoomPoint(point) {
   if (!point) return;
-  let closest = null;
-  let closestDistance = 12;
-  for (const segment of state.geometry.segments) {
-    const distance = pointToSegmentDistance(point, segment.start_px, segment.end_px);
-    if (distance <= closestDistance) {
-      closest = segment;
-      closestDistance = distance;
+  state.geometry.pendingRoom.push({ x: Number(point.x.toFixed(2)), y: Number(point.y.toFixed(2)) });
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+}
+
+function segmentsIntersect(a, b, c, d) {
+  const cross = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+  const abC = cross(a, b, c);
+  const abD = cross(a, b, d);
+  const cdA = cross(c, d, a);
+  const cdB = cross(c, d, b);
+  return ((abC > 0 && abD < 0) || (abC < 0 && abD > 0)) &&
+    ((cdA > 0 && cdB < 0) || (cdA < 0 && cdB > 0));
+}
+
+function isSimplePolygon(vertices) {
+  if (vertices.length < 3) return false;
+  for (let i = 0; i < vertices.length; i += 1) {
+    const a = vertices[i];
+    const b = vertices[(i + 1) % vertices.length];
+    for (let j = i + 1; j < vertices.length; j += 1) {
+      if (j === i || j === i + 1 || (i === 0 && j === vertices.length - 1)) continue;
+      const c = vertices[j];
+      const d = vertices[(j + 1) % vertices.length];
+      if (segmentsIntersect(a, b, c, d)) return false;
     }
   }
-  state.geometry.selectedId = closest?.id || null;
+  return true;
+}
+
+function finishManualRoom() {
+  const vertices = state.geometry.pendingRoom;
+  if (vertices.length < 3) return;
+  const area = polygonAreaPx2(vertices);
+  if (!isSimplePolygon(vertices)) {
+    $("#geometryStatus").textContent = "This outline crosses itself. Cancel it and trace the room boundary without crossing edges.";
+    return;
+  }
+  if (!Number.isFinite(area) || area < 9) {
+    $("#geometryStatus").textContent = "That room outline is too small. Add more widely spaced corners.";
+    return;
+  }
+  const id = "manual-room-" + String(state.geometry.nextRoomId++).padStart(3, "0");
+  state.geometry.rooms.push({
+    id,
+    type: "room_polygon",
+    vertices_px: vertices.map((point) => ({ ...point })),
+    source_page_index: state.result?.source?.page_index ?? 0,
+    created_by_user: true
+  });
+  state.geometry.pendingRoom = [];
+  state.geometry.selectedRoomId = id;
+  state.geometry.mode = "select";
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+}
+
+function cancelManualRoom() {
+  state.geometry.pendingRoom = [];
+  state.geometry.mode = "select";
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+}
+
+function deleteSelectedManualRoom() {
+  if (!state.geometry.selectedRoomId) return;
+  state.geometry.rooms = state.geometry.rooms.filter((room) => room.id !== state.geometry.selectedRoomId);
+  state.geometry.selectedRoomId = null;
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+}
+
+function clearManualRooms() {
+  state.geometry.rooms = [];
+  state.geometry.pendingRoom = [];
+  state.geometry.selectedRoomId = null;
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+}
+
+function selectManualGeometry(point) {
+  if (!point) return;
+  const room = [...state.geometry.rooms].reverse().find((item) => pointInPolygon(point, item.vertices_px));
+  if (room) {
+    state.geometry.selectedRoomId = room.id;
+    state.geometry.selectedId = null;
+  } else {
+    state.geometry.selectedRoomId = null;
+    let closest = null;
+    let closestDistance = 12;
+    for (const segment of state.geometry.segments) {
+      const distance = pointToSegmentDistance(point, segment.start_px, segment.end_px);
+      if (distance <= closestDistance) {
+        closest = segment;
+        closestDistance = distance;
+      }
+    }
+    state.geometry.selectedId = closest?.id || null;
+  }
   renderGeometryControls();
   if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
 }
@@ -477,7 +657,8 @@ function handleDrawingClick(event) {
   if (state.calibration.picking) return addCalibrationPoint(event);
   const point = getSourcePoint(event);
   if (state.geometry.mode === "draw_wall") return addManualWallPoint(point);
-  if (state.geometry.mode === "select") return selectManualWall(point);
+  if (state.geometry.mode === "draw_room") return addManualRoomPoint(point);
+  if (state.geometry.mode === "select") return selectManualGeometry(point);
 }
 
 function undoManualWall() {
@@ -505,23 +686,29 @@ function clearManualWalls() {
 }
 
 function exportManualGeometrySvg() {
-  if (!state.result || !state.geometry.segments.length) return;
+  if (!state.result || (!state.geometry.segments.length && !state.geometry.rooms.length)) return;
   const width = state.result.image.width;
   const height = state.result.image.height;
   const scale = state.calibration.applied?.pixels_per_mm;
   const physicalWidth = scale ? (width / scale).toFixed(3) + "mm" : width + "px";
   const physicalHeight = scale ? (height / scale).toFixed(3) + "mm" : height + "px";
+  const polygons = state.geometry.rooms.map((room) =>
+    '<polygon id="' + room.id + '" points="' + room.vertices_px.map((point) => point.x + "," + point.y).join(" ") +
+    '" fill="rgba(36,132,100,0.12)" stroke="#248464" stroke-width="4" />'
+  );
   const lines = state.geometry.segments.map((segment) =>
     '<line id="' + segment.id + '" x1="' + segment.start_px.x + '" y1="' + segment.start_px.y +
     '" x2="' + segment.end_px.x + '" y2="' + segment.end_px.y +
     '" stroke="#172b4d" stroke-width="6" stroke-linecap="round" />'
-  ).join("\n  ");
+  );
+  const elements = [...polygons, ...lines].join("\n  ");
   const svg = '<?xml version="1.0" encoding="UTF-8"?>\n' +
     '<svg xmlns="http://www.w3.org/2000/svg" width="' + physicalWidth + '" height="' + physicalHeight +
     '" viewBox="0 0 ' + width + ' ' + height + '">\n' +
-    '  <metadata>Planline manually drawn wall segments. Coordinates are in original source-image pixels. ' +
+    '  <metadata>Planline manual linework: ' + state.geometry.segments.length + ' wall segments and ' +
+    state.geometry.rooms.length + ' room polygons. Coordinates are in original source-image pixels. ' +
     (scale ? 'Physical scale uses a user-supplied two-point reference; it is not verified geometry.' : 'No physical scale is embedded.') +
-    '</metadata>\n  ' + lines + '\n</svg>';
+    '</metadata>\n  ' + elements + '\n</svg>';
   const blob = new Blob([svg], { type: "image/svg+xml" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -534,6 +721,11 @@ function exportManualGeometrySvg() {
 }
 
 $("#drawWallTool").addEventListener("click", () => setGeometryMode("draw_wall"));
+$("#drawRoomTool").addEventListener("click", () => setGeometryMode("draw_room"));
+$("#finishRoom").addEventListener("click", finishManualRoom);
+$("#cancelRoom").addEventListener("click", cancelManualRoom);
+$("#deleteRoom").addEventListener("click", deleteSelectedManualRoom);
+$("#clearRooms").addEventListener("click", clearManualRooms);
 $("#selectWallTool").addEventListener("click", () => setGeometryMode("select"));
 $("#undoWall").addEventListener("click", undoManualWall);
 $("#deleteWall").addEventListener("click", deleteSelectedManualWall);
@@ -973,6 +1165,8 @@ function buildReviewObject() {
       centre: detection.centre
     })),
     manual_geometry: state.geometry.segments.map((segment) => ({ ...segment })),
+    manual_rooms: state.geometry.rooms.map((room) => ({ ...room })),
+    manual_rooms: state.geometry.rooms.map((room) => ({ ...room })),
     manual_dimension_text_review: (result.dimension_regions || []).map((region, index) => {
       const textInputs = document.querySelectorAll(".dimension-text-value");
       const verifiedInputs = document.querySelectorAll(".dimension-text-verified-input");
@@ -1092,6 +1286,8 @@ async function saveProject() {
     analysis_result: state.result,
     geometry: state.geometry.segments,
     geometry_next_id: state.geometry.nextId,
+    rooms: state.geometry.rooms,
+    room_next_id: state.geometry.nextRoomId,
     review
   };
   const safeStem = (state.file.name || "drawing")
@@ -1162,25 +1358,36 @@ function restoreProjectReview(review) {
 
 function isValidProjectGeometry(project) {
   const segments = project.geometry ?? [];
-  if (!Array.isArray(segments)) return false;
+  const rooms = project.rooms ?? [];
+  if (!Array.isArray(segments) || !Array.isArray(rooms)) return false;
   if (project.geometry_next_id !== undefined &&
       (!Number.isInteger(project.geometry_next_id) || project.geometry_next_id < 1)) return false;
+  if (project.room_next_id !== undefined &&
+      (!Number.isInteger(project.room_next_id) || project.room_next_id < 1)) return false;
   const ids = new Set();
-  return segments.every((segment) => {
+  const pageIndex = project.analysis_result.source?.page_index ?? 0;
+  const inBounds = (point) => point && Number.isFinite(point.x) && Number.isFinite(point.y) &&
+    point.x >= 0 && point.y >= 0 &&
+    point.x <= project.analysis_result.image.width &&
+    point.y <= project.analysis_result.image.height;
+  const validSegments = segments.every((segment) => {
     if (!segment || typeof segment.id !== "string" || !/^manual-wall-[0-9]{3,}$/.test(segment.id) ||
         ids.has(segment.id) || segment.type !== "wall_segment" ||
         segment.created_by_user !== true || !Number.isInteger(segment.source_page_index) ||
-        segment.source_page_index < 0 || segment.source_page_index !== (project.analysis_result.source?.page_index ?? 0)) return false;
+        segment.source_page_index !== pageIndex) return false;
     ids.add(segment.id);
-    const points = [segment.start_px, segment.end_px];
-    if (!points.every((point) => point && Number.isFinite(point.x) && Number.isFinite(point.y) &&
-        point.x >= 0 && point.y >= 0 &&
-        point.x <= project.analysis_result.image.width &&
-        point.y <= project.analysis_result.image.height)) return false;
-    return Math.hypot(
-      segment.end_px.x - segment.start_px.x,
-      segment.end_px.y - segment.start_px.y
-    ) >= 3;
+    return inBounds(segment.start_px) && inBounds(segment.end_px) &&
+      Math.hypot(segment.end_px.x - segment.start_px.x, segment.end_px.y - segment.start_px.y) >= 3;
+  });
+  if (!validSegments) return false;
+  return rooms.every((room) => {
+    if (!room || typeof room.id !== "string" || !/^manual-room-[0-9]{3,}$/.test(room.id) ||
+        ids.has(room.id) || room.type !== "room_polygon" || room.created_by_user !== true ||
+        !Number.isInteger(room.source_page_index) || room.source_page_index !== pageIndex ||
+        !Array.isArray(room.vertices_px) || room.vertices_px.length < 3 ||
+        !room.vertices_px.every(inBounds)) return false;
+    ids.add(room.id);
+    return isSimplePolygon(room.vertices_px) && polygonAreaPx2(room.vertices_px) >= 9;
   });
 }
 
@@ -1216,6 +1423,8 @@ async function openProjectFile(file) {
     state.result = project.analysis_result;
     state.geometry.segments = Array.isArray(project.geometry) ? project.geometry : [];
     state.geometry.nextId = Number.isInteger(project.geometry_next_id) ? project.geometry_next_id : state.geometry.segments.length + 1;
+    state.geometry.rooms = Array.isArray(project.rooms) ? project.rooms : [];
+    state.geometry.nextRoomId = Number.isInteger(project.room_next_id) ? project.room_next_id : state.geometry.rooms.length + 1;
     state.geometry.selectedId = null;
     state.geometry.pendingPoint = null;
     state.previewUrl = project.analysis_result.preview_data_url;
