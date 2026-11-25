@@ -18,6 +18,11 @@ def make_png(width: int = 400, height: int = 180) -> bytes:
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(pixels)) + chunk(b"IEND", b"")
 
 
+class QuietHandler(SimpleHTTPRequestHandler):
+    def log_message(self, format: str, *args: object) -> None:
+        pass
+
+
 def test_ocr_studio_manual_crop_and_typed_label() -> None:
     web_dir = Path(__file__).resolve().parents[2] / "web"
     samples: list[dict[str, object]] = []
@@ -33,7 +38,7 @@ def test_ocr_studio_manual_crop_and_typed_label() -> None:
             "samples": samples,
         }
 
-    handler = partial(SimpleHTTPRequestHandler, directory=str(web_dir))
+    handler = partial(QuietHandler, directory=str(web_dir))
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -42,25 +47,25 @@ def test_ocr_studio_manual_crop_and_typed_label() -> None:
             browser = playwright.chromium.launch(headless=True)
             page = browser.new_page(viewport={"width": 1440, "height": 1000})
 
-        def api_mock(route) -> None:
-            request = route.request
-            path = request.url.split("?", 1)[0]
-            if path.endswith("/api/ocr/status"):
-                route.fulfill(json={"status": "ok", "paddleocr_installed": True, "paddle_installed": True})
-            elif path.endswith("/api/ocr/datasets") and request.method == "GET":
-                route.fulfill(json={"datasets": [{"dataset_id": "handwriting", "summary": dataset_payload()["summary"]}]})
-            elif path.endswith("/api/ocr/datasets/handwriting") and request.method == "GET":
-                route.fulfill(json=dataset_payload())
-            elif path.endswith("/api/ocr/datasets/handwriting/samples") and request.method == "POST":
-                body = request.post_data_buffer or b""
-                assert b"4,200 mm" in body
-                assert b'name="source_id"' in body
-                samples.append({"crop_id": "crop-001", "text": "4,200 mm", "text_style": "handwritten",
-                                "source_id": "plan-01", "writer_id": "", "verified": True,
-                                "split": None, "image_url": "/placeholder.png"})
-                route.fulfill(status=201, json={"added": 1, "dataset": dataset_payload()})
-            else:
-                route.fulfill(status=404, json={"detail": f"Unexpected test route: {path}"})
+            def api_mock(route) -> None:
+                request = route.request
+                path = request.url.split("?", 1)[0]
+                if path.endswith("/api/ocr/status"):
+                    route.fulfill(json={"status": "ok", "paddleocr_installed": True, "paddle_installed": True})
+                elif path.endswith("/api/ocr/datasets") and request.method == "GET":
+                    route.fulfill(json={"datasets": [{"dataset_id": "handwriting", "summary": dataset_payload()["summary"]}]})
+                elif path.endswith("/api/ocr/datasets/handwriting") and request.method == "GET":
+                    route.fulfill(json=dataset_payload())
+                elif path.endswith("/api/ocr/datasets/handwriting/samples") and request.method == "POST":
+                    body = request.post_data_buffer or b""
+                    assert b"4,200 mm" in body
+                    assert b'name="source_id"' in body
+                    samples.append({"crop_id": "crop-001", "text": "4,200 mm", "text_style": "handwritten",
+                                    "source_id": "plan-01", "writer_id": "", "verified": True,
+                                    "split": None, "image_url": "/placeholder.png"})
+                    route.fulfill(status=201, json={"added": 1, "dataset": dataset_payload()})
+                else:
+                    route.fulfill(status=404, json={"detail": f"Unexpected test route: {path}"})
 
             page.route("**/api/ocr/**", api_mock)
             page.goto(f"http://127.0.0.1:{server.server_port}/ocr.html")
