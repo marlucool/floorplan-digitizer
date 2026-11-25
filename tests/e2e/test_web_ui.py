@@ -159,6 +159,19 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.wait_for_function(
                 "!document.querySelector('#overlay').classList.contains('hidden')"
             )
+            page.locator("#detectionSearch").fill("dimension_value")
+            assert page.locator(".detection-row:visible").count() == 1
+            page.locator("#detectionSearch").fill("does-not-exist")
+            assert page.locator("#noDetectionMatches").is_visible()
+            page.locator("#detectionSearch").fill("")
+            page.locator("#detectionSort").select_option("confidence")
+            page.locator('.detection-row[data-detection-id="det-002"]').click()
+            assert page.locator("#selectedDetection").is_visible()
+            assert "det-002" in page.locator("#selectedDetection").inner_text().lower().lower()
+            page.locator("#themeToggle").click()
+            assert page.locator("html").get_attribute("data-theme") == "dark"
+            page.locator("#themeToggle").click()
+            assert page.locator("html").get_attribute("data-theme") == "light"
             alignment = page.evaluate(
                 "() => { const image = document.querySelector('#previewImage').getBoundingClientRect(); const canvas = document.querySelector('#overlay').getBoundingClientRect(); return { left: Math.abs(image.left - canvas.left), top: Math.abs(image.top - canvas.top), width: Math.abs(image.width - canvas.width), height: Math.abs(image.height - canvas.height) }; }"
             )

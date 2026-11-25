@@ -1,0 +1,1112 @@
+using System.Diagnostics;
+using System.Drawing;
+using System.IO.Compression;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text.Json;
+using Microsoft.Win32;
+using System.Windows.Forms;
+
+namespace Planline.Setup;
+
+internal static class Program
+{
+    internal const string ProductName = "Planline";
+    internal const string InstallMarker = ".planline-installed.json";
+    internal const string DataDirectoryName = "Planline";
+    internal const string Version = "0.1.0";
+
+    [STAThread]
+    private static int Main(string[] args)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return 1;
+        }
+
+        ApplicationConfiguration.Initialize();
+
+        string executable = Environment.ProcessPath ?? Application.ExecutablePath;
+        string executableName = Path.GetFileName(executable);
+        string executableDirectory = Path.GetDirectoryName(executable)!;
+
+        if (executableName.Equals("Planline.Uninstall.exe", StringComparison.OrdinalIgnoreCase))
+        {
+            return InstallerMaintenance.Uninstall(executableDirectory);
+        }
+
+        if (args.Contains("--cleanup", StringComparer.OrdinalIgnoreCase))
+        {
+            return 0;
+        }
+
+        if (File.Exists(Path.Combine(executableDirectory, InstallMarker)))
+        {
+            return InstalledLauncher.Run(executableDirectory);
+        }
+
+        Application.Run(new SetupForm());
+        return 0;
+    }
+}
+
+internal static class InstalledLauncher
+{
+    public static int Run(string installDirectory)
+    {
+        string python = Path.Combine(installDirectory, "python", "python.exe");
+        string appDirectory = Path.Combine(installDirectory, "app");
+        string dataDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            Program.DataDirectoryName
+        );
+
+        if (!File.Exists(python) || !File.Exists(Path.Combine(appDirectory, "planline", "desktop.py")))
+        {
+            MessageBox.Show(
+                "Planline is not installed correctly. Run Planline-Setup.exe again to repair the installation.",
+                "Planline",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error
+            );
+            return 1;
+        }
+
+        Directory.CreateDirectory(Path.Combine(dataDirectory, "logs"));
+        string logPath = Path.Combine(dataDirectory, "logs", "desktop.log");
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = python,
+            WorkingDirectory = appDirectory,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        startInfo.ArgumentList.Add("-m");
+        startInfo.ArgumentList.Add("planline.desktop");
+        startInfo.Environment["PLANLINE_DATA_DIR"] = dataDirectory;
+        startInfo.Environment["PYTHONPATH"] = appDirectory;
+        startInfo.Environment["PYTHONUTF8"] = "1";
+        startInfo.Environment["PYTHONUNBUFFERED"] = "1";
+
+        try
+        {
+            using var process = new Process { StartInfo = startInfo };
+            object logLock = new();
+
+            using var log = new StreamWriter(logPath, append: true) { AutoFlush = true };
+            process.OutputDataReceived += (_, eventArgs) =>
+            {
+                if (eventArgs.Data is not null)
+                {
+                    lock (logLock) log.WriteLine(eventArgs.Data);
+                }
+            };
+            process.ErrorDataReceived += (_, eventArgs) =>
+            {
+                if (eventArgs.Data is not null)
+                {
+                    lock (logLock) log.WriteLine("[stderr] " + eventArgs.Data);
+                }
+            };
+
+            if (!process.Start())
+            {
+                throw new InvalidOperationException("Windows could not start the private Planline runtime.");
+            }
+
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            process.WaitForExit();
+            process.WaitForExit();
+
+            if (process.ExitCode != 0)
+            {
+                MessageBox.Show(
+                    $"Planline closed with an error (exit code {process.ExitCode}).\n\n" +
+                    $"The startup log is saved at:\n{logPath}",
+                    "Planline",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+            }
+
+            return process.ExitCode;
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                $"Planline could not start.\n\n{exception.Message}\n\nLog: {logPath}",
+                "Planline",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error
+            );
+            return 1;
+        }
+    }
+}
+
+internal static class InstallerMaintenance
+{
+    public static int Uninstall(string installDirectory)
+    {
+        var answer = MessageBox.Show(
+            "Remove Planline from this computer?\n\nYour OCR crops and datasets will be kept.",
+            "Uninstall Planline",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question,
+            MessageBoxDefaultButton.Button2
+        );
+        if (answer != DialogResult.Yes)
+        {
+            return 0;
+        }
+
+        bool removeData = MessageBox.Show(
+            "Do you also want to delete your local Planline data, including saved OCR crops and labels?\n\n" +
+            "Choose No to keep your datasets.",
+            "Remove local data?",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2
+        ) == DialogResult.Yes;
+
+        string desktopShortcut = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+            "Planline.lnk"
+        );
+        string startMenuFolder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Programs),
+            "Planline"
+        );
+        string dataDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            Program.DataDirectoryName
+        );
+
+        static string PsLiteral(string value) => "'" + value.Replace("'", "''") + "'";
+
+        var commands = new List<string>
+        {
+            "Start-Sleep -Seconds 2",
+            $"Remove-Item -LiteralPath {PsLiteral(desktopShortcut)} -Force -ErrorAction SilentlyContinue",
+            $"Remove-Item -LiteralPath {PsLiteral(startMenuFolder)} -Recurse -Force -ErrorAction SilentlyContinue",
+            "Remove-Item -Path 'Registry::HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Planline' -Recurse -Force -ErrorAction SilentlyContinue",
+            $"Remove-Item -LiteralPath {PsLiteral(installDirectory)} -Recurse -Force -ErrorAction SilentlyContinue",
+        };
+
+        if (removeData)
+        {
+            commands.Insert(4,
+                $"Remove-Item -LiteralPath {PsLiteral(dataDirectory)} -Recurse -Force -ErrorAction SilentlyContinue");
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe"),
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WindowStyle = ProcessWindowStyle.Hidden,
+        };
+        startInfo.ArgumentList.Add("-NoProfile");
+        startInfo.ArgumentList.Add("-NonInteractive");
+        startInfo.ArgumentList.Add("-WindowStyle");
+        startInfo.ArgumentList.Add("Hidden");
+        startInfo.ArgumentList.Add("-Command");
+        startInfo.ArgumentList.Add(string.Join("; ", commands));
+
+        try
+        {
+            Process.Start(startInfo);
+            return 0;
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                $"The uninstaller could not start the cleanup process.\n\n{exception.Message}",
+                "Uninstall Planline",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error
+            );
+            return 1;
+        }
+    }
+}
+
+internal sealed class SetupForm : Form
+{
+    private const string PythonUrl =
+        "https://www.python.org/ftp/python/3.14.10/python-3.14.10-amd64.exe";
+    private const string PythonSha256 =
+        "92480239264744fe0386a1bd8275786fefa126e3129e56a68e22b52c73329965";
+    private const string WebView2BootstrapperUrl =
+        "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
+    private const string TorchCudaIndex = "https://download.pytorch.org/whl/cu126";
+    private const string TorchCpuIndex = "https://download.pytorch.org/whl/cpu";
+
+    private static readonly HttpClient Http = new(new HttpClientHandler
+    {
+        AllowAutoRedirect = true,
+        AutomaticDecompression = System.Net.DecompressionMethods.All,
+    })
+    {
+        Timeout = TimeSpan.FromMinutes(30),
+    };
+
+    private readonly TextBox _installPath = new();
+    private readonly RadioButton _gpuOption = new();
+    private readonly RadioButton _cpuOption = new();
+    private readonly Label _gpuDetection = new();
+    private readonly Label _status = new();
+    private readonly ProgressBar _progressBar = new();
+    private readonly Button _installButton = new();
+    private readonly CheckBox _desktopShortcut = new();
+    private readonly CheckBox _launchAfterInstall = new();
+
+    public SetupForm()
+    {
+        Text = "Planline Setup";
+        StartPosition = FormStartPosition.CenterScreen;
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        MaximizeBox = false;
+        MinimizeBox = true;
+        ClientSize = new Size(720, 565);
+        Font = new Font("Segoe UI", 9.5f);
+        BackColor = Color.FromArgb(248, 249, 251);
+
+        BuildInterface();
+        DetectNvidia();
+    }
+
+    private void BuildInterface()
+    {
+        var root = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 5,
+            Padding = new Padding(28, 22, 28, 22),
+            BackColor = BackColor,
+        };
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 82));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 145));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 126));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+        Controls.Add(root);
+
+        var header = new Panel { Dock = DockStyle.Fill };
+        var title = new Label
+        {
+            Text = "Install Planline",
+            Font = new Font("Segoe UI Semibold", 22f, FontStyle.Bold),
+            ForeColor = Color.FromArgb(28, 37, 49),
+            AutoSize = true,
+            Location = new Point(0, 0),
+        };
+        var subtitle = new Label
+        {
+            Text = "One installer. No terminal, Python setup or package commands.",
+            ForeColor = Color.FromArgb(90, 101, 116),
+            AutoSize = true,
+            Location = new Point(2, 43),
+        };
+        header.Controls.Add(title);
+        header.Controls.Add(subtitle);
+        root.Controls.Add(header, 0, 0);
+
+        var destination = CreateGroup("Installation location");
+        _installPath.ReadOnly = false;
+        _installPath.Dock = DockStyle.Fill;
+        _installPath.Text = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Programs",
+            "Planline"
+        );
+        var browse = new Button
+        {
+            Text = "Browse…",
+            AutoSize = true,
+            Dock = DockStyle.Right,
+            Margin = new Padding(8, 0, 0, 0),
+        };
+        browse.Click += (_, _) => BrowseForFolder();
+
+        var locationRow = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 36,
+            ColumnCount = 2,
+            RowCount = 1,
+        };
+        locationRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        locationRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        locationRow.Controls.Add(_installPath, 0, 0);
+        locationRow.Controls.Add(browse, 1, 0);
+        var note = new Label
+        {
+            Text = "Planline keeps its Python runtime and libraries inside this folder. It will not change your system PATH or other Python installations.",
+            ForeColor = Color.FromArgb(90, 101, 116),
+            Dock = DockStyle.Top,
+            Height = 42,
+            Padding = new Padding(0, 9, 0, 0),
+        };
+        destination.Controls.Add(note);
+        destination.Controls.Add(locationRow);
+        root.Controls.Add(destination, 0, 1);
+
+        var hardware = CreateGroup("Hardware acceleration");
+        _gpuOption.Text = "NVIDIA GPU acceleration (CUDA 12.6)";
+        _gpuOption.AutoSize = true;
+        _gpuOption.Location = new Point(16, 27);
+        _cpuOption.Text = "CPU only (works without an NVIDIA GPU)";
+        _cpuOption.AutoSize = true;
+        _cpuOption.Location = new Point(16, 57);
+        _gpuDetection.Text = "Checking for an NVIDIA GPU…";
+        _gpuDetection.ForeColor = Color.FromArgb(90, 101, 116);
+        _gpuDetection.AutoSize = true;
+        _gpuDetection.Location = new Point(16, 88);
+        hardware.Controls.Add(_gpuOption);
+        hardware.Controls.Add(_cpuOption);
+        hardware.Controls.Add(_gpuDetection);
+        root.Controls.Add(hardware, 0, 2);
+
+        var options = new Panel { Dock = DockStyle.Fill };
+        _desktopShortcut.Text = "Create a desktop shortcut";
+        _desktopShortcut.Checked = true;
+        _desktopShortcut.AutoSize = true;
+        _desktopShortcut.Location = new Point(0, 5);
+        _launchAfterInstall.Text = "Launch Planline when installation finishes";
+        _launchAfterInstall.Checked = true;
+        _launchAfterInstall.AutoSize = true;
+        _launchAfterInstall.Location = new Point(0, 33);
+        var info = new Label
+        {
+            Text = "The installer downloads a private Python runtime, Planline's dependencies, and WebView2 if Windows does not already have it. The NVIDIA option installs the CUDA-enabled PyTorch build; if CUDA cannot start, setup falls back to the CPU build.",
+            ForeColor = Color.FromArgb(90, 101, 116),
+            AutoSize = false,
+            Width = 650,
+            Height = 55,
+            Location = new Point(0, 67),
+        };
+        options.Controls.Add(_desktopShortcut);
+        options.Controls.Add(_launchAfterInstall);
+        options.Controls.Add(info);
+        root.Controls.Add(options, 0, 3);
+
+        var footer = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 2,
+        };
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        footer.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
+        footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        _status.Text = "Ready to install.";
+        _status.ForeColor = Color.FromArgb(65, 75, 90);
+        _status.Dock = DockStyle.Fill;
+        _progressBar.Dock = DockStyle.Fill;
+        _progressBar.Style = ProgressBarStyle.Continuous;
+        _progressBar.Visible = false;
+        _installButton.Text = "Install Planline";
+        _installButton.Width = 150;
+        _installButton.Height = 38;
+        _installButton.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
+        _installButton.Click += async (_, _) => await InstallAsync();
+
+        footer.Controls.Add(_status, 0, 0);
+        footer.Controls.Add(_progressBar, 0, 1);
+        footer.Controls.Add(_installButton, 1, 0);
+        footer.SetRowSpan(_installButton, 2);
+        root.Controls.Add(footer, 0, 4);
+    }
+
+    private static GroupBox CreateGroup(string title)
+    {
+        return new GroupBox
+        {
+            Text = title,
+            Dock = DockStyle.Fill,
+            ForeColor = Color.FromArgb(45, 57, 72),
+            Padding = new Padding(12, 10, 12, 8),
+        };
+    }
+
+    private void BrowseForFolder()
+    {
+        using var dialog = new FolderBrowserDialog
+        {
+            Description = "Choose where Planline should be installed",
+            UseDescriptionForTitle = true,
+            SelectedPath = _installPath.Text,
+            ShowNewFolderButton = true,
+        };
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            _installPath.Text = Path.Combine(dialog.SelectedPath, "Planline");
+        }
+    }
+
+    private void DetectNvidia()
+    {
+        string? nvidiaSmi = FindNvidiaSmi();
+        if (nvidiaSmi is null)
+        {
+            _gpuOption.Enabled = false;
+            _cpuOption.Checked = true;
+            _gpuDetection.Text = "No NVIDIA driver utility was found. CPU mode is selected.";
+            return;
+        }
+
+        string gpuName = QueryNvidiaName(nvidiaSmi);
+        _gpuOption.Enabled = true;
+        _gpuOption.Checked = true;
+        _gpuDetection.Text = string.IsNullOrWhiteSpace(gpuName)
+            ? "NVIDIA driver detected. CUDA will be tested during setup."
+            : $"Detected: {gpuName}. CUDA will be tested during setup.";
+    }
+
+    private static string? FindNvidiaSmi()
+    {
+        string[] candidates =
+        {
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "nvidia-smi.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "NVIDIA Corporation", "NVSMI", "nvidia-smi.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "NVIDIA Corporation", "NVSMI", "nvidia-smi.exe"),
+        };
+        return candidates.FirstOrDefault(File.Exists);
+    }
+
+    private static string QueryNvidiaName(string executable)
+    {
+        try
+        {
+            var info = new ProcessStartInfo
+            {
+                FileName = executable,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            info.ArgumentList.Add("--query-gpu=name");
+            info.ArgumentList.Add("--format=csv,noheader");
+            using var process = Process.Start(info);
+            if (process is null)
+            {
+                return "";
+            }
+
+            Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+            Task<string> errorTask = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(5000))
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit();
+                return "";
+            }
+
+            string output = outputTask.GetAwaiter().GetResult();
+            _ = errorTask.GetAwaiter().GetResult();
+            return process.ExitCode == 0 ? output.Trim() : "";
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    private async Task InstallAsync()
+    {
+        _installButton.Enabled = false;
+        _gpuOption.Enabled = false;
+        _cpuOption.Enabled = false;
+        _installPath.Enabled = false;
+        _progressBar.Visible = true;
+        _progressBar.Style = ProgressBarStyle.Marquee;
+        _progressBar.MarqueeAnimationSpeed = 28;
+
+        string installDirectory = "";
+        bool useGpu = _gpuOption.Checked;
+        bool cpuFallback = false;
+
+        try
+        {
+            if (!Environment.Is64BitOperatingSystem)
+            {
+                throw new InvalidOperationException("Planline's Windows installer requires 64-bit Windows.");
+            }
+
+            installDirectory = Path.GetFullPath(_installPath.Text.Trim());
+            if (string.IsNullOrWhiteSpace(installDirectory) ||
+                Path.GetPathRoot(installDirectory)?.Equals(installDirectory, StringComparison.OrdinalIgnoreCase) == true)
+            {
+                throw new InvalidOperationException("Choose a folder below a drive, not the drive root.");
+            }
+
+            if (IsPlanlineRunning(installDirectory))
+            {
+                throw new InvalidOperationException("Close Planline before installing or updating it.");
+            }
+
+            string marker = Path.Combine(installDirectory, Program.InstallMarker);
+            bool existingInstall = File.Exists(marker);
+            if (Directory.Exists(installDirectory) && !existingInstall &&
+                Directory.EnumerateFileSystemEntries(installDirectory).Any())
+            {
+                throw new InvalidOperationException(
+                    "The selected folder is not empty and is not a Planline installation. Choose an empty folder."
+                );
+            }
+
+            string? driveRoot = Path.GetPathRoot(installDirectory);
+            if (driveRoot is null || new DriveInfo(driveRoot).AvailableFreeSpace < 12L * 1024 * 1024 * 1024)
+            {
+                throw new InvalidOperationException(
+                    "At least 12 GB of free space is recommended for the application and its machine-learning runtime."
+                );
+            }
+
+            Directory.CreateDirectory(installDirectory);
+            string tempDirectory = Path.Combine(Path.GetTempPath(), "PlanlineSetup");
+            Directory.CreateDirectory(tempDirectory);
+            string pythonInstaller = Path.Combine(tempDirectory, "python-3.14.10-amd64.exe");
+            string webViewInstaller = Path.Combine(tempDirectory, "MicrosoftEdgeWebView2Setup.exe");
+
+            await SetStatusAsync("Downloading the private Python runtime…");
+            await DownloadFileAsync(PythonUrl, pythonInstaller);
+            await VerifySha256Async(pythonInstaller, PythonSha256);
+
+            string pythonDirectory = Path.Combine(installDirectory, "python");
+            if (Directory.Exists(pythonDirectory))
+            {
+                Directory.Delete(pythonDirectory, recursive: true);
+            }
+
+            await SetStatusAsync("Installing Planline's private Python runtime…");
+            Directory.CreateDirectory(pythonDirectory);
+            await RunProcessAsync(
+                pythonInstaller,
+                new[]
+                {
+                    "/quiet",
+                    "InstallAllUsers=0",
+                    "PrependPath=0",
+                    "Include_pip=1",
+                    "Include_launcher=0",
+                    "InstallLauncherAllUsers=0",
+                    "Include_test=0",
+                    "Include_doc=0",
+                    "Shortcuts=0",
+                    $"TargetDir={pythonDirectory}",
+                },
+                installDirectory
+            );
+
+            string python = Path.Combine(pythonDirectory, "python.exe");
+            if (!File.Exists(python))
+            {
+                throw new InvalidOperationException("The Python runtime installer completed but python.exe was not found.");
+            }
+
+            if (!IsWebView2Installed())
+            {
+                await SetStatusAsync("Downloading Microsoft WebView2…");
+                await DownloadFileAsync(WebView2BootstrapperUrl, webViewInstaller);
+                await SetStatusAsync("Installing Microsoft WebView2…");
+                await RunProcessAsync(webViewInstaller, new[] { "/silent", "/install" }, installDirectory);
+                if (!IsWebView2Installed())
+                {
+                    throw new InvalidOperationException(
+                        "WebView2 could not be installed. Windows needs the Microsoft WebView2 Runtime to open Planline's desktop window."
+                    );
+                }
+            }
+
+            string appDirectory = Path.Combine(installDirectory, "app");
+            if (Directory.Exists(appDirectory))
+            {
+                Directory.Delete(appDirectory, recursive: true);
+            }
+            Directory.CreateDirectory(appDirectory);
+
+            await SetStatusAsync("Unpacking Planline…");
+            using (Stream? source = Assembly.GetExecutingAssembly().GetManifestResourceStream("Planline.Source.zip"))
+            {
+                if (source is null)
+                {
+                    throw new InvalidOperationException("The installer does not contain the Planline application files.");
+                }
+                using var archive = new ZipArchive(source, ZipArchiveMode.Read);
+                archive.ExtractToDirectory(appDirectory, overwriteFiles: true);
+            }
+
+            if (!File.Exists(Path.Combine(appDirectory, "yolo_floorplan.pt")) ||
+                !File.Exists(Path.Combine(appDirectory, "planline", "desktop.py")))
+            {
+                throw new InvalidOperationException("The application archive is incomplete (model or desktop launcher missing).");
+            }
+
+            await SetStatusAsync(useGpu
+                ? "Installing NVIDIA-enabled PyTorch (CUDA 12.6)…"
+                : "Installing the CPU PyTorch runtime…");
+
+            if (useGpu)
+            {
+                try
+                {
+                    await InstallTorchAsync(python, TorchCudaIndex);
+                    string cudaStatus = await RunProcessAsync(
+                        python,
+                        new[] { "-c", "import torch; print('CUDA_AVAILABLE=' + str(torch.cuda.is_available()))" },
+                        appDirectory
+                    );
+                    if (!cudaStatus.Contains("CUDA_AVAILABLE=True", StringComparison.Ordinal))
+                    {
+                        throw new InvalidOperationException("The installed CUDA runtime did not detect a usable NVIDIA GPU.");
+                    }
+                }
+                catch (Exception)
+                {
+                    cpuFallback = true;
+                    await SetStatusAsync("CUDA was unavailable. Installing the CPU-compatible runtime instead…");
+                    await RunProcessAsync(
+                        python,
+                        new[] { "-m", "pip", "uninstall", "-y", "torch", "torchvision" },
+                        appDirectory
+                    );
+                    await InstallTorchAsync(python, TorchCpuIndex);
+                }
+            }
+            else
+            {
+                await InstallTorchAsync(python, TorchCpuIndex);
+            }
+
+            await SetStatusAsync("Installing Planline's application libraries…");
+            await RunProcessAsync(
+                python,
+                new[]
+                {
+                    "-m", "pip", "install",
+                    "--disable-pip-version-check",
+                    "--no-warn-script-location",
+                    "-r", Path.Combine(appDirectory, "requirements-desktop.txt"),
+                },
+                appDirectory
+            );
+
+            await SetStatusAsync("Checking the installed application…");
+            await RunProcessAsync(
+                python,
+                new[]
+                {
+                    "-c",
+                    "import cv2, fastapi, torch, webview, ultralytics; " +
+                    "print('Planline dependencies ready; torch=' + torch.__version__)",
+                },
+                appDirectory
+            );
+
+            await SetStatusAsync("Creating shortcuts and registering Planline…");
+            string setupExecutable = Environment.ProcessPath ?? Application.ExecutablePath;
+            string appExecutable = Path.Combine(installDirectory, "Planline.exe");
+            string uninstallerExecutable = Path.Combine(installDirectory, "Planline.Uninstall.exe");
+            CopyExecutable(setupExecutable, appExecutable);
+            CopyExecutable(setupExecutable, uninstallerExecutable);
+
+            string dataDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                Program.DataDirectoryName
+            );
+            Directory.CreateDirectory(dataDirectory);
+            var markerData = new
+            {
+                product = Program.ProductName,
+                version = Program.Version,
+                installed_at_utc = DateTimeOffset.UtcNow,
+                data_directory = dataDirectory,
+                python_version = "3.14.10",
+                accelerator = cpuFallback ? "cpu-fallback" : (useGpu ? "cuda-12.6" : "cpu"),
+            };
+            File.WriteAllText(marker, JsonSerializer.Serialize(markerData, new JsonSerializerOptions { WriteIndented = true }));
+
+            try
+            {
+                CreateStartMenuShortcuts(installDirectory, appExecutable, uninstallerExecutable);
+                if (_desktopShortcut.Checked)
+                {
+                    CreateShortcut(
+                        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Planline.lnk"),
+                        appExecutable,
+                        installDirectory,
+                        "Planline floor-plan and OCR workspace"
+                    );
+                }
+                RegisterUninstallEntry(installDirectory, uninstallerExecutable);
+            }
+            catch (Exception exception)
+            {
+                await SetStatusAsync("Installed; Windows shortcut registration needs attention.");
+                MessageBox.Show(
+                    $"Planline was installed, but Windows could not create every shortcut or uninstall entry.\n\n{exception.Message}",
+                    "Planline Setup",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+            }
+
+            _progressBar.Style = ProgressBarStyle.Continuous;
+            _progressBar.Value = 100;
+            _status.Text = "Installation complete.";
+
+            string result = cpuFallback
+                ? "Planline is installed. CUDA could not be started on this system, so the CPU runtime was installed instead."
+                : useGpu
+                    ? "Planline is installed with NVIDIA CUDA acceleration."
+                    : "Planline is installed with the CPU runtime.";
+
+            MessageBox.Show(
+                result + "\n\nOpen Planline from the desktop or Start menu.",
+                "Planline Setup",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information
+            );
+
+            if (_launchAfterInstall.Checked)
+            {
+                Process.Start(new ProcessStartInfo(appExecutable) { UseShellExecute = true });
+            }
+
+            Close();
+        }
+        catch (Exception exception)
+        {
+            _status.Text = "Installation did not finish.";
+            _progressBar.Style = ProgressBarStyle.Continuous;
+            _progressBar.Value = 0;
+            MessageBox.Show(
+                $"Planline could not be installed.\n\n{exception.Message}\n\n" +
+                "You can run this installer again after resolving the issue.",
+                "Planline Setup",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error
+            );
+            _installButton.Enabled = true;
+            _gpuOption.Enabled = true;
+            _cpuOption.Enabled = true;
+            _installPath.Enabled = true;
+        }
+    }
+
+    private async Task InstallTorchAsync(string python, string indexUrl)
+    {
+        await RunProcessAsync(
+            python,
+            new[]
+            {
+                "-m", "pip", "install",
+                "--disable-pip-version-check",
+                "--index-url", indexUrl,
+                "torch==2.10.0",
+                "torchvision==0.25.0",
+            },
+            Path.GetDirectoryName(python)!
+        );
+    }
+
+    private Task SetStatusAsync(string message)
+    {
+        if (InvokeRequired)
+        {
+            Invoke((Action)(() => _status.Text = message));
+            return Task.CompletedTask;
+        }
+        _status.Text = message;
+        _status.Refresh();
+        return Task.CompletedTask;
+    }
+
+    private async Task DownloadFileAsync(string url, string destination)
+    {
+        using var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+
+        long? totalBytes = response.Content.Headers.ContentLength;
+        await using Stream input = await response.Content.ReadAsStreamAsync();
+        await using var output = new FileStream(
+            destination,
+            FileMode.Create,
+            FileAccess.Write,
+            FileShare.None,
+            bufferSize: 1024 * 64,
+            useAsync: true
+        );
+
+        byte[] buffer = new byte[1024 * 128];
+        long totalRead = 0;
+        int read;
+        while ((read = await input.ReadAsync(buffer)) > 0)
+        {
+            await output.WriteAsync(buffer.AsMemory(0, read));
+            totalRead += read;
+
+            if (totalBytes is > 0)
+            {
+                int percent = (int)Math.Clamp(totalRead * 100 / totalBytes.Value, 0, 100);
+                _progressBar.Style = ProgressBarStyle.Continuous;
+                _progressBar.Value = percent;
+            }
+            _status.Text = totalBytes is > 0
+                ? $"Downloading… {FormatBytes(totalRead)} of {FormatBytes(totalBytes.Value)}"
+                : $"Downloading… {FormatBytes(totalRead)}";
+        }
+    }
+
+    private static async Task VerifySha256Async(string path, string expected)
+    {
+        await using var stream = File.OpenRead(path);
+        byte[] hash = await SHA256.HashDataAsync(stream);
+        string actual = Convert.ToHexString(hash).ToLowerInvariant();
+        if (!CryptographicOperations.FixedTimeEquals(
+            Convert.FromHexString(actual),
+            Convert.FromHexString(expected)
+        ))
+        {
+            File.Delete(path);
+            throw new InvalidOperationException(
+                "The Python download did not match the official SHA-256 checksum. The file was deleted."
+            );
+        }
+    }
+
+    private async Task<string> RunProcessAsync(
+        string executable,
+        IEnumerable<string> arguments,
+        string workingDirectory
+    )
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = executable,
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (string argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = new Process { StartInfo = startInfo };
+        var output = new List<string>();
+        object outputLock = new();
+
+        void Capture(string? line, bool isError)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return;
+            }
+
+            lock (outputLock)
+            {
+                output.Add((isError ? "!" : "") + line);
+                if (output.Count > 40)
+                {
+                    output.RemoveAt(0);
+                }
+            }
+
+            string compact = line.Length > 105 ? line[^105..] : line;
+            if (IsHandleCreated && !IsDisposed)
+            {
+                try
+                {
+                    BeginInvoke((Action)(() => _status.Text = compact));
+                }
+                catch (InvalidOperationException)
+                {
+                    // The setup window may be closing while a child process exits.
+                }
+            }
+        }
+
+        process.OutputDataReceived += (_, eventArgs) => Capture(eventArgs.Data, false);
+        process.ErrorDataReceived += (_, eventArgs) => Capture(eventArgs.Data, true);
+
+        if (!process.Start())
+        {
+            throw new InvalidOperationException($"Could not start {Path.GetFileName(executable)}.");
+        }
+
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+        await process.WaitForExitAsync();
+        process.WaitForExit();
+
+        if (process.ExitCode != 0)
+        {
+            string details;
+            lock (outputLock)
+            {
+                details = string.Join(Environment.NewLine, output.TakeLast(18));
+            }
+            throw new InvalidOperationException(
+                $"{Path.GetFileName(executable)} exited with code {process.ExitCode}.\n\n{details}"
+            );
+        }
+
+        lock (outputLock)
+        {
+            return string.Join(Environment.NewLine, output);
+        }
+    }
+
+    private static bool IsWebView2Installed()
+    {
+        string[] roots =
+        {
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Microsoft", "EdgeWebView", "Application"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Microsoft", "EdgeWebView", "Application"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "EdgeWebView", "Application"),
+        };
+
+        return roots.Any(root =>
+            Directory.Exists(root) &&
+            Directory.EnumerateDirectories(root)
+                .Any(version => File.Exists(Path.Combine(version, "msedgewebview2.exe")))
+        );
+    }
+
+    private static bool IsPlanlineRunning(string installDirectory)
+    {
+        foreach (Process process in Process.GetProcessesByName("Planline"))
+        {
+            using (process)
+            {
+                try
+                {
+                    string? executable = process.MainModule?.FileName;
+                    if (executable is not null &&
+                        Path.GetFullPath(executable).StartsWith(
+                            Path.GetFullPath(installDirectory).TrimEnd(Path.DirectorySeparatorChar) +
+                            Path.DirectorySeparatorChar,
+                            StringComparison.OrdinalIgnoreCase
+                        ))
+                    {
+                        return true;
+                    }
+                }
+                catch
+                {
+                    // Another user's process or a protected process is not inspectable.
+                }
+            }
+        }
+        return false;
+    }
+
+    private static void CopyExecutable(string source, string destination)
+    {
+        if (Path.GetFullPath(source).Equals(Path.GetFullPath(destination), StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+        File.Copy(source, destination, overwrite: true);
+    }
+
+    private static void CreateStartMenuShortcuts(
+        string installDirectory,
+        string appExecutable,
+        string uninstallerExecutable
+    )
+    {
+        string startMenu = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Programs),
+            "Planline"
+        );
+        Directory.CreateDirectory(startMenu);
+
+        CreateShortcut(
+            Path.Combine(startMenu, "Planline.lnk"),
+            appExecutable,
+            installDirectory,
+            "Planline floor-plan and OCR workspace"
+        );
+        CreateShortcut(
+            Path.Combine(startMenu, "Uninstall Planline.lnk"),
+            uninstallerExecutable,
+            installDirectory,
+            "Uninstall Planline"
+        );
+    }
+
+    private static void CreateShortcut(string shortcutPath, string target, string workingDirectory, string description)
+    {
+        Type shellType = Type.GetTypeFromProgID("WScript.Shell")
+            ?? throw new InvalidOperationException("Windows Script Host is unavailable for shortcut creation.");
+
+        object shell = Activator.CreateInstance(shellType)
+            ?? throw new InvalidOperationException("Could not create the Windows shortcut service.");
+
+        object? shortcut = null;
+        try
+        {
+            dynamic shellObject = shell;
+            shortcut = shellObject.CreateShortcut(shortcutPath);
+            dynamic shortcutObject = shortcut;
+            shortcutObject.TargetPath = target;
+            shortcutObject.WorkingDirectory = workingDirectory;
+            shortcutObject.Description = description;
+            shortcutObject.IconLocation = target + ",0";
+            shortcutObject.Save();
+        }
+        finally
+        {
+            if (shortcut is not null && Marshal.IsComObject(shortcut))
+            {
+                Marshal.FinalReleaseComObject(shortcut);
+            }
+            if (Marshal.IsComObject(shell))
+            {
+                Marshal.FinalReleaseComObject(shell);
+            }
+        }
+    }
+
+    private static void RegisterUninstallEntry(string installDirectory, string uninstallerExecutable)
+    {
+        using RegistryKey key = Registry.CurrentUser.CreateSubKey(
+            @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Planline"
+        );
+        key.SetValue("DisplayName", "Planline");
+        key.SetValue("DisplayVersion", Program.Version);
+        key.SetValue("Publisher", "Marlu");
+        key.SetValue("InstallLocation", installDirectory);
+        key.SetValue("DisplayIcon", Path.Combine(installDirectory, "Planline.exe"));
+        key.SetValue("UninstallString", $"\"{uninstallerExecutable}\"");
+        key.SetValue("NoModify", 1, RegistryValueKind.DWord);
+        key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] units = { "B", "KB", "MB", "GB" };
+        double amount = bytes;
+        int unit = 0;
+        while (amount >= 1024 && unit < units.Length - 1)
+        {
+            amount /= 1024;
+            unit++;
+        }
+        return $"{amount:0.0} {units[unit]}";
+    }
+}

@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 
 
-MODEL_DEFAULT = "en_PP-OCRv5_mobile_rec"
+MODEL_DEFAULT = "PP-OCRv5_mobile_rec"
 
 
 def _result_payload(result: Any) -> dict[str, Any]:
@@ -111,16 +111,32 @@ def recognize_review_crops(
 def recognize_dataset_crops(
     dataset_dir: Path,
     recognizer: Any,
+    *,
+    split: str | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
-    """Recognise every validated crop in a curated Planline dataset."""
-    from .dataset import _read_manifest, validate_dataset
+    """Recognise validated crops, optionally limiting inference to one split."""
+    from .dataset import SPLITS_NAME, _read_manifest, validate_dataset
 
+    if split not in {None, "train", "validation", "test"}:
+        raise ValueError("split must be train, validation, test or None.")
     validate_dataset(dataset_dir)
     entries = _read_manifest(dataset_dir)
+    assignments: dict[str, str] | None = None
+    if split is not None:
+        split_path = dataset_dir / SPLITS_NAME
+        if not split_path.is_file():
+            raise ValueError("Create a source/writer-grouped split plan before selecting a split.")
+        split_data = json.loads(split_path.read_text(encoding="utf-8"))
+        raw_assignments = split_data.get("assignments")
+        if not isinstance(raw_assignments, dict):
+            raise ValueError("Dataset split plan is missing its assignments map.")
+        assignments = raw_assignments
     predictions: list[dict[str, Any]] = []
     skipped = 0
     for item in entries:
         crop_id = item.get("crop_id")
+        if assignments is not None and assignments.get(crop_id) != split:
+            continue
         image_rel = item.get("image_path")
         if not isinstance(crop_id, str) or not isinstance(image_rel, str):
             skipped += 1
@@ -155,7 +171,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--image", type=Path, help="Exact raster image used for the review (required with --review).")
     parser.add_argument("--output", required=True, type=Path, help="Output predictions JSON path.")
     parser.add_argument("--model", default=MODEL_DEFAULT, help=f"PaddleOCR recognition model (default: {MODEL_DEFAULT}).")
+    parser.add_argument("--model-dir", type=Path, help="Local exported PaddleOCR inference model directory (overrides --model).")
     parser.add_argument("--device", default="cpu", help="Paddle device, for example cpu or gpu:0 (default: cpu).")
+    parser.add_argument("--split", choices=["train", "validation", "test", "all"], default="all",
+                        help="Dataset samples to recognise (default: all).")
     args = parser.parse_args(argv)
 
     try:
@@ -166,11 +185,19 @@ def main(argv: list[str] | None = None) -> int:
 
         from paddleocr import TextRecognition
 
-        recognizer = TextRecognition(model_name=args.model, device=args.device)
+        if args.model_dir is not None:
+            model_dir = args.model_dir.expanduser().resolve()
+            if not model_dir.is_dir() or not any(model_dir.glob("*.pdiparams")):
+                raise ValueError(f"Fine-tuned model directory is missing exported .pdiparams weights: {model_dir}")
+            recognizer = TextRecognition(model_dir=str(model_dir), device=args.device)
+            model_name = str(model_dir)
+        else:
+            recognizer = TextRecognition(model_name=args.model, device=args.device)
+            model_name = args.model
         if args.dataset is not None:
-            predictions, skipped = recognize_dataset_crops(args.dataset, recognizer)
+            predictions, skipped = recognize_dataset_crops(args.dataset, recognizer, split=None if args.split == "all" else args.split)
             input_kind = "planline-handwriting-crops/v1"
-            source_info = {"dataset_dir": str(args.dataset)}
+            source_info = {"dataset_dir": str(args.dataset), "split": args.split}
         else:
             review = json.loads(args.review.read_text(encoding="utf-8"))
             encoded = np.fromfile(str(args.image), dtype=np.uint8)
@@ -186,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
             }
         output = {
             "engine": "PaddleOCR",
-            "model": args.model,
+            "model": model_name,
             "input_kind": input_kind,
             **source_info,
             "predictions": predictions,

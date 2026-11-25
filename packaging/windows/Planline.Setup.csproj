@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>Planline.Setup</AssemblyName>
+    <RootNamespace>Planline.Setup</RootNamespace>
+    <Version>0.1.0</Version>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <FileVersion>0.1.0.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="$(PlanlineSourceZip)" LogicalName="Planline.Source.zip"
+                      Condition="'$(PlanlineSourceZip)' != '' and Exists('$(PlanlineSourceZip)')" />
+  </ItemGroup>
+
+  <Target Name="RequirePlanlineSourceArchive" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(PlanlineSourceZip)' == ''"
+           Text="PlanlineSourceZip must point to the source archive to embed in the installer." />
+    <Error Condition="!Exists('$(PlanlineSourceZip)')"
+           Text="Planline source archive was not found: $(PlanlineSourceZip)" />
+  </Target>
+</Project>

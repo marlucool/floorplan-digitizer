@@ -24,6 +24,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .constraints import DimensionChainRequest, validate_dimension_chain
+from .ocr_studio_api import router as ocr_studio_router
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 WEB_DIR = ROOT_DIR / "web"
@@ -391,5 +392,13 @@ async def analyze_drawing(
 def index() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
 
+
+@app.get("/ocr", response_class=FileResponse)
+def ocr_studio() -> FileResponse:
+    """Serve the local OCR annotation and training workbench."""
+    return FileResponse(WEB_DIR / "ocr.html")
+
+
+app.include_router(ocr_studio_router)
 
 app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")

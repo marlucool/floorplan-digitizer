@@ -12,16 +12,17 @@
   <header class="topbar">
     <a class="brand" href="/" aria-label="Planline home"><span class="brand-mark">P</span><span>planline<span class="brand-dot">.</span></span></a>
     <div class="top-meta"><span class="local-dot" id="apiDot"></span><span id="apiStatus">Checking local API…</span><span class="divider">/</span> 2D workspace</div>
-    <a class="repo-link" href="https://github.com/marlucool/floorplan-digitizer" target="_blank" rel="noreferrer">Source repository ↗</a>
+    <div class="top-links"><button id="themeToggle" class="toolbar-button theme-toggle" type="button" aria-label="Switch to dark theme" title="Switch theme">Dark mode</button><a class="repo-link" href="#chainChecker">Dimension checks ↓</a><a class="repo-link" href="/ocr">OCR Studio ↗</a><a class="repo-link" href="https://github.com/marlucool/floorplan-digitizer" target="_blank" rel="noreferrer">Source repository ↗</a></div>
   </header>
   <main>
+    <nav class="workspace-nav" aria-label="Workspace sections"><a class="workspace-nav-item active" href="#sourceDrawing"><span>01</span> Drawing</a><a class="workspace-nav-item" href="#candidateReview"><span>02</span> Review detections</a><a class="workspace-nav-item" href="#chainChecker"><span>03</span> Dimension checks</a><span class="workspace-nav-hint">Shortcuts <kbd>Ctrl</kbd> + <kbd>O</kbd> open · <kbd>Ctrl</kbd> + <kbd>Enter</kbd> analyse</span></nav>
     <section class="intro">
       <div><p class="eyebrow">SCAN TO CAD · EARLY INTEGRATION</p><h1>Turn a scanned plan<br><em>into editable geometry.</em></h1></div>
       <p class="intro-copy">Import a drawing to detect candidate walls and dimension annotations. Measurements are never guessed from pixel proportions: written dimensions must be read and verified first.</p>
     </section>
 
     <section class="workspace">
-      <aside class="sidebar">
+      <aside class="sidebar" id="sourceDrawing">
         <div class="panel-heading"><span>01 / SOURCE DRAWING</span><span class="step-state" id="sourceState">Waiting</span></div>
         <label class="dropzone" id="dropzone" for="fileInput">
           <input id="fileInput" type="file" accept=".png,.jpg,.jpeg,.webp,.tif,.tiff,.pdf,image/*,application/pdf">
@@ -60,11 +61,11 @@
       </section>
     </section>
 
-    <section class="results">
+    <section class="results" id="candidateReview">
       <div class="results-head"><div><p class="eyebrow">03 / REVIEW DETECTIONS</p><h2>Candidate regions</h2></div><span class="result-status" id="resultStatus">NOT ANALYSED</span></div>
       <div class="notice" id="notice"><b>Awaiting a drawing.</b><span>Once analysed, candidate regions will be listed here. Detector confidence is not OCR confidence.</span></div>
       <div class="summary hidden" id="summary"></div>
-      <div class="review-toolbar"><label for="classFilter">Show class</label><select id="classFilter"><option value="all">All detections</option><option value="wall">Walls</option><option value="dimension_line">Dimension lines</option><option value="dimension_value">Dimension values</option></select><span>Choose a row to highlight its box.</span><button id="exportReview" class="toolbar-button" type="button" disabled>Export JSON</button></div><div class="detection-list" id="detectionList"></div>
+      <div class="review-toolbar"><div class="review-filter"><label for="classFilter">Class</label><select id="classFilter"><option value="all">All detections</option><option value="wall">Walls</option><option value="dimension_line">Dimension lines</option><option value="dimension_value">Dimension values</option></select></div><div class="review-search"><label class="sr-only" for="detectionSearch">Search detections</label><input id="detectionSearch" type="search" placeholder="Search ID or class…" autocomplete="off"></div><div class="review-sort"><label for="detectionSort">Sort</label><select id="detectionSort"><option value="original">Original order</option><option value="confidence">Highest score</option><option value="size">Largest region</option></select></div><span class="review-hint">Select a row to locate it on the drawing.</span><button id="exportReview" class="toolbar-button" type="button" disabled>Export review ↗</button></div><div class="detection-list" id="detectionList"></div><p id="noDetectionMatches" class="no-detection-matches hidden">No candidate regions match these filters. Clear the search or choose another class.</p><aside id="selectedDetection" class="selected-detection hidden" aria-live="polite"><div><span class="eyebrow">SELECTED CANDIDATE</span><strong id="selectedDetectionName">—</strong></div><div class="selected-detection-metrics"><span><small>DETECTOR SCORE</small><b id="selectedDetectionScore">—</b></span><span><small>POSITION</small><b id="selectedDetectionPosition">—</b></span><span><small>BOX SIZE</small><b id="selectedDetectionSize">—</b></span></div></aside>
       <details class="text-review hidden" id="dimensionTextReview">
         <summary><span class="eyebrow">03 / DIMENSION TEXT</span><strong>Manual transcription <span class="summary-hint">OCR not connected</span></strong></summary>
         <div id="dimensionTextItems" class="dimension-text-items"></div>
