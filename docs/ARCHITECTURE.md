@@ -10,8 +10,8 @@ The system measures success by correction time and resulting geometry, not by a 
 
 | Component | Responsibility | Current state |
 | --- | --- | --- |
-| Web UI | Source preview, uncertainty review, manual correction, chain checks, 2D preview and export controls | Implemented as a local frontend; sample project is interactive |
-| Local API | Project/file storage, job state, review persistence, source retrieval and guarded export | Implemented; no analyser is attached |
+| Web UI | Source preview, uncertainty review, manual correction, chain checks, 2D preview and export controls | Implemented in `web/`; sample project is interactive |
+| Local API | Project/file storage, job state, review persistence, source retrieval and guarded export | Implemented in `backend/`; source preflight only, no analyser attached |
 | Image preparation | Deskewing, denoising, contrast normalisation, page/frame detection and tiling | Planned |
 | Detection | Locate walls, openings, symbols, dimension strings/lines, notes and title-block regions | Planned model adapter |
 | OCR ensemble | Printed text, handwritten numeric text and annotation recognition | Planned model adapters |
@@ -82,22 +82,27 @@ The analyser will add the following fields to a project record. These fields are
 }
 ```
 
-The current API runs deterministic source preflight for uploads (file fingerprint, available image dimensions, and input-quality notes), then returns an `analysis.state` of `blocked` because the model adapters that would create OCR and geometry data are not installed.
+The current API stores uploads locally and runs deterministic source preflight (SHA-256 fingerprint, available image dimensions, and basic input-quality notes). It returns an `analysis.state` of `blocked` because the model adapters that would create dimension readings and geometry are not installed. The frontend hides sample readings whenever a real drawing is loaded.
 
 ## OCR and training strategy
 
-- Begin with pretrained models. Benchmark printed drawing OCR, handwriting/numeral recognition and detection independently before training new models.
-- Use complementary models for printed dimensions/text, handwritten numbers, and architectural features. Keep their outputs and confidence sources distinct.
-- Fine-tune only after a baseline evaluation on representative scans. Employer/draftsman drawings require documented permission, a data manifest, and annotation rules before use.
+- Start with **dimension numerals**, not general-purpose English OCR. The first useful OCR task is reading printed and handwritten numbers attached to dimension annotations; general notes, room labels and title-block text are deferred until they provide measurable value.
+- Benchmark printed numerals, handwritten numerals and architectural-feature detection independently. Keep each model output, source crop, confidence and alternatives distinct.
+- Use geometry and dimension context to rank numeric candidates, but never let a contextual guess silently replace the source reading.
+- Begin with pretrained compact models and fine-tune only after a baseline evaluation on representative scans. Employer/draftsman drawings require documented permission, a data manifest, and annotation rules before use.
 - Generate synthetic examples from vector plans where exact geometry and dimension labels are known. Use them to broaden layouts, scan degradation and dimension-chain cases; do not rely on synthetic handwriting as the sole handwriting source.
 - Combine licensed real plans with synthetic examples, preserving train/validation/test separation by source plan rather than by crop.
 - Use the RTX 2080 Ti (11 GB VRAM) as the local target. Start with compact detector/OCR variants, mixed precision inference, conservative batch sizes, tiled high-resolution inference, and staged fine-tuning rather than large end-to-end models.
 
 ## Development plan
 
+### Existing baseline — kept separate from Planline
+
+The root-level `main.py`, `detection.py`, `ocr.py`, `model.py` and `dxf_export.py` are an earlier experimental pipeline: YOLO detects three classes (`wall`, `dimension_line`, `dimension_value`), a custom ResNet18 classifies handwritten digits, and heuristic matching produces a DXF. This pipeline is **not called by the Planline API** and has not been established as reliable on arbitrary scanned or non-scale plans. Treat it as a baseline to evaluate, not as the current web-app analyser.
+
 ### Phase 0 — Baseline and data governance
 
-1. Audit the referenced `wojtek-smyczek/floorplan-digitizer` repository for reusable DXF ideas, detection/OCR assumptions, model licences and code quality. It documents a YOLO detector, handwritten digit OCR, geometric wall matching and DXF output, but its training data and accuracy must be independently evaluated before reuse.
+1. Audit the existing detector/OCR/DXF baseline for reusable ideas, model licences, assumptions and code quality. Evaluate its training data and accuracy independently before connecting or reusing it.
 2. Create a dataset register covering source, licence, permission, drawing type, scan quality and split assignment. Use only plans with clear permission/licensing.
 3. Define annotation guidelines for walls, openings, dimension strings, direction/orientation, overall dimensions, chains, notes and review outcomes.
 4. Establish a representative held-out evaluation set before choosing or fine-tuning models.
@@ -132,3 +137,10 @@ The current API runs deterministic source preflight for uploads (file fingerprin
 ## Out of scope
 
 Planline produces 2D geometry only. It does not infer a 3D building model or silently fill missing information.
+
+
+## Product boundary
+
+Planline is a **2D digitisation and verification** tool, not a 3D building generator. For non-scale drawings, written dimensions are the primary metric constraints; pixel distances are not treated as real-world measurements unless a valid scale or calibration is available. The system should expose conflicts and missing information instead of silently stretching, closing or inventing walls.
+
+The first OCR milestone is deliberately narrow: recognise dimension numbers and relevant numeric annotations. Broad English text recognition is not a first-stage dependency. The longer-term training workspace will compare models on a held-out set using exact numeric accuracy, dimension-to-segment association, chain consistency, topology/export correctness and human correction time.

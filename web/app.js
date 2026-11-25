@@ -81,6 +81,46 @@
     $('#exportNote').textContent = 'Uploaded drawing is not reconstructed. Export is limited to the illustrative sample geometry.';
   }
 
+  function renderPipelineStatus(mode) {
+    const modes = {
+      sample: { pill: 'Demo data', detail: 'The sample plan demonstrates review and a sample DXF export. It is not the result of model inference.', stages: { preprocess: ['complete', 'Sample ready'], detect: ['', 'Not run'], ocr: ['', 'Not run'], constraints: ['', 'Not run'], reconstruct: ['', 'Not run'] } },
+      preview: { pill: 'Preview only', detail: 'The file is loaded for preview. No detector or OCR model has analysed its contents.', stages: { preprocess: ['', 'Not run'], detect: ['', 'Not run'], ocr: ['', 'Not run'], constraints: ['', 'Not run'], reconstruct: ['', 'Not run'] } },
+      preflight: { pill: 'Preflight complete', detail: 'The local API stored the source and checked file identity and available image metadata. Model inference is not configured.', stages: { preprocess: ['complete', 'Source checked'], detect: ['blocked', 'Not configured'], ocr: ['blocked', 'Not configured'], constraints: ['blocked', 'Waiting for OCR'], reconstruct: ['blocked', 'Waiting for geometry'] } }
+    };
+    const selected = modes[mode] || modes.preview;
+    $('#pipelineStatePill').textContent = selected.pill;
+    $('#pipelineStatusDetail').textContent = selected.detail;
+    Object.entries(selected.stages).forEach(([name, value]) => {
+      const item = $(`[data-pipeline-stage="${name}"]`);
+      if (!item) return;
+      item.classList.toggle('complete', value[0] === 'complete');
+      item.classList.toggle('blocked', value[0] === 'blocked');
+      $('small', item).textContent = value[1];
+    });
+  }
+
+  function renderPreflightNotice(preflight, error) {
+    const title = $('#analysisBlockedTitle');
+    const message = $('#analysisBlockedMessage');
+    const list = $('#analysisFindings');
+    list.replaceChildren();
+    if (error) {
+      title.textContent = 'Local processing service unavailable';
+      message.textContent = 'The drawing remains available in this browser tab, but the local API could not store it or run source preflight. Nothing has been analysed.';
+    } else if (preflight) {
+      title.textContent = 'Source stored and checked — no readings yet';
+      message.textContent = 'The local API saved the original file and completed basic source preflight. It has not run OCR, dimension detection, dimension association, or geometry reconstruction.';
+      (Array.isArray(preflight.findings) ? preflight.findings : []).forEach(finding => {
+        const item = document.createElement('li');
+        item.textContent = finding.message;
+        list.appendChild(item);
+      });
+    } else {
+      title.textContent = 'Preview only — local API not connected';
+      message.textContent = 'The drawing is previewed in this browser tab. It has not been uploaded to a server, stored as a project, analysed, or converted into geometry.';
+    }
+  }
+
   async function checkApi() {
     if (window.location.protocol === 'file:') return;
     try {
@@ -108,28 +148,8 @@
     const analysis = await fetch(`/api/projects/${project.id}/analyze`, { method: 'POST' });
     if (!analysis.ok) throw new Error('The local service stored the drawing, but could not start analysis.');
     const result = await analysis.json();
+    renderPipelineStatus('preflight');
     renderPreflightNotice(result.analysis.preflight);
-  }
-
-  function renderPreflightNotice(preflight) {
-    const notice = $('#uploadNotice');
-    notice.replaceChildren();
-    const title = document.createElement('strong');
-    title.textContent = 'Local source preflight complete.';
-    const summary = document.createElement('span');
-    summary.textContent = ' Your scan is stored locally. OCR, detection, and 2D reconstruction have not run because model adapters are not configured.';
-    notice.append(title, summary);
-    const findings = preflight && Array.isArray(preflight.findings) ? preflight.findings : [];
-    if (findings.length) {
-      const list = document.createElement('ul');
-      list.className = 'preflight-findings';
-      findings.forEach(finding => {
-        const item = document.createElement('li');
-        item.textContent = finding.message;
-        list.appendChild(item);
-      });
-      notice.appendChild(list);
-    }
   }
 
   async function handleFile(file) {
@@ -162,14 +182,15 @@
         $('#sourceDimensions').textContent = `${image.naturalWidth} × ${image.naturalHeight} px · preview only`;
       };
     }
-    $('#uploadNotice').classList.remove('hidden');
-    $('#uploadNotice').innerHTML = '<strong>Preview only — no analysis has run.</strong>The review values and confidence scores are illustrative sample data, not readings from this file. Review and export are paused until a local OCR and geometry service is connected.';
+    renderPipelineStatus('preview');
+    renderPreflightNotice(null);
     renderMeasurementRows();
     updateReviewState();
-    $('#reviewModeChip').textContent = 'SAMPLE PLACEHOLDERS';
+    $('#reviewModeChip').textContent = 'NOT ANALYSED';
     $('.status-pill').innerHTML = '<span class="status-dot amber"></span> Uploaded · not analysed';
     $('#cadSummary').textContent = 'Sample geometry only · uploaded drawing not reconstructed';
     $('#cadSummary').setAttribute('aria-label', 'Sample geometry only. Uploaded drawing not reconstructed.');
+    $('#nextToReview').innerHTML = 'View analysis status <span>→</span>';
     showToast('Drawing loaded locally. OCR and reconstruction are not connected yet.');
     $('#exportNote').textContent = 'Your uploaded drawing has not been processed. The downloadable DXF remains a separate sample layout.';
     $('#exportButton').disabled = true;
@@ -177,6 +198,8 @@
       await createBackendProject(file);
       if (state.apiAvailable) showToast('Drawing stored locally. Source preflight is complete; OCR is not configured.');
     } catch (error) {
+      renderPipelineStatus('preview');
+      renderPreflightNotice(null, error);
       showToast(error.message || 'Drawing previewed, but the local service was unavailable.');
     }
   }
@@ -186,6 +209,9 @@
     state.file = null;
     state.projectId = null;
     state.sample = true;
+    renderPipelineStatus('sample');
+    renderPreflightNotice(null);
+    $('#nextToReview').innerHTML = 'Continue to review <span>→</span>';
     state.measurements = [
       { id: 'a', value: 3000, confidence: 98, verified: true },
       { id: 'b', value: 4500, confidence: 96, verified: true },
@@ -200,7 +226,6 @@
     $('#cadSummary').textContent = 'Illustrative geometry · 10,000 × 7,000 mm';
     $('#exportNote').textContent = 'The sample geometry can be exported. Uploaded drawings need the processing backend first.';
     $('#exportButton').disabled = false;
-    $('#uploadNotice').classList.add('hidden');
     $('#reviewModeChip').textContent = 'SAMPLE DATA';
     setSourceMode('sample');
     renderMeasurementRows();
@@ -225,7 +250,7 @@
         <div class="measurement-main">
           <span class="measurement-index">${letter}</span>
           <div class="measurement-copy">
-            <label for="value-${measurement.id}">Horizontal span</label>
+            <label for="value-${measurement.id}">Horizontal chain segment</label>
             <div class="measurement-input-wrap">
               <input id="value-${measurement.id}" class="dimension-input" type="number" min="1" step="1" value="${measurement.value}" aria-label="Dimension ${letter} in millimetres">
               <span>mm</span>
@@ -318,6 +343,25 @@
   }
 
   function updateReviewState() {
+    if (!state.sample) {
+      $('#sampleReviewContent').classList.add('hidden');
+      $('#analysisBlocked').classList.remove('hidden');
+      $('#reviewModeChip').textContent = 'NOT ANALYSED';
+      $('#reviewCount').textContent = 'No readings';
+      $('#verifiedCount').innerHTML = '—';
+      $('#progressValue').style.width = '0%';
+      $('#progressLabel').textContent = 'Not started';
+      $('#chainStatus').textContent = 'Unavailable';
+      $('#chainStatus').classList.add('mismatch');
+      $('#verifyAllButton').disabled = true;
+      $('#nextToPreview').disabled = true;
+      $('#stepNav3').disabled = true;
+      $('#exportButton').disabled = true;
+      return;
+    }
+    $('#sampleReviewContent').classList.remove('hidden');
+    $('#analysisBlocked').classList.add('hidden');
+    $('#reviewModeChip').textContent = 'SAMPLE DATA';
     const verified = state.measurements.filter(item => item.verified).length;
     const total = state.measurements.length;
     const pending = total - verified;
@@ -328,8 +372,6 @@
     $('#progressValue').style.width = `${(verified / total) * 100}%`;
     $('#progressLabel').textContent = `${Math.round((verified / total) * 100)}% reviewed`;
     $('#reviewCount').textContent = pending === 0 ? 'All reviewed' : `${pending} needs review`;
-    $('#navReviewCount').textContent = String(pending);
-    $('#navReviewCount').classList.toggle('hidden', pending === 0);
     $('#chainStatus').textContent = chainMatches ? 'Matches' : 'Mismatch';
     $('#chainStatus').classList.toggle('mismatch', !chainMatches);
     $('#overallCheck').querySelector('.overall-copy span').textContent = `${state.measurements.map(item => formatNumber(item.value)).join(' + ')} = ${formatNumber(sum)} mm`;
@@ -448,6 +490,7 @@
 
   bindEvents();
   renderMeasurementRows();
+  renderPipelineStatus('sample');
   updateReviewState();
   void checkApi();
 })();

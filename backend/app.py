@@ -8,6 +8,7 @@ OCR or reconstruct geometry unless an analyser is configured.
 from __future__ import annotations
 
 import json
+import math
 import re
 import struct
 import uuid
@@ -23,11 +24,12 @@ from pydantic import BaseModel, Field
 from backend.pipeline.preflight import inspect_source
 
 ROOT = Path(__file__).resolve().parents[1]
+WEB_ROOT = ROOT / "web"
 DATA = ROOT / "runtime" / "projects"
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 ALLOWED_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff", ".pdf"}
 
-app = FastAPI(title="Planline local API", version="0.2.0")
+app = FastAPI(title="Planline local API", version="0.3.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:8000", "http://localhost:8000"],
@@ -100,23 +102,44 @@ def public_project(project: dict[str, Any]) -> dict[str, Any]:
     return copy
 
 
-def dxf_for_measurements(measurements: list[dict[str, Any]]) -> str:
-    width = sum(item["value_mm"] for item in measurements)
-    x1 = measurements[0]["value_mm"]
-    x2 = x1 + measurements[1]["value_mm"]
-    height = 7000
-    lines = [(0, 0, width, 0), (width, 0, width, height), (width, height, 0, height), (0, height, 0, 0),
-             (x1, 0, x1, height), (x2, 0, x2, height)]
+def dxf_for_geometry(geometry: dict[str, Any]) -> str:
+    """Export explicit, validated millimetre wall segments; never infer a plan from labels."""
+    walls = geometry.get("walls")
+    if not isinstance(walls, list) or not walls:
+        raise HTTPException(409, "Verified geometry contains no wall segments.")
+
+    def point(value: Any) -> tuple[float, float]:
+        if not isinstance(value, (list, tuple)) or len(value) != 2:
+            raise HTTPException(409, "Every wall endpoint must contain [x_mm, y_mm].")
+        try:
+            x, y = float(value[0]), float(value[1])
+        except (TypeError, ValueError):
+            raise HTTPException(409, "Wall coordinates must be numeric.")
+        if not (math.isfinite(x) and math.isfinite(y)) or max(abs(x), abs(y)) > 1_000_000_000:
+            raise HTTPException(409, "Wall coordinates are outside the supported range.")
+        return x, y
+
     pairs: list[str] = []
     def add(code: int, value: Any) -> None:
         pairs.extend((str(code), str(value)))
+
     add(0, "SECTION"); add(2, "HEADER"); add(9, "$INSUNITS"); add(70, 4); add(0, "ENDSEC")
+    add(0, "SECTION"); add(2, "TABLES"); add(0, "TABLE"); add(2, "LAYER"); add(70, 1)
+    add(0, "LAYER"); add(2, "WALLS"); add(70, 0); add(62, 7); add(6, "CONTINUOUS")
+    add(0, "ENDTAB"); add(0, "ENDSEC")
     add(0, "SECTION"); add(2, "ENTITIES")
-    for x_a, y_a, x_b, y_b in lines:
-        add(0, "LINE"); add(8, "WALLS"); add(10, x_a); add(20, y_a); add(11, x_b); add(21, y_b)
+    for wall in walls:
+        if not isinstance(wall, dict):
+            raise HTTPException(409, "Wall records must be objects.")
+        start = point(wall.get("start_mm"))
+        end = point(wall.get("end_mm"))
+        if start == end:
+            raise HTTPException(409, "Zero-length wall segments cannot be exported.")
+        add(0, "LINE"); add(8, "WALLS")
+        add(10, format(start[0], ".6f")); add(20, format(start[1], ".6f")); add(30, 0)
+        add(11, format(end[0], ".6f")); add(21, format(end[1], ".6f")); add(31, 0)
     add(0, "ENDSEC"); add(0, "EOF")
     return "\r\n".join(pairs) + "\r\n"
-
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
@@ -211,7 +234,18 @@ def update_measurement(project_id: str, measurement_id: str, patch: MeasurementP
     project = read_project(project_id)
     for measurement in project["measurements"]:
         if measurement.get("id") == measurement_id:
+            previous_value = measurement.get("value_mm")
             measurement.update(patch.model_dump())
+            if previous_value != patch.value_mm:
+                geometry = project.get("geometry")
+                if isinstance(geometry, dict):
+                    geometry["state"] = "review_required"
+                    validation = geometry.setdefault("validation", {})
+                    if isinstance(validation, dict):
+                        validation["valid"] = False
+                        issues = validation.setdefault("issues", [])
+                        if isinstance(issues, list) and "measurement changed after geometry validation" not in issues:
+                            issues.append("measurement changed after geometry validation")
             project["updated_at"] = now()
             write_project(project)
             return public_project(project)
@@ -224,9 +258,14 @@ def export_dxf(project_id: str) -> PlainTextResponse:
     measurements = project["measurements"]
     if not measurements or not all(item.get("verified") for item in measurements):
         raise HTTPException(409, "DXF export requires reviewed measurements and verified geometry.")
-    if not project.get("geometry"):
-        raise HTTPException(409, "DXF export requires verified geometry from the local analyser.")
-    return PlainTextResponse(dxf_for_measurements(measurements), media_type="application/dxf", headers={"Content-Disposition": "attachment; filename=planline-floorplan.dxf"})
+    geometry = project.get("geometry")
+    if not isinstance(geometry, dict) or geometry.get("state") != "verified":
+        raise HTTPException(409, "DXF export requires geometry explicitly marked verified by the analyser.")
+    validation = geometry.get("validation")
+    if not isinstance(validation, dict) or validation.get("valid") is not True:
+        raise HTTPException(409, "DXF export requires successful geometry validation.")
+    dxf = dxf_for_geometry(geometry)
+    return PlainTextResponse(dxf, media_type="application/dxf", headers={"Content-Disposition": "attachment; filename=planline-floorplan.dxf"})
 
 
-app.mount("/", StaticFiles(directory=ROOT, html=True), name="frontend")
+app.mount("/", StaticFiles(directory=WEB_ROOT, html=True), name="frontend")

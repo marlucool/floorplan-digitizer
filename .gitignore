@@ -36,3 +36,6 @@ rzut.dxf
 predykcje_raw.json
 wynikowy_rzut.dxf
 converter.py
+
+# Planline local runtime data
+runtime/

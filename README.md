@@ -1,213 +1,119 @@
-# ArchiAI — Automatic Floor Plan to DXF Conversion
+# Planline — Scanned Floor Plans to Editable 2D CAD
 
-A project that converts hand-drawn simplified floor plans of apartments and architectural objects into DXF files, ready to open in CAD software (AutoCAD, BricsCAD, etc.).
+Planline is a local-first project exploring how to turn scanned or hand-drawn 2D floor plans into **editable, dimensionally constrained CAD geometry**.
 
-Developed as part of a Python course at the Jagiellonian University.
+The target is not a simple image-to-vector trace. Real survey plans can be skewed, faded, scanned at unknown scale, or drawn approximately rather than perfectly to scale. Planline is intended to read the written dimensions, relate them to the drawing, detect contradictions, and keep uncertain results in a human review queue.
 
-## Motivation
+> **Current status: early prototype.** The web workspace and local file API are in place. Uploaded files can be previewed and stored locally, and the API can run basic source preflight. The OCR, feature-detection, dimension-association and reconstruction adapters are not connected yet. The only currently exportable DXF in the web UI is illustrative sample geometry.
 
-As an architect, I regularly conduct architectural surveys. One of the first steps is measuring the entire building or unit, then hand-sketching the floor plan on an iPad or A4 sheet. That sketch then has to be manually redrawn in CAD software — a tedious and time-consuming process. I wanted to automate this second step: converting a hand-drawn sketch with dimensions directly into a DXF file.
+## What works today
 
-![Real survey floor plan](docs/rysunek.png)
+| Area | Current capability |
+| --- | --- |
+| Web workspace | Three-step local UI: add drawing, review dimensions, preview/export |
+| Source preview | PNG, JPG, WEBP and browser-supported TIFF previews; PDF files can be selected and stored, but PDF pages are not rendered in the current UI |
+| Local API | Stores uploads and project metadata under `runtime/projects/` on this computer |
+| Source preflight | SHA-256 file fingerprint, available image dimensions and basic quality findings |
+| Review workflow | Editable sample dimensions, verification controls and a live example dimension-chain check |
+| DXF | Download of the illustrative sample plan only; it is not generated from an uploaded drawing |
 
-| Input (hand-drawn sketch) | Output (DXF file in CAD) |
-|:---:|:---:|
-| ![Input sketch](docs/input.jpg) | ![Generated DXF](docs/output.png) |
+The sample readings and confidence percentages are demonstration data. They are not model predictions. When an uploaded drawing is selected, the sample review rows and sample export are disabled so they cannot be mistaken for results from that drawing.
 
-## Development Process
+## Run the web app
 
-**Data collection** — I manually drew 63 simplified floor plans containing three object classes (`wall`, `dimension_line`, `dimension_value`), then annotated them (bounding boxes + labels) using Roboflow.
-
-**Digit OCR** — I prepared a custom dataset of ~1,000 hand-written digits (~100 per digit, 0–9). The model alone gave unsatisfactory results, so I combined it with the popular MNIST dataset (60,000 samples) in a two-phase training approach (pretrain + fine-tune), which significantly improved accuracy.
-
-**Matching dimensions to walls** — The initial approach was to correlate recognized values with dimension lines (`dimension_line`) and only then with wall elements. After getting mediocre results, I switched to directly matching dimension values to walls, bypassing the dimension line entirely. This simplification yielded significantly better results.
-
-## Tools
-
-During development I used Claude Code as an assistive tool — the pipeline architecture, design decisions, and data collection are my own work.
-
-## Installation & Quick Start (generating rzut.dxf)
+Run these commands from the repository root. The web app uses the smaller backend requirements file; installing the root `requirements.txt` also installs the heavier experimental ML stack.
 
 ```bash
-pip install -r requirements.txt
+python -m venv .venv
 ```
 
-Train the local YOLO model (requires a dataset in `yolo_dataset/` exported from Roboflow in YOLOv8 format):
+Activate the environment:
 
-```bash
-python train_yolo.py
-cp runs/detect/yolo_floorplan/weights/best.pt yolo_floorplan.pt
+```powershell
+# Windows PowerShell
+.venv\\Scripts\\Activate.ps1
 ```
 
-Run:
+```bash
+# macOS / Linux
+source .venv/bin/activate
+```
+
+Install and start the local service:
 
 ```bash
+python -m pip install -r backend/requirements.txt
+python -m uvicorn backend.app:app --reload
+```
+
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000).
+
+Uploaded source files and project metadata are written to `runtime/projects/` on the same machine. That directory is ignored by Git. The service does not send files to a remote OCR provider.
+
+For frontend-only exploration, open `web/index.html` directly. Direct-file mode supports the sample interaction and browser preview, but it cannot store server-side projects or run API preflight.
+
+See [backend/README.md](backend/README.md) for API routes and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the system design and development phases.
+
+## Where the project is heading
+
+The intended workflow is:
+
+1. **Import and prepare the scan.** Preserve the source, identify page bounds and orientation, inspect resolution, deskew and normalise contrast, and rasterise PDF pages before recognition.
+2. **Find drawing features and dimension regions.** Detect walls, openings, dimension strings/lines and relevant symbols. Use high-resolution crops or tiles where small handwritten dimensions would otherwise be lost.
+3. **Read dimension numerals.** Prioritise printed and handwritten numbers rather than running broad English OCR over every room label and note. Keep candidate readings, source crops, confidence and model provenance.
+4. **Resolve dimensions as constraints.** Associate each number with the correct wall or dimension segment. Compare chained dimensions with overall dimensions, identify missing values and surface contradictions. Written dimensions should govern non-scale sketches; image pixels must not be mistaken for millimetres.
+5. **Reconstruct editable 2D geometry.** Build walls and openings from verified constraints, check connectivity and topology, and show unresolved gaps or conflicts for correction.
+6. **Export only verified geometry.** Produce DXF/SVG from the reviewed vector model, with units and layers preserved. A plausible-looking drawing is not enough if its dimensions or topology are unsupported.
+
+A separate training/evaluation workspace is planned for dataset manifests, annotation QA, model comparison and regression testing. It should use plans that are licensed or explicitly permitted, keep train/validation/test splits separate by source drawing, and measure exact dimension accuracy, association accuracy, chain consistency, geometry correctness and time spent correcting results.
+
+The local development target is the existing RTX 2080 Ti (11 GB VRAM), so compact models, tiled inference, conservative batches and staged processing are preferred over a large end-to-end model. Model choice will follow evaluation on representative plans, not assumptions based on benchmark scores alone.
+
+**Scope:** 2D floor-plan digitisation and CAD output. 3D building reconstruction is not a current goal.
+
+## Existing experimental pipeline
+
+The repository also contains an earlier command-line experiment:
+
+- `main.py` — fixed-input detection, digit OCR and DXF pipeline
+- `train_yolo.py` / `trainer.py` — detector and digit-recognition training scripts
+- `detection.py`, `ocr.py`, `model.py`, `dxf_export.py` — supporting modules
+- `yolo_floorplan.pt` and `digit_ocr_resnet18.pth` — committed experimental model weights
+
+This older pipeline uses YOLO for three object classes and a custom ResNet18 for handwritten digits. It is **not integrated into the Planline web API**, does not implement the planned review/constraint workflow, and should not be treated as validated for arbitrary plans. Its output is a research baseline to test and improve, not the promised end state of the application.
+
+To run that separate experiment, install the root ML dependencies and use the repository's fixed `test.jpg` input:
+
+```bash
+python -m pip install -r requirements.txt
 python main.py
 ```
 
-## How It Works
+## Repository layout
 
-The system consists of three main modules:
-
-1. **`dataset_creator.py`** — creates training data from sheets of hand-written digits
-2. **`trainer.py`** — trains a neural network model (ResNet18) for digit recognition
-3. **`train_yolo.py`** — trains a local YOLOv8 model for floor plan element detection
-4. **`main.py`** — the main pipeline that processes a floor plan photo into a DXF file
-
-The pipeline uses:
-
-- **YOLOv8 (Ultralytics, local)** — detects walls, dimension lines, and dimension values in the image
-- **Custom CNN model (ResNet18)** — recognizes hand-written digits (OCR)
-- **OpenCV** — image processing and digit segmentation
-- **ezdxf** — generates the CAD file in DXF format
-
-## Requirements
-
-- Python 3.10+
-- Libraries listed in `requirements.txt`
-
-## Project Structure
-
-```
-projekt-1-inwentaryzacja/
-├── main.py                   # Main pipeline (detection → OCR → DXF)
-├── train_yolo.py             # Local YOLOv8 model training
-├── trainer.py                # Digit recognition model training script
-├── dataset_creator.py        # Dataset creation from digit sheets
-├── requirements.txt          # Python dependencies
-├── test.jpg                  # Sample floor plan for processing
-├── digit_ocr_resnet18.pth    # Trained ResNet18 model (~43 MB)
-├── yolo_floorplan.pt         # Trained YOLOv8 model (local)
-├── dane_projektu.json        # YOLO detection result (bounding boxes, classes, values)
-├── rzut.dxf                  # Generated CAD file
-│
-├── sketches/                 # Sheets with hand-written digits (0.jpg–9.jpg)
-├── my_dataset/               # Extracted digit samples (~100 per digit)
-│   ├── 0/ ... 9/
-├── mnist_data/               # MNIST data (downloaded automatically)
-├── debug_digits/             # Debug images — digits extracted from the floor plan
-└── roboflow_dataset/         # Hand-drawn floor plan sketches
+```text
+floorplan-digitizer/
+├── web/                         # Planline browser interface
+├── backend/                     # Local FastAPI service and source preflight
+│   └── pipeline/
+├── docs/
+│   ├── ARCHITECTURE.md           # System design, data contract and roadmap
+│   ├── input.jpg                 # Legacy pipeline example input
+│   ├── output.png                # Legacy pipeline example output
+│   └── rysunek.png               # Project reference drawing
+├── main.py                       # Separate experimental CLI pipeline
+├── detection.py                  # Legacy detection post-processing
+├── ocr.py / model.py              # Legacy digit OCR
+├── dxf_export.py                 # Legacy DXF construction
+├── train_yolo.py / trainer.py     # Legacy training scripts
+└── requirements.txt              # Dependencies for the legacy ML pipeline
 ```
 
-## Preparing Training Data
+## Development principles
 
-### 1. Preparing digit sheets
-
-Place 10 photos in the `sketches/` folder (files `0.jpg` to `9.jpg`), where each photo contains many instances of a given digit written by hand on a sheet of paper.
-
-### 2. Extracting samples (`dataset_creator.py`)
-
-```bash
-python dataset_creator.py
-```
-
-The script processes each sheet:
-
-- Converts the image to grayscale and applies binarization (Otsu)
-- Detects contours of individual digits
-- Filters out contours that are too small or too large
-- Crops and scales each digit to 64×64 px
-- Saves samples to `my_dataset/<digit>/`
-
-Result: ~990 training samples (~100 per digit, 0–9).
-
-## Training the OCR Model
-
-```bash
-python trainer.py
-```
-
-Training proceeds in two phases:
-
-### Phase 1 — Pretraining
-
-- Combines custom data with a subset of MNIST (5,000 samples)
-- Custom data is weighted 5× higher than MNIST
-- 15 epochs, Adam optimizer, lr=0.0005
-
-### Phase 2 — Fine-tuning
-
-- Training on custom data only
-- 25 epochs, lr=0.0001
-
-**Model architecture:**
-
-- Base: ResNet18 with modifications
-- Input: 1 channel (grayscale image)
-- Output: 10 classes (digits 0–9)
-- Regularization: Dropout(0.5)
-- Data augmentation: rotation, shear, perspective, blur, brightness adjustment
-
-Result: `digit_ocr_resnet18.pth` file.
-
-## Running the Main Pipeline
-
-```bash
-python main.py
-```
-
-The program processes `test.jpg` and generates:
-
-- `dane_projektu.json` — detection data with recognized values
-- `rzut.dxf` — CAD file with the reconstructed floor plan
-- `debug_digits/` — auxiliary images for OCR verification
-
-## Pipeline Step by Step
-
-### Step 1 — Object Detection (YOLO)
-
-The local YOLOv8 model detects three object classes in the floor plan photo:
-
-- **Walls** (`wall`) — rectangular bounding boxes around drawn walls
-- **Dimension lines** (`dimension_line`) — lines with arrows indicating a dimension
-- **Dimension values** (`dimension_value`) — areas containing hand-written numbers
-
-### Step 2 — Detection Post-processing
-
-- **NMS (Non-Maximum Suppression)** — removes overlapping detections
-- **Merging adjacent values** — merges split detections of multi-digit numbers
-
-### Step 3 — Digit Recognition (OCR)
-
-For each detected dimension value:
-
-1. Extract the red channel (dimensions drawn in red)
-2. Threshold binarization
-3. Segmentation into individual digits (column projection analysis)
-4. Resize to 64×64 px
-5. Classify each digit using the ResNet18 model
-6. Filter by confidence (>70%)
-7. Assemble digits into a complete number
-
-### Step 4 — Matching Dimensions to Walls
-
-- Build a wall graph: split into vertical (V) and horizontal (H) walls
-- Identify gaps between adjacent walls
-- Assign recognized values to the corresponding gaps
-- Estimate scale (pixels → real-world units)
-
-### Step 5 — Calculating Coordinates
-
-- Sequentially determine wall positions based on dimensions
-- X axis: left to right (based on H gaps)
-- Y axis: top to bottom (based on V gaps)
-
-### Step 6 — Closing the Floor Plan
-
-- Identify unconnected wall endpoints
-- Use unassigned dimensions to extend walls
-- Draw closing segments
-
-### Step 7 — Export to DXF
-
-Generate a CAD file with line segments representing walls, compatible with AutoCAD and other CAD software.
-
-## Input and Output Files
-
-| File | Type | Description |
-| -------------------- | ------- | ------------------------------------------ |
-| `test.jpg` | input | Photo/scan of the architectural floor plan |
-| `digit_ocr_resnet18.pth` | model | Trained ResNet18 model for OCR |
-| `dane_projektu.json` | output | YOLO detection results + recognized values |
-| `rzut.dxf` | output | Reconstructed floor plan in CAD format |
-| `debug_digits/` | output | Debug images of extracted digits |
+- Keep the workflow local-first and preserve the original scan.
+- Treat every detected dimension as a candidate until checked.
+- Keep printed OCR, handwritten OCR and geometric evidence distinguishable.
+- Do not use general text OCR unless it adds measurable value to the dimension-reading task.
+- Never invent missing dimensions or silently force geometry to close.
+- Keep the sample UI, the old experimental pipeline and the future production analyser clearly separated.
