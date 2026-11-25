@@ -1406,7 +1406,7 @@ async function loadOcrCapabilities() {
     const datasetPayload = await datasetsResponse.json();
     state.ocrDatasets = Array.isArray(datasetPayload.datasets) ? datasetPayload.datasets : [];
     renderDrawingDatasetOptions();
-    state.ocrReady = Boolean(status.paddle_installed && status.paddleocr_installed);
+    state.ocrReady = Boolean(status.inference_runtime_ready ?? (status.paddle_installed && status.paddleocr_installed));
     state.ocrModels = Array.isArray(modelPayload.models) ? modelPayload.models : [];
     const select = $("#ocrModelSelect");
     select.replaceChildren();
