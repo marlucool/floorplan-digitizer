@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 
 
-MODEL_DEFAULT = "PP-OCRv5_server_rec"
+MODEL_DEFAULT = "en_PP-OCRv5_mobile_rec"
 
 
 def _result_payload(result: Any) -> dict[str, Any]:
