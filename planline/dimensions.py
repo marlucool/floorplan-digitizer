@@ -136,6 +136,8 @@ def interpret_dimension_text(text: str) -> dict[str, Any]:
         if inches is None or inches >= 12 or feet < 0 or (feet == 0 and inches <= 0):
             return _result(raw, "unrecognized", dimension_type, reason="The feet/inches components must describe a positive length.")
         millimetres = feet * UNIT_TO_MM["ft"] + inches * UNIT_TO_MM["in"]
+        if millimetres > Decimal("1000000000"):
+            return _result(raw, "unrecognized", dimension_type, reason="The dimension exceeds the supported range.")
         return _result(raw, "parsed", dimension_type, value_mm=_format_mm(millimetres), unit="ft/in")
 
     # Standalone fractional inches: 1/2", 2 1/2 in.
@@ -146,7 +148,11 @@ def interpret_dimension_text(text: str) -> dict[str, Any]:
     )
     if fractional_inches:
         number = _parse_fraction(fractional_inches.group("number"))
+        if number is None or number <= 0:
+            return _result(raw, "unrecognized", dimension_type, reason="The fractional inch value is invalid.")
         millimetres = number * UNIT_TO_MM["in"]
+        if millimetres > Decimal("1000000000"):
+            return _result(raw, "unrecognized", dimension_type, reason="The dimension exceeds the supported range.")
         return _result(raw, "parsed", dimension_type, value_mm=_format_mm(millimetres), value=format(number.normalize(), "f"), unit="in")
 
     # Explicitly suffixed metric/imperial dimension.
@@ -163,6 +169,8 @@ def interpret_dimension_text(text: str) -> dict[str, Any]:
         if number <= 0:
             return _result(raw, "unrecognized", dimension_type, reason="A dimension length must be greater than zero.")
         millimetres = number * UNIT_TO_MM[unit]
+        if millimetres > Decimal("1000000000"):
+            return _result(raw, "unrecognized", dimension_type, reason="The dimension exceeds the supported range.")
         return _result(raw, "parsed", dimension_type, value_mm=_format_mm(millimetres), value=format(number.normalize(), "f"), unit=unit)
 
     # Bare number or fraction: deliberately do not assume millimetres.
