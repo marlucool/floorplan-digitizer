@@ -69,6 +69,7 @@
 .dimension-text-meta{font:9px 'DM Mono';color:var(--muted)}
 .dimension-text-fields label{display:grid;gap:5px;font:10px 'DM Mono';color:var(--muted);text-transform:uppercase}
 .dimension-text-fields input[type=text]{width:100%;min-width:0;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:13px 'DM Mono'}
+.dimension-text-fields select{width:100%;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:11px 'DM Mono'}
 .dimension-text-verified{display:flex!important;align-items:center;gap:7px!important;text-transform:none!important}
 .dimension-text-verified input{accent-color:var(--accent)}
 @media(max-width:520px){.dimension-text-item{grid-template-columns:1fr}.dimension-text-crop{max-height:180px}}
