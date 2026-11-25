@@ -366,7 +366,7 @@ def import_crop_csv(
     return result
 
 
-def validate_dataset(dataset_dir: Path) -> dict[str, Any]:
+def validate_dataset(dataset_dir: Path, *, validate_splits: bool = True) -> dict[str, Any]:
     entries = _read_manifest(dataset_dir)
     if not entries:
         raise ValueError(f"No samples found in {dataset_dir / MANIFEST_NAME}.")
@@ -428,17 +428,31 @@ def validate_dataset(dataset_dir: Path) -> dict[str, Any]:
         styles[style] += 1
 
     split_path = dataset_dir / SPLITS_NAME
-    if split_path.exists():
+    if split_path.exists() and validate_splits:
         try:
             split_data = json.loads(split_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
             raise ValueError(f"{SPLITS_NAME} is not valid JSON.") from exc
-        assignments = split_data.get("assignments", {})
+        if not isinstance(split_data, dict):
+            raise ValueError(f"{SPLITS_NAME} must contain a JSON object.")
+        assignments = split_data.get("assignments")
+        if not isinstance(assignments, dict):
+            raise ValueError(f"{SPLITS_NAME} must contain an assignments object.")
+        if split_data.get("dataset_schema_version") != DATASET_SCHEMA:
+            raise ValueError(f"{SPLITS_NAME} has an unsupported dataset schema version.")
         current_ids = {item["crop_id"] for item in entries}
         if set(assignments) != current_ids:
             raise ValueError("splits.json is stale; regenerate splits after changing the manifest.")
-        if any(split not in {"train", "validation", "test"} for split in assignments.values()):
+        allowed_splits = {"train", "validation", "test"}
+        if any(
+            not isinstance(split, str) or split not in allowed_splits
+            for split in assignments.values()
+        ):
             raise ValueError("splits.json contains an unsupported split name.")
+        if set(assignments.values()) != allowed_splits:
+            raise ValueError(
+                "splits.json must assign at least one sample to train, validation and test."
+            )
         for component in _connected_group_ids(entries):
             component_splits = {assignments[crop_id] for crop_id in component}
             if len(component_splits) != 1:
@@ -490,7 +504,9 @@ def _connected_group_ids(entries: list[dict[str, Any]]) -> list[list[str]]:
 
 def create_grouped_splits(dataset_dir: Path, *, seed: int = 42, force: bool = False) -> dict[str, Any]:
     """Create deterministic 80/10/10 splits grouped by source drawing and writer."""
-    validate_dataset(dataset_dir)
+    # A forced rebuild is the recovery path for stale or malformed split
+    # metadata. Validate the samples and images independently of that file.
+    validate_dataset(dataset_dir, validate_splits=not force)
     existing_path = dataset_dir / SPLITS_NAME
     if existing_path.exists() and not force:
         raise ValueError(f"{SPLITS_NAME} already exists. Use --force to deliberately rebuild it.")

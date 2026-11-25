@@ -281,3 +281,76 @@ def test_adding_samples_invalidates_previous_split_file(tmp_path: Path) -> None:
         })
     import_crop_csv(next_csv, output)
     assert not (output / "splits.json").exists()
+
+
+
+def _three_group_dataset(tmp_path: Path) -> Path:
+    crop = tmp_path / "crop.png"
+    Image.new("RGB", (12, 8), "white").save(crop)
+    csv_path = tmp_path / "labels.csv"
+    with csv_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle, fieldnames=["image", "text", "source_id", "text_style", "verified"]
+        )
+        writer.writeheader()
+        for index in range(3):
+            writer.writerow({
+                "image": "crop.png",
+                "text": str(1000 + index),
+                "source_id": f"sheet-{index}",
+                "text_style": "handwritten",
+                "verified": "true",
+            })
+    dataset_dir = tmp_path / "dataset"
+    import_crop_csv(csv_path, dataset_dir)
+    create_grouped_splits(dataset_dir)
+    return dataset_dir
+
+
+def test_force_rebuild_recovers_stale_split_assignments(tmp_path: Path) -> None:
+    dataset_dir = _three_group_dataset(tmp_path)
+    split_path = dataset_dir / "splits.json"
+    split_data = json.loads(split_path.read_text(encoding="utf-8"))
+    split_data["assignments"]["deleted-crop"] = "test"
+    split_path.write_text(json.dumps(split_data), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="stale"):
+        validate_dataset(dataset_dir)
+
+    rebuilt = create_grouped_splits(dataset_dir, seed=17, force=True)
+    current_ids = {
+        json.loads(line)["crop_id"]
+        for line in (dataset_dir / "manifest.jsonl").read_text(encoding="utf-8").splitlines()
+    }
+    assert set(rebuilt["assignments"]) == current_ids
+    assert validate_dataset(dataset_dir)["splits_present"] is True
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ("[]", "JSON object"),
+        ('{"assignments": []}', "assignments object"),
+    ],
+)
+def test_split_validation_rejects_malformed_metadata(
+    tmp_path: Path, payload: str, message: str
+) -> None:
+    dataset_dir = _three_group_dataset(tmp_path)
+    (dataset_dir / "splits.json").write_text(payload, encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        validate_dataset(dataset_dir)
+
+
+def test_split_validation_requires_train_validation_and_test_samples(tmp_path: Path) -> None:
+    dataset_dir = _three_group_dataset(tmp_path)
+    split_path = dataset_dir / "splits.json"
+    split_data = json.loads(split_path.read_text(encoding="utf-8"))
+    split_data["assignments"] = {
+        crop_id: "train" for crop_id in split_data["assignments"]
+    }
+    split_path.write_text(json.dumps(split_data), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="at least one sample to train, validation and test"):
+        validate_dataset(dataset_dir)
