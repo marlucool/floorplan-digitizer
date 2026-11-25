@@ -85,7 +85,9 @@ def test_ocr_studio_manual_crop_and_typed_label() -> None:
             assert "small dataset" in page.locator("#qualityWarnings").inner_text().lower()
             page.set_input_files("#cropFiles", {"name": "old-plan.png", "mimeType": "image/png", "buffer": png})
             page.wait_for_function("document.querySelector('#cropCanvas').width > 0")
-            canvas_box = page.locator("#cropCanvas").bounding_box()
+            canvas = page.locator("#cropCanvas")
+            canvas.scroll_into_view_if_needed()
+            canvas_box = canvas.bounding_box()
             assert canvas_box is not None
             page.mouse.move(canvas_box["x"] + 30, canvas_box["y"] + 35)
             page.mouse.down()
