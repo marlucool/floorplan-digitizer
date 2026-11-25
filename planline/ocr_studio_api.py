@@ -23,6 +23,7 @@ from .dataset import (
     update_crop_sample,
 )
 from .ocr_training import cancel_job, get_job, start_benchmark_job, start_training_job
+from .ocr_quality import audit_dataset
 
 OCR_DATASET_ROOT = Path(__file__).resolve().parents[1] / "datasets" / "ocr"
 MAX_CROP_BYTES = 25 * 1024 * 1024
@@ -303,6 +304,17 @@ def create_ocr_splits(dataset_id: str, request: CreateSplitsRequest) -> dict[str
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"splits": result, "dataset": _dataset_payload(dataset_id, dataset_dir)}
 
+
+
+
+@router.get("/datasets/{dataset_id}/quality")
+def audit_ocr_dataset(dataset_id: str) -> dict[str, Any]:
+    """Return a read-only audit of OCR labels, crop hashes and grouped splits."""
+    dataset_dir = _dataset_dir(dataset_id)
+    try:
+        return audit_dataset(dataset_dir)
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 @router.post("/datasets/{dataset_id}/train", status_code=202)
 def start_ocr_training(dataset_id: str, request: StartTrainingRequest) -> dict[str, Any]:
