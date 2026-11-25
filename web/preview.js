@@ -88,7 +88,7 @@ window.PLANLINE_PREVIEW = true;
       const response = await nativeFetch(new URL("demo-floorplan.svg", document.baseURI));
       if (!response.ok) throw new Error("Could not load the demo drawing.");
       const blob = await response.blob();
-      const file = new File([blob], "planline-demo.png", { type: "image/svg+xml" });
+      const file = new File([blob], "planline-demo.svg", { type: "image/svg+xml" });
       if (typeof window.setFile !== "function" || typeof window.analyse !== "function") {
         throw new Error("The drawing workspace did not finish loading.");
       }
