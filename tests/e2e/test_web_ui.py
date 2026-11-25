@@ -70,6 +70,17 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                     {"model_id": "base:PP-OCRv5_mobile_rec", "label": "PP-OCRv5 mobile", "kind": "base"}
                 ]}),
             )
+            page.route(
+                "**/api/ocr/datasets",
+                lambda route: route.fulfill(json={"datasets": [
+                    {"dataset_id": "handwritten-dimensions", "summary": {"samples": 2}}
+                ]}),
+            )
+            crop_saved: dict[str, str] = {}
+
+            def save_crop(route) -> None:
+                crop_saved["body"] = route.request.post_data or ""
+                route.fulfill(json={"crop_id": "crop-003", "dataset": {"dataset_id": "handwritten-dimensions"}})
             sample_png = make_png(400, 300)
             preview_data_url = "data:image/png;base64," + base64.b64encode(sample_png).decode("ascii")
 
@@ -331,7 +342,19 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.locator(".dimension-text-style").select_option("handwritten")
             assert page.locator(".dimension-text-value").input_value() == "4200"
             assert page.locator(".dimension-text-item").get_attribute("data-detection-id") == "det-004"
+            page.locator("#drawingDatasetSelect").select_option("handwritten-dimensions")
+            page.locator("#drawingSourceId").fill("plan-01")
+            page.locator("#drawingWriterId").fill("writer-a")
+            assert page.locator(".save-dimension-crop").is_disabled()
             page.locator(".dimension-text-verified-input").check()
+            page.route("**/api/ocr/datasets/handwritten-dimensions/samples", save_crop)
+            assert page.locator(".save-dimension-crop").is_enabled()
+            page.locator(".save-dimension-crop").click()
+            page.wait_for_function("document.querySelector('.save-dimension-crop').textContent.includes('Saved to')")
+            assert "4200" in crop_saved["body"]
+            assert "handwritten" in crop_saved["body"]
+            assert "plan-01" in crop_saved["body"]
+            assert "writer-a" in crop_saved["body"]
             page.locator(".dimension-line-select").select_option("det-002")
             page.locator(".dimension-wall-span-select").select_option("0")
             page.locator(".dimension-association-verified-input").check()

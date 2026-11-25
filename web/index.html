@@ -148,6 +148,15 @@
           <button id="runOcrButton" class="toolbar-button" type="button" disabled>Run OCR on candidates</button>
           <output id="ocrAssistStatus" aria-live="polite">Checking optional OCR runtime…</output>
         </div>
+        <section class="dataset-capture-panel" aria-label="Save reviewed dimension crops to OCR training data">
+          <div class="dataset-capture-heading"><strong>Save verified crops to training data</strong><a href="/ocr">Manage datasets ↗</a></div>
+          <div class="dataset-capture-fields">
+            <label for="drawingDatasetSelect">OCR dataset<select id="drawingDatasetSelect"><option value="">Loading local datasets…</option></select></label>
+            <label for="drawingSourceId">Source drawing ID<input id="drawingSourceId" type="text" maxlength="128" placeholder="Drawing filename"></label>
+            <label for="drawingWriterId">Writer ID (optional)<input id="drawingWriterId" type="text" maxlength="128" placeholder="Reuse for the same handwriting author"></label>
+          </div>
+          <output id="datasetCaptureStatus" aria-live="polite">Only individually verified crops are saved. The full drawing stays in the current workspace.</output>
+        </section>
         <div id="dimensionTextItems" class="dimension-text-items"></div>
       </details>
       <div class="limitations"><div class="limitation-mark">i</div><div><strong>Important: detection is not measurement.</strong><p>This workflow ranks dimension-value boxes against dimension-line boxes, then proposes wall pairs whose facing edges bracket each line. These are axis-aligned geometric hypotheses, not verified measurements or CAD geometry. OCR suggestions are optional and unverified; every character, selected line and wall pair must be checked against the source drawing.</p></div></div>

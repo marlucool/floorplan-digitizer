@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, ocrReady: false, ocrModels: [], ocrPredictions: {}, ocrRunning: false, ocrModelId: null, ocrDevice: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, ocrReady: false, ocrModels: [], ocrDatasets: [], ocrPredictions: {}, ocrRunning: false, ocrModelId: null, ocrDevice: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -88,6 +88,8 @@ function setFile(file) {
   $("#previewImage").onload = null;
   $("#previewImage").onerror = null;
   state.file = file;
+  if ($("#drawingSourceId")) $("#drawingSourceId").value = (file.name.replace(/\\.[^.]+$/, "") || "drawing").slice(0, 128);
+  updateDatasetCaptureButtons();
   $("#brightnessControl").value = "0";
   $("#contrastControl").value = "1";
   $("#brightnessValue").textContent = "0";
@@ -1018,6 +1020,7 @@ function clearDimensionTextReview() {
   panel.classList.add("hidden");
   panel.open = false;
   $("#dimensionTextItems").replaceChildren();
+  updateDatasetCaptureButtons();
 }
 
 function renderDimensionTextReview(regions) {
@@ -1187,7 +1190,17 @@ function renderDimensionTextReview(regions) {
     });
 
     associationPanel.append(associationHeading, associationHelp, lineLabel, spanLabel, associationVerifiedLabel);
-    fields.append(meta, textLabel, styleLabel, verifiedLabel, associationPanel);
+
+    const saveCropButton = document.createElement("button");
+    saveCropButton.type = "button";
+    saveCropButton.className = "toolbar-button save-dimension-crop";
+    saveCropButton.textContent = "Save verified crop to dataset";
+    saveCropButton.disabled = !region.crop_data_url;
+    saveCropButton.addEventListener("click", () => saveDimensionCropToDataset(region, row, saveCropButton));
+    textInput.addEventListener("input", updateDatasetCaptureButtons);
+    verifiedInput.addEventListener("change", updateDatasetCaptureButtons);
+
+    fields.append(meta, textLabel, styleLabel, verifiedLabel, associationPanel, saveCropButton);
     row.append(fields);
     container.append(row);
   });
@@ -1220,6 +1233,99 @@ function showOcrSuggestion(row, prediction) {
   fields.insertBefore(wrapper, association || null);
 }
 
+function renderDrawingDatasetOptions() {
+  const select = $("#drawingDatasetSelect");
+  if (!select) return;
+  const previous = select.value;
+  select.replaceChildren();
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = state.ocrDatasets.length ? "Choose a local dataset…" : "No datasets yet — create one in OCR Studio";
+  select.append(placeholder);
+  state.ocrDatasets.forEach((dataset) => {
+    const option = document.createElement("option");
+    option.value = dataset.dataset_id;
+    option.textContent = dataset.dataset_id + " · " + (dataset.summary?.samples || 0) + " crops";
+    select.append(option);
+  });
+  if (state.ocrDatasets.some((dataset) => dataset.dataset_id === previous)) select.value = previous;
+  select.disabled = state.ocrDatasets.length === 0;
+  if (!state.ocrDatasets.length) {
+    $("#datasetCaptureStatus").textContent = "Create an OCR dataset in OCR Studio before saving crops. Only verified crops are copied; the full drawing is not uploaded.";
+  } else {
+    $("#datasetCaptureStatus").textContent = "Choose a dataset, keep the source ID consistent across pages from the same drawing, and save only transcriptions you have checked.";
+  }
+  updateDatasetCaptureButtons();
+}
+
+function updateDatasetCaptureButtons() {
+  const selectedDataset = $("#drawingDatasetSelect")?.value || "";
+  const sourceId = $("#drawingSourceId")?.value.trim() || "";
+  const ready = Boolean(selectedDataset && sourceId);
+  document.querySelectorAll(".dimension-text-item").forEach((row) => {
+    const button = row.querySelector(".save-dimension-crop");
+    if (!button || row.dataset.savedCropId) return;
+    const text = row.querySelector(".dimension-text-value")?.value.trim() || "";
+    const verified = row.querySelector(".dimension-text-verified-input")?.checked;
+    const hasCrop = Boolean(row.querySelector(".dimension-text-crop"));
+    button.disabled = !ready || !text || !verified || !hasCrop;
+    button.title = !selectedDataset
+      ? "Choose or create an OCR dataset first."
+      : !sourceId
+        ? "Enter a source drawing ID so related crops stay grouped."
+        : !verified
+          ? "Verify the transcription against the source drawing first."
+          : "";
+  });
+}
+
+async function saveDimensionCropToDataset(region, row, button) {
+  const datasetId = $("#drawingDatasetSelect").value;
+  const text = row.querySelector(".dimension-text-value").value.trim();
+  const verified = row.querySelector(".dimension-text-verified-input").checked;
+  const sourceId = $("#drawingSourceId").value.trim();
+  const writerId = $("#drawingWriterId").value.trim();
+  if (!region.crop_data_url || !datasetId || !text || !verified || !sourceId) {
+    updateDatasetCaptureButtons();
+    return;
+  }
+  button.disabled = true;
+  const originalText = button.textContent;
+  button.textContent = "Saving crop…";
+  $("#datasetCaptureStatus").textContent = "Saving only this verified dimension crop to the selected local dataset…";
+  try {
+    const cropResponse = await fetch(region.crop_data_url);
+    if (!cropResponse.ok) throw new Error("The dimension crop could not be read.");
+    const cropBlob = await cropResponse.blob();
+    const form = new FormData();
+    form.append("file", cropBlob, "dimension-crop.png");
+    form.append("text", text);
+    form.append("source_id", sourceId);
+    form.append("writer_id", writerId);
+    form.append("text_style", row.querySelector(".dimension-text-style").value);
+    form.append("verified", "true");
+    const response = await fetch("/api/ocr/datasets/" + encodeURIComponent(datasetId) + "/samples", {
+      method: "POST",
+      body: form
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || "The crop could not be saved.");
+    row.dataset.savedCropId = payload.crop_id || "saved";
+    button.textContent = "Saved to " + datasetId;
+    button.disabled = true;
+    $("#datasetCaptureStatus").textContent = "Saved one verified crop. The source drawing was not uploaded; source ID " + sourceId + " keeps related crops grouped.";
+    state.ocrDatasets = state.ocrDatasets.map((dataset) => dataset.dataset_id === datasetId
+      ? { ...dataset, summary: { ...dataset.summary, samples: (dataset.summary?.samples || 0) + 1 } }
+      : dataset);
+    renderDrawingDatasetOptions();
+    $("#drawingDatasetSelect").value = datasetId;
+  } catch (error) {
+    button.textContent = originalText;
+    $("#datasetCaptureStatus").textContent = "Could not save crop: " + (error.message || "Local OCR dataset unavailable.");
+    updateDatasetCaptureButtons();
+  }
+}
+
 function updateOcrControls() {
   if (!$("#runOcrButton")) return;
   const hasCandidates = Boolean(state.result?.dimension_regions?.length);
@@ -1237,13 +1343,17 @@ function updateOcrControls() {
 
 async function loadOcrCapabilities() {
   try {
-    const [statusResponse, modelsResponse] = await Promise.all([
+    const [statusResponse, modelsResponse, datasetsResponse] = await Promise.all([
       fetch("/api/ocr/status"),
-      fetch("/api/ocr/models")
+      fetch("/api/ocr/models"),
+      fetch("/api/ocr/datasets")
     ]);
-    if (!statusResponse.ok || !modelsResponse.ok) throw new Error("OCR status endpoint unavailable.");
+    if (!statusResponse.ok || !modelsResponse.ok || !datasetsResponse.ok) throw new Error("OCR status endpoint unavailable.");
     const status = await statusResponse.json();
     const modelPayload = await modelsResponse.json();
+    const datasetPayload = await datasetsResponse.json();
+    state.ocrDatasets = Array.isArray(datasetPayload.datasets) ? datasetPayload.datasets : [];
+    renderDrawingDatasetOptions();
     state.ocrReady = Boolean(status.paddle_installed && status.paddleocr_installed);
     state.ocrModels = Array.isArray(modelPayload.models) ? modelPayload.models : [];
     const select = $("#ocrModelSelect");
@@ -2011,4 +2121,6 @@ fetch("/api/health").then((r) => r.json()).then((health) => {
   showNotice("API unavailable", "Start the local Planline API to enable drawing analysis.");
 });
 
+$("#drawingDatasetSelect").addEventListener("change", updateDatasetCaptureButtons);
+$("#drawingSourceId").addEventListener("input", updateDatasetCaptureButtons);
 loadOcrCapabilities();
