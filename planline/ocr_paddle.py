@@ -155,6 +155,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--image", type=Path, help="Exact raster image used for the review (required with --review).")
     parser.add_argument("--output", required=True, type=Path, help="Output predictions JSON path.")
     parser.add_argument("--model", default=MODEL_DEFAULT, help=f"PaddleOCR recognition model (default: {MODEL_DEFAULT}).")
+    parser.add_argument("--model-dir", type=Path, help="Local exported PaddleOCR inference model directory (overrides --model).")
     parser.add_argument("--device", default="cpu", help="Paddle device, for example cpu or gpu:0 (default: cpu).")
     args = parser.parse_args(argv)
 
@@ -166,7 +167,15 @@ def main(argv: list[str] | None = None) -> int:
 
         from paddleocr import TextRecognition
 
-        recognizer = TextRecognition(model_name=args.model, device=args.device)
+        if args.model_dir is not None:
+            model_dir = args.model_dir.expanduser().resolve()
+            if not model_dir.is_dir() or not any(model_dir.glob("*.pdiparams")):
+                raise ValueError(f"Fine-tuned model directory is missing exported .pdiparams weights: {model_dir}")
+            recognizer = TextRecognition(model_dir=str(model_dir), device=args.device)
+            model_name = str(model_dir)
+        else:
+            recognizer = TextRecognition(model_name=args.model, device=args.device)
+            model_name = args.model
         if args.dataset is not None:
             predictions, skipped = recognize_dataset_crops(args.dataset, recognizer)
             input_kind = "planline-handwriting-crops/v1"
@@ -186,7 +195,7 @@ def main(argv: list[str] | None = None) -> int:
             }
         output = {
             "engine": "PaddleOCR",
-            "model": args.model,
+            "model": model_name,
             "input_kind": input_kind,
             **source_info,
             "predictions": predictions,
