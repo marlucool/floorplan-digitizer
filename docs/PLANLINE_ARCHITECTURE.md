@@ -246,7 +246,7 @@ For sensitive drawings, configure and monitor the server/container temporary dir
 
 ## Dataset strategy — research first, no training yet
 
-Do not start another training run until the annotation schema, rights, evaluation split and target failure modes are agreed.
+Do not start another training run until the annotation schema, rights, evaluation split and target failure modes are agreed. The new planline.dataset CLI now provides the first curation step: it exports verified full-string crops from review JSON or imports manually cropped images using a CSV manifest, then validates checksums and builds source/writer-safe splits. It prepares data only; it does not train a recogniser.
 
 A useful development dataset should contain both:
 
@@ -278,6 +278,7 @@ Split training/validation/test by original drawing and writer, not by cropped di
 - [ ] Compare full-frame YOLO inference with overlapping multi-scale tiles on held-out scans before changing the default detector path.
 - [ ] Audit the legacy digit classifier on held-out scans; do not integrate its current integer output as dimension OCR.
 - [x] Fix and test end-of-row digit segmentation in `dataset_creator.py` before generating any replacement dataset.
+- [x] Add a local OCR crop dataset curator/importer with verified labels, checksum validation and source/writer-grouped splits.
 - [ ] Replace random crop-level validation with drawing-/writer-grouped held-out evaluation before trusting OCR accuracy.
 - [ ] Benchmark at least two OCR baselines on complete dimension strings, including rotated, faded and handwritten samples.
 - [ ] Add text-to-dimension-line and dimension-line-to-span association records with multiple candidates and human review.

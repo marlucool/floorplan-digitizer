@@ -170,11 +170,67 @@ python -m planline.ocr_eval \\
 
 Only manually verified, non-empty reference strings are scored. Missing predictions count as empty strings. Only leading/trailing whitespace is trimmed; punctuation, decimal separators and units are compared exactly. Keep the review export and predictions file together so each result can be traced to its source detection.
 
+## Handwritten-dimension crop dataset
+
+Your own manually cropped dimension images can be used directly. Planline can also extract verified crops from its review export.
+
+### Option A — export crops reviewed in Planline
+
+1. Analyse the source drawing in the web app.
+2. In the dimension-candidate review, enter the complete text exactly as written, choose **Handwritten**, and tick **I checked this transcription** only after confirming it against the original.
+3. Export the review JSON. Keep the exact raster image used for analysis; the JSON contains crop coordinates and labels, not image pixels.
+4. From the repository root, run:
+
+~~~bash
+python -m planline.dataset export-review \
+  --review planline-review.json \
+  --image original-scan.png \
+  --output-dir datasets/handwriting \
+  --writer-id writer-01
+~~~
+
+The source ID defaults to the SHA-256 of the raster file. Pass --source-id with a stable drawing ID when multiple files or scans represent the same source plan. The command only exports non-empty, manually verified labels matching the selected style (handwritten by default). It uses the original source pixels and the saved crop bounds. For a PDF, supply a raster image of the same page that the detector analysed.
+
+### Option B — import crops you made yourself
+
+Create a CSV next to your crop images with these columns:
+
+~~~csv
+image,text,source_id,writer_id,text_style,verified
+crops/plan-a-001.png,"4,200 mm",plan-a,writer-01,handwritten,true
+crops/plan-a-002.png,2750,plan-a,writer-01,handwritten,true
+crops/plan-b-001.png,3.65m,plan-b,writer-02,handwritten,true
+~~~
+
+- image is a path relative to the CSV file (or an absolute path).
+- text is the exact visible string; preserve decimal marks and units rather than normalising them.
+- source_id must be the same for every crop from the same drawing.
+- writer_id is optional but should be a stable pseudonymous ID when known. Do not use a person's real name.
+- text_style is handwritten, printed, unclear or unknown. The default import selects handwritten rows.
+- verified must be true only after the label has been checked against the source.
+
+Import, validate and split:
+
+~~~bash
+python -m planline.dataset import-csv --annotations crops.csv --output-dir datasets/handwriting
+python -m planline.dataset validate --dataset datasets/handwriting
+python -m planline.dataset split --dataset datasets/handwriting --seed 42
+~~~
+
+The dataset contains images/, manifest.jsonl and splits.json. Splits target 80/10/10, but actual proportions depend on how many independent source/writer groups you have. At least three independent groups are required. Crops connected by either source_id or writer_id are kept together to prevent near-duplicate drawing or handwriting leakage. Adding samples invalidates the old split file; regenerate it after curation. Use --force only when you deliberately want to replace an existing split plan.
+
+### Cropping guidance
+
+Use a tight crop around the **complete handwritten dimension**, with enough margin to retain punctuation, decimal points, unit marks and any distinguishing strokes. Do not split a multi-digit number into separate digit images. Avoid manually sharpening, thresholding, resizing or cleaning the crop before import; keep the original pixels so preprocessing can be evaluated consistently. If a value is ambiguous, leave it unverified and out of the training/evaluation set until it is resolved.
+
+Only use drawings you own or have permission to use. The dataset tool stores crops and labels locally; the repository ignores the datasets/ directory. It does not upload drawings, train a model, or claim that the resulting dataset is representative by itself. Keep a range of plans, writers, scan qualities and dimension styles before drawing conclusions.
+
 ## Development checks
 
 ```bash
 python -m pip install -r requirements-dev.txt
 PYTHONPATH=. python -m pytest -q tests/test_*.py
+python -m planline.dataset --help
 node --check web/app.js
 ```
 

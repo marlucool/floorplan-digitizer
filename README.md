@@ -22,6 +22,15 @@ The important problem is not tracing pixels. Survey drawings can be skewed, fade
 | Dimension chain | Separate API endpoint checks explicitly supplied values, verification flags, units and tolerance using decimal arithmetic |
 | Optional OCR | Standalone PaddleOCR recognition runner for saved dimension crops; raw results remain unverified |
 | OCR evaluation | Tool to compare predictions against manually verified transcriptions using exact-match rate, prediction coverage and character error rate |
+| Crop dataset curation | Export verified full-string crops or import manual crops; validate manifests and create source/writer-safe splits |
+
+### Start collecting handwritten dimension samples
+
+The repository now includes a local dataset curation tool. It does not train a model yet; it turns your reviewed crops into a traceable OCR dataset so we can benchmark recognisers and decide what to fine-tune.
+
+For new drawings, crop the **whole dimension string** as one image (for example, “4,200 mm”), not individual digits. Transcribe exactly what is visible, preserve decimals and units, and only mark a label verified after checking it against the drawing. Keep crops from one plan under the same source ID. Use the same pseudonymous writer ID for samples written by the same person.
+
+The dataset is local and excluded from Git. Detailed commands and the CSV format are in [the crop-data guide](web/README.md#handwritten-dimension-crop-dataset).
 
 A detector score is **not** OCR confidence or a probability that a measurement is correct. A bounding box is a candidate region, not a wall centreline or a measurement. Pixel distances are not millimetres.
 
@@ -69,7 +78,7 @@ The target is a reviewable 2D digitisation pipeline:
 
 The OCR direction is deliberately numeric-first. General English room-label and note recognition is not an initial dependency unless evaluation shows it materially improves the dimension workflow. The optional PaddleOCR recogniser is a baseline to measure, not a claim that OCR is solved.
 
-A separate training/evaluation workspace is planned for rights-cleared dataset manifests, annotation QA, model comparisons and regression tests. Evaluation should be split by original drawing (and writer where relevant), not by crops from the same source. Measure exact full-dimension accuracy, prediction coverage, dimension association, chain consistency, topology/export correctness and human correction time.
+The first dataset-capture and validation utilities are now implemented. Full model training and a browser-integrated OCR stage remain future work. Evaluation must be split by original drawing and writer, not by individual crops. Measure exact full-dimension accuracy, prediction coverage, dimension association, chain consistency, topology/export correctness and human correction time.
 
 The existing RTX 2080 Ti (11 GB VRAM) is the initial local development target. Compact models, tiled inference, conservative batch sizes and staged processing are preferred over a large end-to-end model. Model selection should follow representative-plan evaluation.
 
@@ -100,6 +109,7 @@ Install the lightweight test dependencies:
 ```bash
 python -m pip install -r requirements-dev.txt
 PYTHONPATH=. python -m pytest -q tests/test_*.py
+python -m planline.dataset --help
 node --check web/app.js
 ```
 
@@ -117,7 +127,7 @@ The regular CI suite uses a fake detector, so passing it verifies API behaviour 
 
 ```text
 floorplan-digitizer/
-├── planline/                     # Local API, constraints and OCR utilities
+├── planline/                     # Local API, constraints, OCR and dataset curation utilities
 ├── web/                          # Active browser UI and usage guide
 ├── schemas/                      # Versioned detection-review JSON schema
 ├── tests/                        # API, constraints, OCR, dataset and browser tests

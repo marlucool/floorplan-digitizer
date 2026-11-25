@@ -22,6 +22,7 @@ The active application is served from the root web/ directory by the local FastA
 | Dimension-chain arithmetic | Implemented as a separate API endpoint for explicit values, verification flags, units and tolerance |
 | OCR runner | Optional standalone PaddleOCR crop recogniser; not wired into the web analysis endpoint |
 | OCR evaluation | Implemented for predictions compared with manually verified transcriptions |
+| Handwriting crop curation | Implemented as a local CLI for verified review crops or manually cropped images, manifest validation and source/writer-grouped splits |
 | Dimension association | Not implemented |
 | Metric reconstruction | Not implemented |
 | Verified CAD export | Not implemented in the web application |
@@ -46,6 +47,8 @@ flowchart TD
   L --> M[Match, mismatch, needs review or unresolved]
 ```
 
+The local planline.dataset utility can take the verified review labels and source crop coordinates and prepare a separate OCR dataset. It can also import manually cropped images with a CSV label manifest. It validates image checksums and keeps samples sharing either a source drawing or writer in one train/validation/test split. This is dataset curation only; it does not train a recogniser.
+
 The current data flow intentionally stops before dimension-to-wall association and geometry reconstruction. The dimension-chain validator performs arithmetic on values supplied by a reviewer; it does not infer those values or connect them to detector boxes.
 
 ## Target processing architecture
@@ -66,7 +69,7 @@ The optional PaddleOCR runner currently provides a recognition-only baseline on 
 
 ## Data and evaluation
 
-Use only plans that are owned, licensed or explicitly permitted for the intended use. Maintain source manifests and annotation guidelines. Split training, validation and test sets by original drawing (and writer for handwriting), not by individual crops, to prevent source leakage.
+Use only plans that are owned, licensed or explicitly permitted for the intended use. Maintain source manifests and annotation guidelines. The local dataset CLI writes verified full-string crops to an ignored datasets/ directory, preserves exact text labels, source IDs, optional pseudonymous writer IDs and checksums, and creates group-safe splits. It supports both Planline review exports and manually cropped images supplied through CSV. This establishes a curation path before any model-training decision. Split training, validation and test sets by original drawing (and writer for handwriting), not by individual crops, to prevent source leakage.
 
 Measure the whole task rather than a single OCR score:
 
@@ -90,6 +93,6 @@ The initial local target is an RTX 2080 Ti with 11 GB VRAM. Start with compact m
 4. **Association and constraints:** associate text with dimension graphics and measured spans; surface chain contradictions and unresolved dimensions.
 5. **2D reconstruction:** create editable wall/opening topology with validation and correction tools.
 6. **Verified export:** add DXF/SVG only after geometry and dimension gates are testable.
-7. **Training workspace:** add reproducible datasets, experiments, model versioning and regression evaluation after data rights and baselines are established.
+7. **Training workspace:** add reproducible datasets, experiments, model versioning and regression evaluation after data rights and baseline annotations are established. The initial local crop curation/validation CLI is implemented; model training remains future work.
 
 See [PLANLINE_ARCHITECTURE.md](PLANLINE_ARCHITECTURE.md) for the more detailed research notes, risk analysis, OCR comparisons and engineering backlog.

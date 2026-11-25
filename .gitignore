@@ -47,3 +47,6 @@ runtime/
 
 # Local Python environment
 .venv/
+
+# Local source-derived OCR datasets; do not commit drawings or crops
+/datasets/
