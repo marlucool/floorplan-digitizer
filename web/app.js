@@ -1817,6 +1817,33 @@ function renderChainResult(result) {
     line.textContent = "Missing segments: " + result.unresolved_indices.map((index) => index + 1).join(", ");
     box.append(line);
   }
+  if (result.candidate_available && result.candidate_index !== null) {
+    const proposal = document.createElement("div");
+    proposal.className = "chain-candidate";
+    const explanation = document.createElement("p");
+    explanation.textContent = "Calculated candidate for Segment " + (result.candidate_index + 1) +
+      ": " + result.candidate_value + " " + result.unit +
+      ". This is arithmetic only; it is not independently verified.";
+    const apply = document.createElement("button");
+    apply.className = "toolbar-button";
+    apply.type = "button";
+    apply.textContent = "Use candidate in Segment " + (result.candidate_index + 1);
+    apply.addEventListener("click", () => {
+      const row = $("#chainSegments").querySelectorAll(".chain-segment-row")[result.candidate_index];
+      if (!row) return;
+      row.querySelector(".segment-value").value = result.candidate_value;
+      row.querySelector(".segment-verified").checked = false;
+      row.querySelector(".segment-value").focus();
+      apply.disabled = true;
+      apply.textContent = "Added — verify this value manually";
+    });
+    proposal.append(explanation, apply);
+    box.append(proposal);
+  } else if (result.candidate_reason && result.unresolved_indices.length) {
+    const line = document.createElement("p");
+    line.textContent = "Cannot calculate a candidate: " + result.candidate_reason;
+    box.append(line);
+  }
   if (result.overall_unresolved) {
     const line = document.createElement("p");
     line.textContent = "Overall dimension is missing.";
