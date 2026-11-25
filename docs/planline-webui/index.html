@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#f5f6f3" />
+  <title>Planline — 2D Floor Plan Digitiser</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Main navigation">
+      <a class="brand" href="#workspace" aria-label="Planline home">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+        <span class="brand-name">planline<span>.</span></span>
+      </a>
+
+      <div class="workspace-switcher">
+        <span class="switcher-icon">W</span>
+        <span class="switcher-copy"><strong>Workspace</strong><small>Local project</small></span>
+        <span class="chevron">⌄</span>
+      </div>
+
+      <div class="nav-label">WORKSPACE</div>
+      <nav class="nav-list">
+        <a class="nav-item active" href="#workspace"><span class="nav-icon">▦</span> Digitiser</a>
+        <a class="nav-item" href="#review"><span class="nav-icon">☷</span> Review queue <span class="nav-count" id="navReviewCount">1</span></a>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="engine-card">
+          <div class="engine-top"><span class="status-dot muted"></span><span>Processing engine</span></div>
+          <strong>Not connected</strong>
+          <p>The interface is ready for a local OCR and geometry service.</p>
+          <span class="engine-tag">UI prototype</span>
+        </div>
+        <div class="profile-row">
+          <div class="avatar">PL</div>
+          <div><strong>Local session</strong><small>Nothing uploaded</small></div>
+          <span class="more">···</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content" id="workspace">
+      <header class="topbar">
+        <div class="breadcrumb"><span>Workspace</span><span class="crumb-sep">/</span><strong>Untitled project</strong></div>
+        <div class="topbar-actions">
+          <span class="local-indicator" id="apiStatus"><span class="status-dot amber"></span> Local preview mode</span>
+          <button class="button button-primary" id="uploadTopButton" type="button"><span class="button-plus">＋</span> Import drawing</button>
+        </div>
+      </header>
+
+      <section class="page-heading">
+        <div>
+          <div class="eyebrow">ONE WORKSPACE · 2D ONLY</div>
+          <h1>Floor plan review</h1>
+          <p class="page-subtitle">Try the workflow with the sample plan. Uploaded drawings can be previewed; OCR and reconstruction are not connected yet.</p>
+        </div>
+        <div class="heading-status"><span class="status-pill status-demo"><span class="status-dot amber"></span> Demo project</span><span class="autosave-label">Local preview · no server connection</span></div>
+      </section>
+
+      <section class="project-strip" aria-label="Project details">
+        <div class="project-file-icon">▤</div>
+        <div class="project-file-copy"><strong id="projectFileName">sample-house-scan.png</strong><small id="projectFileMeta">Illustrative sample · 2D residential plan</small></div>
+        <div class="strip-divider"></div>
+        <div class="project-metric"><span>DRAWING TYPE</span><strong>Residential · 2D</strong></div>
+        <div class="project-metric"><span>UNITS</span><strong>Millimetres (mm)</strong></div>
+        <div class="strip-spacer"></div>
+        <button class="button button-quiet" id="resetButton" type="button">Reset sample</button>
+      </section>
+
+      <nav class="stepper" aria-label="Floor plan workflow">
+        <button class="step-tab active" id="stepNav1" type="button" data-step="1" aria-current="step"><span class="step-number">1</span><span>Add drawing</span></button>
+        <span class="step-connector" aria-hidden="true"></span>
+        <button class="step-tab" id="stepNav2" type="button" data-step="2"><span class="step-number">2</span><span>Review dimensions</span></button>
+        <span class="step-connector" aria-hidden="true"></span>
+        <button class="step-tab" id="stepNav3" type="button" data-step="3" disabled><span class="step-number">3</span><span>Preview &amp; export</span></button>
+      </nav>
+
+      <section id="stepPage1" class="step-page active" aria-labelledby="sourceTitle">
+          <section class="panel source-panel" aria-labelledby="sourceTitle">
+            <div class="panel-header">
+              <div><div class="panel-kicker">STEP 1 · INPUT</div><h2 id="sourceTitle">Your scan</h2></div>
+              <div class="panel-tools"><span class="small-chip" id="sourceTypeChip">SAMPLE SCAN</span><button class="icon-button" id="replaceFileButton" type="button" aria-label="Replace drawing" title="Replace drawing">↗</button></div>
+            </div>
+            <div class="source-stage" id="sourceStage">
+              <div class="scan-paper" id="samplePaper">
+                <svg class="scan-svg" viewBox="0 0 650 400" role="img" aria-label="Illustrative scanned house plan with handwritten-style dimensions">
+                  <defs>
+                    <pattern id="paperGrain" width="17" height="17" patternUnits="userSpaceOnUse"><circle cx="2" cy="4" r=".55" fill="#9c988d" opacity=".2"/><circle cx="13" cy="12" r=".45" fill="#9c988d" opacity=".18"/></pattern>
+                    <filter id="soften"><feGaussianBlur stdDeviation=".3"/></filter>
+                  </defs>
+                  <rect width="650" height="400" fill="#f4f0e5"/><rect width="650" height="400" fill="url(#paperGrain)"/>
+                  <g transform="translate(70 42) rotate(-.7 250 150)" stroke="#454640" fill="none" stroke-linecap="square" filter="url(#soften)">
+                    <path d="M40 45 H510 V310 H40 Z" stroke-width="7"/>
+                    <path d="M190 45 V310 M390 45 V310 M190 170 H390" stroke-width="5"/>
+                    <path d="M40 190 H190 M390 190 H510" stroke-width="5"/>
+                    <path d="M190 112 H225 M260 112 H390 M390 242 H430 M465 242 H510" stroke-width="4"/>
+                    <path d="M225 112 A35 35 0 0 1 260 147 M430 242 A35 35 0 0 1 465 277" stroke-width="1.8"/>
+                    <path d="M102 45 V80 M132 45 V80 M102 80 H132 M275 45 V80 M305 45 V80 M275 80 H305" stroke-width="1.7"/>
+                    <path d="M40 105 H75 M40 135 H75 M75 105 V135 M510 105 H475 M510 135 H475 M475 105 V135" stroke-width="1.7"/>
+                  </g>
+                  <g fill="#69685f" font-family="Georgia,serif" font-style="italic" font-size="13" opacity=".88">
+                    <text x="160" y="151">BED 1</text><text x="352" y="151">BED 2</text><text x="260" y="263">LIVING</text><text x="463" y="148">KITCHEN</text><text x="95" y="280">GARAGE</text>
+                  </g>
+                  <g fill="#8b5142" font-family="Georgia,serif" font-style="italic" font-size="17" opacity=".92">
+                    <text x="150" y="29" transform="rotate(-1 150 29)">3000</text><text x="355" y="29" transform="rotate(1 355 29)">4500</text><text x="530" y="180" transform="rotate(90 530 180)">2500</text><text x="295" y="370" transform="rotate(-1 295 370)">10000 overall</text>
+                  </g>
+                  <g stroke="#8b5142" stroke-width="1.2" fill="none" opacity=".7"><path d="M112 39 H260 M112 34 V44 M260 34 V44 M260 39 H455 M260 34 V44 M455 34 V44"/><path d="M542 92 V225 M537 92 H547 M537 225 H547"/></g>
+                  <g fill="#77746b" font-size="10" font-family="sans-serif"><text x="522" y="386">SAMPLE / NOT TO SCALE</text></g>
+                </svg>
+                <span class="paper-stamp">ARCHIVE COPY</span>
+              </div>
+              <div class="image-preview hidden" id="imagePreviewWrap"><img id="uploadedPreview" alt="Uploaded floor plan preview" /></div>
+              <div class="file-preview hidden" id="filePreviewWrap"><div class="file-large-icon">PDF</div><strong id="pdfName">drawing.pdf</strong><span>PDF selected · page rendering is not connected in this prototype.</span></div>
+              <div class="source-empty hidden" id="sourceEmpty"><div class="empty-icon">＋</div><strong>Bring in a drawing</strong><span>Drop a scan here or choose a file.</span><button class="button button-primary" id="emptyUploadButton" type="button">Choose file</button></div>
+              <div class="stage-caption"><span><i class="caption-dot"></i> Original input</span><span id="sourceDimensions">Illustrative scan · 650 × 400</span></div>
+            </div>
+            <div class="source-footer"><span><span class="tiny-lock">⌑</span> Original file is not modified</span><button class="text-button" id="changeFileText" type="button">Change file <span>↗</span></button></div>
+          </section>
+          <section class="pipeline-status-card" aria-labelledby="pipelineStatusTitle">
+            <div class="pipeline-status-header">
+              <div>
+                <div class="panel-kicker">LOCAL PIPELINE</div>
+                <h3 id="pipelineStatusTitle">Sample workflow</h3>
+              </div>
+              <span class="pipeline-state-pill" id="pipelineStatePill">Demo data</span>
+            </div>
+            <p class="pipeline-status-detail" id="pipelineStatusDetail">The sample lets you explore review and export. It is not the result of OCR or reconstruction.</p>
+            <ol class="pipeline-stage-list" aria-label="Processing stages">
+              <li class="pipeline-stage complete" data-pipeline-stage="preprocess"><span class="pipeline-stage-icon">1</span><span><strong>Check source</strong><small>Sample ready</small></span></li>
+              <li class="pipeline-stage" data-pipeline-stage="detect"><span class="pipeline-stage-icon">2</span><span><strong>Find drawing features</strong><small>Not run</small></span></li>
+              <li class="pipeline-stage" data-pipeline-stage="ocr"><span class="pipeline-stage-icon">3</span><span><strong>Read dimensions</strong><small>Not run</small></span></li>
+              <li class="pipeline-stage" data-pipeline-stage="constraints"><span class="pipeline-stage-icon">4</span><span><strong>Check consistency</strong><small>Not run</small></span></li>
+              <li class="pipeline-stage" data-pipeline-stage="reconstruct"><span class="pipeline-stage-icon">5</span><span><strong>Build 2D plan</strong><small>Not run</small></span></li>
+            </ol>
+          </section>
+          <div class="step-actions step-actions-end"><span class="step-hint">Files are previewed in this browser. Nothing is uploaded.</span><button class="button button-primary step-next" id="nextToReview" type="button">Continue to review <span>→</span></button></div>
+      </section>
+
+      <section id="stepPage2" class="step-page" aria-labelledby="reviewTitle">
+        <div class="right-column" id="review">
+          <section class="panel review-panel" aria-labelledby="reviewTitle">
+            <div class="panel-header review-header">
+              <div><div class="panel-kicker">STEP 2 · HUMAN CHECK</div><h2 id="reviewTitle">Review dimensions</h2></div>
+              <div class="panel-tools"><span class="small-chip amber-chip" id="reviewModeChip">SAMPLE DATA</span><span class="review-count" id="reviewCount">1 needs review</span></div>
+            </div>
+            <p class="panel-intro">Check the value, confidence, and dimension-chain total. Uncertain readings stay marked until you confirm them.</p>
+            <div class="upload-notice hidden" id="uploadNotice" role="status" aria-live="polite"><strong>No analysis has run on this file.</strong>The values shown are sample placeholders, not readings from your upload. OCR and reconstruction are not connected yet.</div>
+            <div class="review-summary">
+              <div><strong id="verifiedCount">2 <span>/ 3</span></strong><small>Sample dimensions checked</small></div>
+              <div class="summary-progress"><div class="progress-track"><div class="progress-value" id="progressValue" style="width:66.66%"></div></div><small id="progressLabel">67% reviewed</small></div>
+            </div>
+            <div class="table-heading"><span>DIMENSION · VALUE</span><span>CONFIDENCE</span></div>
+            <div class="measurement-list" id="measurementList">
+              <article class="measurement-row verified" data-id="a">
+                <div class="measurement-main"><span class="measurement-index">A</span><div class="measurement-copy"><label for="value-a">Horizontal span</label><div class="measurement-input-wrap"><input id="value-a" class="dimension-input" type="number" min="1" step="1" value="3000" aria-label="Dimension A in millimetres"><span>mm</span></div></div></div>
+                <div class="confidence-cell"><span class="confidence-score high">98%</span><span class="confidence-caption">High</span><button class="verify-toggle checked" type="button" aria-label="Mark dimension A unverified" aria-pressed="true">✓</button></div>
+              </article>
+              <article class="measurement-row verified" data-id="b">
+                <div class="measurement-main"><span class="measurement-index">B</span><div class="measurement-copy"><label for="value-b">Horizontal span</label><div class="measurement-input-wrap"><input id="value-b" class="dimension-input" type="number" min="1" step="1" value="4500" aria-label="Dimension B in millimetres"><span>mm</span></div></div></div>
+                <div class="confidence-cell"><span class="confidence-score high">96%</span><span class="confidence-caption">High</span><button class="verify-toggle checked" type="button" aria-label="Mark dimension B unverified" aria-pressed="true">✓</button></div>
+              </article>
+              <article class="measurement-row needs-review" data-id="c">
+                <div class="measurement-main"><span class="measurement-index">C</span><div class="measurement-copy"><label for="value-c">Horizontal span</label><div class="measurement-input-wrap"><input id="value-c" class="dimension-input" type="number" min="1" step="1" value="2500" aria-label="Dimension C in millimetres"><span>mm</span></div><span class="row-note">Confirm this reading</span></div></div>
+                <div class="confidence-cell"><span class="confidence-score medium">76%</span><span class="confidence-caption">Review</span><button class="verify-toggle" type="button" aria-label="Verify dimension C" aria-pressed="false">✓</button></div>
+              </article>
+            </div>
+            <div class="overall-check" id="overallCheck">
+              <div class="overall-icon">∑</div>
+              <div class="overall-copy"><strong>Dimension chain</strong><span>3,000 + 4,500 + 2,500 = 10,000 mm</span></div>
+              <span class="match-pill" id="chainStatus">Matches</span>
+            </div>
+            <div class="overall-input-row"><label for="overallValue">Overall dimension</label><div class="overall-input-wrap"><input id="overallValue" type="number" min="1" step="1" value="10000"><span>mm</span></div></div>
+            <button class="button button-dark button-full" id="verifyAllButton" type="button">Confirm all sample dimensions <span>✓</span></button>
+            <p class="fine-print">The sample confidence values are illustrative; they are not OCR results.</p>
+          </section>
+        </div>
+        <div class="step-actions step-actions-between"><button class="button button-quiet step-back" type="button" data-go-step="1">← Back to drawing</button><button class="button button-primary step-next" id="nextToPreview" type="button" disabled>Continue to preview <span>→</span></button></div>
+      </section>
+
+      <section id="stepPage3" class="step-page" aria-labelledby="reconstructionTitle">
+          <section class="panel reconstruction-panel" aria-labelledby="reconstructionTitle">
+            <div class="panel-header">
+              <div><div class="panel-kicker">STEP 3 · PREVIEW</div><h2 id="reconstructionTitle">2D plan preview</h2></div>
+              <div class="panel-tools"><span class="small-chip green-chip">SAMPLE GEOMETRY</span><button class="icon-button" id="fitViewButton" type="button" aria-label="Fit drawing to view" title="Fit drawing to view">⤢</button></div>
+            </div>
+            <div class="cad-stage" id="cadStage">
+              <div class="cad-grid"></div>
+              <svg id="cadSvg" viewBox="0 0 680 390" role="img" aria-label="Illustrative editable 2D floor plan preview">
+                <g id="cadDrawing"></g>
+                <g id="cadDimensions"></g>
+              </svg>
+              <div class="cad-axis"><span>X · mm</span><span>Y · mm</span></div>
+              <div class="cad-legend"><span><i class="legend-wall"></i> Walls</span><span><i class="legend-opening"></i> Openings (illustrative)</span><span><i class="legend-dim"></i> Dimensions</span></div>
+            </div>
+            <div class="cad-footer"><span id="cadSummary">Illustrative geometry · 10,000 × 7,000 mm</span><span class="scale-label">VIEW <strong>FIT</strong></span></div>
+          </section>
+          <section class="export-card">
+            <div class="export-icon">▱</div>
+            <div class="export-copy"><strong>Export editable drawing</strong><span>Sample DXF only · millimetre units</span></div>
+            <button class="export-button" id="exportButton" type="button">↓</button>
+            <div class="export-note" id="exportNote">The sample geometry can be exported. Uploaded drawings need the processing backend first.</div>
+          </section>
+        <div class="step-actions step-actions-between"><button class="button button-quiet step-back" type="button" data-go-step="2">← Back to dimensions</button><span class="step-hint">Sample geometry only · uploaded drawings are not reconstructed.</span></div>
+      </section>
+
+      <footer class="app-footer"><span>PLANLINE <span class="footer-dot">·</span> 2D FLOOR PLAN DIGITISER</span><span>Prototype 0.1 <span class="footer-dot">·</span> Local-only interface</span></footer>
+    </main>
+  </div>
+
+  <input id="fileInput" class="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp,image/tiff,application/pdf,.tif,.tiff" />
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
