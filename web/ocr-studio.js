@@ -16,7 +16,7 @@
     datasets: [], datasetId: null, dataset: null, queue: [], queueIndex: 0,
     image: null, imageFile: null, cropBlob: null, cropRect: null,
     pointerStart: null, editingId: null, activeJobId: null, pollTimer: null,
-    lastTrainedModel: null, busy: false, paddleReady: false, ocrReady: false
+    lastTrainedModel: null, busy: false, paddleReady: false, ocrReady: false, pythonCompatible: false
   };
 
   const terminalStatuses = new Set(["completed", "completed_no_export", "failed", "cancelled"]);
@@ -67,7 +67,8 @@
     $("#benchmarkTrainedButton").disabled = state.busy || hasJob || !splitReady || !state.ocrReady || !selectedModel;
     $("#cancelJobButton").classList.toggle("hidden", !hasJob);
     const readiness = $("#trainingReadiness");
-    if (!state.paddleReady) readiness.textContent = "Install PaddlePaddle to train";
+    if (!state.pythonCompatible) readiness.textContent = "Compatible Python runtime required";
+    else if (!state.paddleReady) readiness.textContent = "PaddlePaddle runtime not installed";
     else if (!summary || !summary.samples) readiness.textContent = "Add verified crops to begin";
     else if (summary.independent_groups < 3) readiness.textContent = `${summary.samples} crops · need 3 independent groups`;
     else if (!splitReady) readiness.textContent = `${summary.samples} crops · build splits before training`;
@@ -77,13 +78,19 @@
   async function loadDatasets(preferredId) {
     try {
       const status = await api("/api/ocr/status");
-      state.paddleReady = Boolean(status.paddle_installed);
-      state.ocrReady = Boolean(status.paddle_installed && status.paddleocr_installed);
+      state.pythonCompatible = Boolean(status.python_compatible_for_paddle);
+      state.paddleReady = Boolean(status.training_runtime_ready ?? (state.pythonCompatible && status.paddle_installed));
+      state.ocrReady = Boolean(status.inference_runtime_ready ?? (state.pythonCompatible && status.paddle_installed && status.paddleocr_installed));
       $("#apiStatus").textContent = state.ocrReady
-        ? "Local OCR engine ready" : "Dataset editor ready · install OCR engine";
-      $("#ocrDependencyNote").textContent = state.ocrReady
-        ? "Paddle and PaddleOCR are available in this Python environment. The training source checkout is still required for fine-tuning."
-        : "Dataset annotation works without OCR packages. To benchmark, install PaddlePaddle (choose a build matching your CUDA/CPU setup) and requirements-ocr-paddle.txt into the same Python environment used to launch Planline. Fine-tuning also needs a PaddleOCR source checkout.";
+        ? "Local OCR engine ready"
+        : !state.pythonCompatible
+          ? "Dataset editor ready · compatible OCR runtime required"
+          : "Dataset editor ready · OCR runtime not installed";
+      $("#ocrDependencyNote").textContent = !state.pythonCompatible
+        ? status.training_note + " No install command will fix this Python-version mismatch; Planline needs a separate compatible OCR runtime."
+        : state.ocrReady
+          ? status.training_note
+          : status.training_note + " Dataset annotation and verified crop storage remain available without the OCR engine.";
     } catch (_) { $("#apiStatus").textContent = "Local OCR workbench"; }
     const payload = await api("/api/ocr/datasets");
     state.datasets = payload.datasets || [];
