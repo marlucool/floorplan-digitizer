@@ -55,11 +55,11 @@ internal static class InstalledLauncher
 {
     // A named, per-session mutex prevents two launcher processes from opening
     // the shared desktop.log or starting competing local API instances.
-    private const string InstanceMutexName = @"Local\\Planline.Desktop";
+    private const string InstanceMutexName = @"Local\Planline.Desktop";
 
     public static int Run(string installDirectory)
     {
-        using var instanceMutex = new Mutex(initiallyOwned: false, InstanceMutexName);
+        using var instanceMutex = new Mutex(initiallyOwned: false, name: InstanceMutexName);
         bool ownsMutex = false;
         try
         {
@@ -179,8 +179,8 @@ internal static class InstalledLauncher
             if (process.ExitCode != 0)
             {
                 MessageBox.Show(
-                    $"Planline closed with an error (exit code {process.ExitCode}).\\n\\n" +
-                    $"The startup log is saved at:\\n{actualLogPath}",
+                    $"Planline closed with an error (exit code {process.ExitCode}).\n\n" +
+                    $"The startup log is saved at:\n{actualLogPath}",
                     "Planline",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error
@@ -192,7 +192,7 @@ internal static class InstalledLauncher
         catch (Exception exception)
         {
             MessageBox.Show(
-                $"Planline could not start.\\n\\n{exception.Message}\\n\\nLog: {actualLogPath}",
+                $"Planline could not start.\n\n{exception.Message}\n\nLog: {actualLogPath}",
                 "Planline",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error
