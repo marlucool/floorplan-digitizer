@@ -1157,34 +1157,71 @@ internal sealed class SetupForm : Form
         using var process = new Process { StartInfo = startInfo };
         var output = new List<string>();
         object outputLock = new();
+        string? activeDownload = null;
+        long? activeDownloadSize = null;
 
         void Capture(string? line, bool isError)
         {
-            if (string.IsNullOrWhiteSpace(line))
-            {
-                return;
-            }
+            if (string.IsNullOrWhiteSpace(line)) return;
 
             lock (outputLock)
             {
                 output.Add((isError ? "!" : "") + line);
-                if (output.Count > 40)
+                if (output.Count > 40) output.RemoveAt(0);
+            }
+
+            // pip reports each wheel separately. Keep those assets visible instead
+            // of replacing the whole installer status with opaque console output.
+            string trimmed = line.Trim();
+            int marker = trimmed.IndexOf("Downloading ", StringComparison.OrdinalIgnoreCase);
+            if (marker < 0)
+                marker = trimmed.IndexOf("Using cached ", StringComparison.OrdinalIgnoreCase);
+            if (marker >= 0)
+            {
+                string asset = trimmed[(marker + (trimmed.IndexOf("Using cached ", StringComparison.OrdinalIgnoreCase) == marker
+                    ? "Using cached ".Length : "Downloading ".Length))..];
+                int sizeStart = asset.IndexOf(" (", StringComparison.Ordinal);
+                string assetPath = sizeStart >= 0 ? asset[..sizeStart] : asset;
+                string assetName = assetPath.Split('/').LastOrDefault() ?? assetPath;
+                activeDownload = Uri.UnescapeDataString(assetName);
+                activeDownloadSize = null;
+                if (sizeStart >= 0)
                 {
-                    output.RemoveAt(0);
+                    Match sizeMatch = Regex.Match(asset[sizeStart..], @"\((?<n>[\d.]+)\s*(?<u>KB|MB|GB|B)\)", RegexOptions.IgnoreCase);
+                    if (sizeMatch.Success)
+                        activeDownloadSize = ParseAssetBytes(sizeMatch.Groups["n"].Value, sizeMatch.Groups["u"].Value);
+                }
+                UpdateAsset(activeDownload, 0, activeDownloadSize, "Downloading");
+                _progressDetail.Text = $"Downloading package: {activeDownload}";
+            }
+
+            if (activeDownload is not null)
+            {
+                Match progress = Regex.Match(trimmed,
+                    @"(?<p>\d{1,3})%.*?\|\s*(?<d>[\d.]+)\s*(?<du>KB|MB|GB|B)\s*/\s*(?<t>[\d.]+)\s*(?<tu>KB|MB|GB|B)",
+                    RegexOptions.IgnoreCase);
+                if (progress.Success)
+                {
+                    long done = ParseAssetBytes(progress.Groups["d"].Value, progress.Groups["du"].Value);
+                    long total = ParseAssetBytes(progress.Groups["t"].Value, progress.Groups["tu"].Value);
+                    activeDownloadSize = total;
+                    UpdateAsset(activeDownload, done, total, "Downloading");
+                    _progressDetail.Text = $"{activeDownload}: {FormatBytes(done)} of {FormatBytes(total)} ({progress.Groups["p"].Value}%)";
+                }
+                if (trimmed.Contains("Installing collected packages", StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.Contains("Successfully installed", StringComparison.OrdinalIgnoreCase))
+                {
+                    UpdateAsset(activeDownload, activeDownloadSize ?? 0, activeDownloadSize, "Downloaded");
+                    activeDownload = null;
+                    activeDownloadSize = null;
                 }
             }
 
-            string compact = line.Length > 105 ? line[^105..] : line;
+            string compact = trimmed.Length > 105 ? trimmed[^105..] : trimmed;
             if (IsHandleCreated && !IsDisposed)
             {
-                try
-                {
-                    BeginInvoke((Action)(() => _status.Text = compact));
-                }
-                catch (InvalidOperationException)
-                {
-                    // The setup window may be closing while a child process exits.
-                }
+                try { BeginInvoke((Action)(() => _status.Text = compact)); }
+                catch (InvalidOperationException) { /* Window is closing. */ }
             }
         }
 
@@ -1344,6 +1381,20 @@ internal sealed class SetupForm : Form
         key.SetValue("UninstallString", $"\"{uninstallerExecutable}\"");
         key.SetValue("NoModify", 1, RegistryValueKind.DWord);
         key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
+    }
+
+    private static long ParseAssetBytes(string value, string unit)
+    {
+        if (!double.TryParse(value, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out double amount)) return 0;
+        double multiplier = unit.ToUpperInvariant() switch
+        {
+            "KB" => 1024d,
+            "MB" => 1024d * 1024,
+            "GB" => 1024d * 1024 * 1024,
+            _ => 1d,
+        };
+        return (long)(amount * multiplier);
     }
 
     private static string FormatBytes(long bytes)
