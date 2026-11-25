@@ -401,7 +401,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.wait_for_function("document.querySelector('.dimension-interpretation').dataset.status === 'unit_missing'")
             assert "No unit is written" in page.locator(".dimension-interpretation").inner_text()
             assert "millimetres" in page.locator(".dimension-interpretation").inner_text()
-            assert page.locator(".dimension-text-value").input_value() == "2685 mm"
+            assert page.locator(".dimension-text-value").input_value() == "4200"
             assert page.locator(".dimension-text-item").get_attribute("data-detection-id") == "det-004"
             page.locator(".dimension-text-value").fill("2685 mm")
             page.locator(".interpret-dimension-button").click()
@@ -433,7 +433,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.locator("#overallVerified").check()
             page.locator("#checkChain").click()
             page.wait_for_selector('#chainResult[data-status="matches"]')
-            assert page.locator(".dimension-text-value").input_value() == "4200"
+            assert page.locator(".dimension-text-value").input_value() == "2685 mm"
             assert page.locator(".dimension-text-verified-input").is_checked()
 
             assert submitted["segment_values"] == ["3000", "4500"]
