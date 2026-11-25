@@ -53,7 +53,50 @@ internal static class Program
 
 internal static class InstalledLauncher
 {
+    // A named, per-session mutex prevents two launcher processes from opening
+    // the shared desktop.log or starting competing local API instances.
+    private const string InstanceMutexName = @"Local\\Planline.Desktop";
+
     public static int Run(string installDirectory)
+    {
+        using var instanceMutex = new Mutex(initiallyOwned: false, InstanceMutexName);
+        bool ownsMutex = false;
+        try
+        {
+            try
+            {
+                ownsMutex = instanceMutex.WaitOne(0);
+            }
+            catch (AbandonedMutexException)
+            {
+                // The previous launcher exited without releasing the mutex.
+                // WaitOne has acquired ownership in this case.
+                ownsMutex = true;
+            }
+
+            if (!ownsMutex)
+            {
+                MessageBox.Show(
+                    "Planline is already starting or running. Switch to the existing Planline window instead of opening another copy.",
+                    "Planline",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+                return 0;
+            }
+
+            return RunSingleInstance(installDirectory);
+        }
+        finally
+        {
+            if (ownsMutex)
+            {
+                instanceMutex.ReleaseMutex();
+            }
+        }
+    }
+
+    private static int RunSingleInstance(string installDirectory)
     {
         string python = Path.Combine(installDirectory, "python", "python.exe");
         string appDirectory = Path.Combine(installDirectory, "app");
@@ -73,8 +116,10 @@ internal static class InstalledLauncher
             return 1;
         }
 
-        Directory.CreateDirectory(Path.Combine(dataDirectory, "logs"));
-        string logPath = Path.Combine(dataDirectory, "logs", "desktop.log");
+        string logDirectory = Path.Combine(dataDirectory, "logs");
+        Directory.CreateDirectory(logDirectory);
+        string logPath = Path.Combine(logDirectory, "desktop.log");
+        string actualLogPath = logPath;
 
         var startInfo = new ProcessStartInfo
         {
@@ -97,7 +142,15 @@ internal static class InstalledLauncher
             using var process = new Process { StartInfo = startInfo };
             object logLock = new();
 
-            using var log = new StreamWriter(logPath, append: true) { AutoFlush = true };
+            using var log = OpenLogWriter(logPath, out actualLogPath);
+            if (!string.Equals(actualLogPath, logPath, StringComparison.OrdinalIgnoreCase))
+            {
+                log.WriteLine(
+                    $"[launcher] The shared desktop.log was locked by another process. " +
+                    $"This session is writing to {actualLogPath}."
+                );
+            }
+
             process.OutputDataReceived += (_, eventArgs) =>
             {
                 if (eventArgs.Data is not null)
@@ -126,8 +179,8 @@ internal static class InstalledLauncher
             if (process.ExitCode != 0)
             {
                 MessageBox.Show(
-                    $"Planline closed with an error (exit code {process.ExitCode}).\n\n" +
-                    $"The startup log is saved at:\n{logPath}",
+                    $"Planline closed with an error (exit code {process.ExitCode}).\\n\\n" +
+                    $"The startup log is saved at:\\n{actualLogPath}",
                     "Planline",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error
@@ -139,12 +192,39 @@ internal static class InstalledLauncher
         catch (Exception exception)
         {
             MessageBox.Show(
-                $"Planline could not start.\n\n{exception.Message}\n\nLog: {logPath}",
+                $"Planline could not start.\\n\\n{exception.Message}\\n\\nLog: {actualLogPath}",
                 "Planline",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error
             );
             return 1;
+        }
+    }
+
+    private static StreamWriter OpenLogWriter(string logPath, out string actualLogPath)
+    {
+        actualLogPath = logPath;
+        try
+        {
+            // Permit log viewers/readers while the single-instance mutex
+            // protects against competing Planline writers.
+            return new StreamWriter(
+                new FileStream(logPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)
+            ) { AutoFlush = true };
+        }
+        catch (IOException)
+        {
+            // A stale process or an external tool may still hold the shared
+            // log with exclusive access. Do not let that prevent the app opening.
+            string directory = Path.GetDirectoryName(logPath)
+                ?? throw new IOException("Could not determine the Planline log directory.");
+            actualLogPath = Path.Combine(
+                directory,
+                $"desktop-{DateTime.Now:yyyyMMdd-HHmmss-fff}-{Environment.ProcessId}.log"
+            );
+            return new StreamWriter(
+                new FileStream(actualLogPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read)
+            ) { AutoFlush = true };
         }
     }
 }
