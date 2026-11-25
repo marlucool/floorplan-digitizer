@@ -17,6 +17,7 @@ The important problem is not tracing pixels. Survey drawings can be skewed, fade
 | PDF handling | Select and analyse any page in a multi-page PDF without re-uploading the source |
 | Scale calibration | Manual two-point reference in mm, cm, m, inches or feet; exported with provenance and explicitly not treated as geometry validation |
 | Projects | Save/open portable `.planline` files with the source drawing, analysis, manual review and calibration; saving is explicit and local |
+| Room boundaries | Draw closed room polygons and calculate area in px² or calibrated m² using a user-supplied reference |
 | Manual geometry | Draw, select, delete and export user-created wall segments as SVG; detector boxes are not auto-converted into walls |
 | Manual geometry | Draw, select, delete and export user-created wall segments as SVG; detector boxes are not auto-converted into walls |
 | Image preparation | Bounded brightness/contrast adjustments before detection and crop generation; source coordinates remain unchanged |

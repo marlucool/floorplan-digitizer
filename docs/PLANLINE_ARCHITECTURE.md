@@ -29,7 +29,11 @@ The current web integration is intentionally a detection-and-review slice:
 
 ### Portable project files
 
-The Drawing workspace supports explicit save/open of versioned `.planline` JSON project files. A project embeds the original source file (up to the existing 25 MB source limit), current analysis payload, manual dimension transcriptions, association selections, scale calibration and user-drawn wall segments. Saving is user-initiated; there is no background project upload or server-side project storage. Project import validates the format version and source byte count before replacing the current workspace. Keep project files in a trusted local location because they contain the source drawing.
+The Drawing workspace supports explicit save/open of versioned `.planline` JSON project files. A project embeds the original source file (up to the existing 25 MB source limit), current analysis payload, manual dimension transcriptions, association selections, scale calibration, user-drawn wall segments and manual room polygons. Saving is user-initiated; there is no background project upload or server-side project storage. Project import validates the format version and source byte count before replacing the current workspace. Keep project files in a trusted local location because they contain the source drawing.
+
+### Manual room boundaries and area
+
+A reviewer can create a room polygon by clicking at least three corners and explicitly finishing the outline. Self-crossing outlines are rejected. Area is calculated from the polygon using the shoelace formula. Without calibration, only square pixels are reported; with calibration, the app displays a derived square-metre value that is explicitly tied to the user-supplied, unverified two-point reference. Room polygons are user-authored and are not inferred from detector boxes or automatically closed.
 
 ### Manual wall geometry
 

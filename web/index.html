@@ -90,6 +90,18 @@
             <button id="exportGeometry" class="toolbar-button" type="button" disabled>Export SVG</button>
           </div>
           <output id="geometryStatus" aria-live="polite">Analyse a drawing to start manually tracing wall segments.</output>
+          <div class="room-heading"><strong>Manual room boundaries</strong><span id="roomCount">0 rooms</span></div>
+          <p>Click each corner, then finish the outline. Area is only converted to square metres when you apply a scale reference.</p>
+          <div class="geometry-tools">
+            <button id="drawRoomTool" class="toolbar-button" type="button" disabled>Draw room</button>
+            <button id="finishRoom" class="toolbar-button" type="button" disabled>Finish room</button>
+          </div>
+          <div class="geometry-tools">
+            <button id="cancelRoom" class="toolbar-button" type="button" disabled>Cancel outline</button>
+            <button id="deleteRoom" class="toolbar-button" type="button" disabled>Delete room</button>
+            <button id="clearRooms" class="toolbar-button" type="button" disabled>Clear rooms</button>
+          </div>
+          <output id="roomArea" aria-live="polite">Select a room to view its area.</output>
         </section>
         <div class="privacy-note"><span class="lock">▣</span><span><strong>Local-first processing</strong><br>Nothing is saved automatically. Use Save project to create a local .planline file containing the source drawing and review state. Multipart uploads may use temporary storage during receipt; request files are closed after processing.</span></div>
         <div class="panel-heading section-gap"><span>02 / PIPELINE STATUS</span></div>
