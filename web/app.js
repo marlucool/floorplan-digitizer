@@ -100,6 +100,8 @@ function setFile(file) {
   $("#previewImage").removeAttribute("src");
   $("#overlay").classList.add("hidden");
   $("#classFilter").value = "all"; state.activeFilter = "all";
+  state.searchQuery = ""; state.sortMode = "original";
+  $("#detectionSearch").value = ""; $("#detectionSort").value = "original";
   $("#imageDimensions").textContent = "Waiting for analysis";
   $("#detectionCount").textContent = "0 detected regions";
   $("#resultStatus").textContent = "NOT ANALYSED";
