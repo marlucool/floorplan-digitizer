@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
-from planline.ocr_eval import evaluate_ocr, levenshtein_distance
+from planline.ocr_eval import evaluate_ocr, levenshtein_distance, main
 
 
 def _review() -> dict:
@@ -89,3 +91,30 @@ def test_evaluate_ocr_requires_verified_transcriptions() -> None:
         item["verified"] = False
     with pytest.raises(ValueError, match="No non-empty"):
         evaluate_ocr(review, {"predictions": []})
+
+
+
+def test_ocr_evaluation_cli_writes_metrics_json(tmp_path) -> None:
+    review_path = tmp_path / "review.json"
+    predictions_path = tmp_path / "predictions.json"
+    output_path = tmp_path / "metrics.json"
+    review_path.write_text(json.dumps(_review()), encoding="utf-8")
+    predictions_path.write_text(
+        json.dumps({"engine": "test-engine", "predictions": [
+            {"detection_id": "det-001", "text": "4200"},
+            {"detection_id": "det-002", "text": "2500"},
+            {"detection_id": "det-003", "text": "3.5"}
+        ]}),
+        encoding="utf-8",
+    )
+
+    exit_code = main([
+        "--review", str(review_path),
+        "--predictions", str(predictions_path),
+        "--output", str(output_path),
+    ])
+
+    assert exit_code == 0
+    report = json.loads(output_path.read_text(encoding="utf-8"))
+    assert report["engine"] == "test-engine"
+    assert report["metrics"]["exact_match_rate"] == 1.0
