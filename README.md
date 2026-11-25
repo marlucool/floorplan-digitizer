@@ -15,6 +15,7 @@ The important problem is not tracing pixels. Survey drawings can be skewed, fade
 | Web app | Browser UI served by the local FastAPI application |
 | Input | PNG, JPG, WEBP, TIFF and PDF uploads up to 25 MB |
 | PDF handling | Select and analyse any page in a multi-page PDF without re-uploading the source |
+| Scale calibration | Manual two-point reference in mm, cm, m, inches or feet; exported with provenance and explicitly not treated as geometry validation |
 | Detection | Bundled YOLO model proposes wall, dimension_line and dimension_value regions |
 | Review | Detection overlays, zoom, confidence-threshold control, class filtering, selected-box highlighting and dimension-region crops |
 | Manual transcription | Reviewer-entered text can be linked to detection IDs and marked as printed, handwritten or unclear |
@@ -93,7 +94,7 @@ Planline does not intentionally save uploaded drawings as project files. However
 
 - Automatic OCR directly in the drawing-analysis workflow (OCR Studio currently uses human-selected crops and user-verified transcriptions for dataset capture).
 - Fully automatic, verified dimension association. Current box-based candidates require human confirmation and do not handle arbitrary rotated/diagonal geometry. The global assignment is a recommendation, not a verified measurement.
-- Reliable unit interpretation or scale calibration from written dimensions.
+- Automatic scale inference from written dimensions or multiple references; current two-point calibration is explicitly user-supplied.
 - Automatic dimension-chain solving across a floor plan.
 - Editable wall/opening reconstruction with topology and geometry validation.
 - DXF/SVG export generated from verified uploaded-plan geometry.
