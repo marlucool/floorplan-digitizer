@@ -33,7 +33,7 @@ The Drawing workspace supports explicit save/open of versioned `.planline` JSON 
 
 ### Manual room boundaries and area
 
-A reviewer can create a room polygon by clicking at least three corners and explicitly finishing the outline. Self-crossing outlines are rejected. Area is calculated from the polygon using the shoelace formula. Without calibration, only square pixels are reported; with calibration, the app displays a derived square-metre value that is explicitly tied to the user-supplied, unverified two-point reference. Room polygons are user-authored and are not inferred from detector boxes or automatically closed.
+A reviewer can create a room polygon by clicking at least three corners and explicitly finishing the outline. Self-crossing outlines are rejected. Area is calculated from the polygon using the shoelace formula. Without calibration, only square pixels are reported; with calibration, the app displays a derived square-metre value that is explicitly tied to the user-supplied, unverified two-point reference. Room polygons are user-authored and are not inferred from detector boxes or automatically closed. Selected room corners can be dragged to refine the outline; edits that create a self-crossing or degenerate polygon are reverted.
 
 ### Manual wall geometry
 
