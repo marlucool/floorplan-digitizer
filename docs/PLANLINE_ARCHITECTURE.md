@@ -221,6 +221,7 @@ Recommended evaluation order:
 3. Run TrOCR on the same handwritten line crops as a recognition-only comparison.
 4. Report exact-string accuracy, character error rate, decimal/separator errors, unit errors and the proportion of crops requiring human correction. Include faint, skewed, rotated and overlapping examples.
 5. Keep all machine results **unverified**. Only a human-confirmed complete string may enter the dimension-chain workflow.
+6. Use `python -m planline.ocr_eval` to compare an engine's predictions against verified review exports. It reports exact-string rate and character error rate overall and by text style; it has no OCR-engine dependency.
 
 Do not add either OCR package to the default install yet. The next step is a reproducible benchmark against representative scans, not another training run or an assumption that generic handwriting scores transfer to architectural dimensions.
 
