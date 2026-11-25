@@ -97,7 +97,7 @@ kbd{font:10px 'DM Mono',monospace;background:#f0efe9;border:1px solid #d9d8cf;bo
 .detection-row.selected{box-shadow:inset 3px 0 0 var(--green)}
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #8ba982;outline-offset:2px}
 .hidden{display:none!important}
-html[data-theme="dark"]{color-scheme:dark;--ink:#e8e9e3;--muted:#a4aa9f;--line:#3a4039;--paper:#171b18;--canvas:#202720;--green:#a7c29d;--green-dark:#d0e2c8;--amber:#e2b46f;--red:#e18c80}
+html[data-theme="dark"]{color-scheme:dark;--ink:#e8e9e3;--muted:#a4aa9f;--line:#3a4039;--paper:#171b18;--canvas:#202720;--green:#a7c29d;--green-dark:#334b37;--amber:#e2b46f;--red:#e18c80}
 html[data-theme="dark"] body{background:var(--paper);color:var(--ink)}
 html[data-theme="dark"] .topbar,html[data-theme="dark"] .review-search input,html[data-theme="dark"] .review-toolbar select{background:#202620;color:var(--ink);border-color:var(--line)}
 html[data-theme="dark"] .workspace-nav-item:hover,html[data-theme="dark"] .workspace-nav-item.active{background:#29352a;border-color:#435441;color:#d5e6cd}
