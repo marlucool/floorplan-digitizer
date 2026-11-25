@@ -351,6 +351,8 @@ def start_benchmark_job(
         str(prediction_path.resolve()),
         "--device",
         device,
+        "--split",
+        "test",
     ]
     if selected_model_dir:
         command.extend(["--model-dir", str(selected_model_dir)])
