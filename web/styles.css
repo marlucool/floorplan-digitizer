@@ -141,3 +141,11 @@ html[data-theme="dark"] .dimension-association{background:#202620;border-color:v
 .top-links .repo-link{margin-left:0;white-space:nowrap}
 .top-links a[aria-current=page]{color:var(--green-dark);font-weight:700}
 @media(max-width:700px){.topbar{flex-wrap:wrap;padding-top:10px;padding-bottom:10px;gap:9px}.top-links{width:100%;margin:0;justify-content:flex-start;gap:12px}.top-links .repo-link{font-size:10px}}
+
+/* Multi-page PDF source selection. */
+.pdf-page-control{display:grid;gap:7px;margin:12px 0 4px;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface,#fff)}
+.pdf-page-control>label{font:600 11px Manrope;color:var(--ink)}
+.pdf-page-input{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pdf-page-input input{width:86px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:12px 'DM Mono',monospace}
+.pdf-page-input span,.pdf-page-control small{color:var(--muted);font-size:10px;line-height:1.5}
+html[data-theme="dark"] .pdf-page-control{background:#202620;border-color:var(--line)}

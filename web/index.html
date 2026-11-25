@@ -32,6 +32,11 @@
           <small>PNG · JPG · WEBP · TIFF · PDF<br>Maximum file size: 25 MB</small>
         </label>
         <div class="file-card hidden" id="fileCard"><div class="file-icon">▧</div><div class="file-info"><strong id="fileName">—</strong><small id="fileMeta">—</small></div><button id="removeFile" class="icon-button" type="button" aria-label="Remove drawing">×</button></div>
+        <div class="pdf-page-control hidden" id="pdfPageControl">
+          <label for="pdfPageNumber">PDF page to analyse</label>
+          <div class="pdf-page-input"><input id="pdfPageNumber" type="number" min="1" step="1" value="1" inputmode="numeric"><span id="pdfPageCount">Page count will be confirmed after analysis.</span></div>
+          <small>Choose any page in the PDF. You can analyse other pages without uploading the file again.</small>
+        </div>
         <button id="analyzeButton" class="primary-button" type="button" disabled>Analyse drawing <span>→</span></button>
         <div class="confidence-control">
           <label for="confidenceThreshold">Detector threshold <output id="confidenceValue">0.25</output></label>

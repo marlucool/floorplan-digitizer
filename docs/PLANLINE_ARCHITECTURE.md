@@ -16,7 +16,7 @@ The current web integration is intentionally a detection-and-review slice:
 
 - FastAPI serves the browser UI and exposes `/api/health` and `/api/analyze`.
 - PNG/JPG/WEBP/TIFF and PDF uploads are accepted within the configured limits.
-- PDF handling rasterises page one only.
+- Multi-page PDFs support explicit 1-based page selection in the drawing workspace; each selected page is rasterised independently and source page identity is preserved in the review result.
 - The existing YOLO weights detect candidate `wall`, `dimension_line`, and `dimension_value` regions.
 - The UI displays the preview, candidate boxes, class counts, detector scores, a configurable confidence threshold, filtering, selected-box highlighting, zoom/fit controls and a scrollable zoomed view.
 - A candidate-review JSON export preserves source pixel dimensions, detector metadata, bounding boxes, scores and optional user-entered dimension-text transcriptions with printed/handwritten/unclear labels under a versioned schema; it excludes source/crop pixels and is not a measurement record.

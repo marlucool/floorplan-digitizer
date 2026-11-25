@@ -14,7 +14,7 @@ The important problem is not tracing pixels. Survey drawings can be skewed, fade
 | --- | --- |
 | Web app | Browser UI served by the local FastAPI application |
 | Input | PNG, JPG, WEBP, TIFF and PDF uploads up to 25 MB |
-| PDF handling | First page rasterisation; multi-page selection is not implemented |
+| PDF handling | Select and analyse any page in a multi-page PDF without re-uploading the source |
 | Detection | Bundled YOLO model proposes wall, dimension_line and dimension_value regions |
 | Review | Detection overlays, zoom, confidence-threshold control, class filtering, selected-box highlighting and dimension-region crops |
 | Manual transcription | Reviewer-entered text can be linked to detection IDs and marked as printed, handwritten or unclear |

@@ -101,8 +101,8 @@ def _decode_raster(data: bytes) -> np.ndarray:
     return image
 
 
-def decode_upload(data: bytes, filename: str) -> tuple[np.ndarray, dict[str, Any]]:
-    """Decode an image or rasterise page one of a PDF in memory."""
+def decode_upload(data: bytes, filename: str, page_index: int = 0) -> tuple[np.ndarray, dict[str, Any]]:
+    """Decode an image or rasterise the selected zero-based PDF page in memory."""
     suffix = Path(filename).suffix.lower()
     if suffix not in ALLOWED_SUFFIXES:
         raise ValueError("Use PNG, JPG, WEBP, TIFF or PDF.")
@@ -110,6 +110,8 @@ def decode_upload(data: bytes, filename: str) -> tuple[np.ndarray, dict[str, Any
         raise ValueError("The uploaded file is empty.")
 
     if suffix != ".pdf":
+        if page_index != 0:
+            raise ValueError("Page selection is only available for PDF files.")
         return _decode_raster(data), {
             "source_type": "image",
             "page_count": 1,
@@ -131,8 +133,13 @@ def decode_upload(data: bytes, filename: str) -> tuple[np.ndarray, dict[str, Any
             raise ValueError("Password-protected PDFs are not supported.")
         if document.page_count < 1:
             raise ValueError("The PDF contains no pages.")
+        if page_index < 0 or page_index >= document.page_count:
+            raise ValueError(
+                f"Page {page_index + 1} is outside this PDF. "
+                f"Choose a page from 1 to {document.page_count}."
+            )
 
-        page = document.load_page(0)
+        page = document.load_page(page_index)
         rect = page.rect
         page_area = max(float(rect.width * rect.height), 1.0)
         scale = min(2.0, (MAX_IMAGE_PIXELS / page_area) ** 0.5)
@@ -151,8 +158,7 @@ def decode_upload(data: bytes, filename: str) -> tuple[np.ndarray, dict[str, Any
         return image, {
             "source_type": "pdf",
             "page_count": document.page_count,
-            "page_index": 0,
-            "note": "Only the first PDF page is analysed in this version.",
+            "page_index": page_index,
         }
     finally:
         document.close()
@@ -309,6 +315,7 @@ def validate_dimension_chain_endpoint(
 async def analyze_drawing(
     file: UploadFile = File(...),
     confidence_threshold: float = Form(0.25),
+    page_index: int = Form(0),
 ) -> dict[str, Any]:
     """Detect candidate regions after multipart parsing and bounded in-memory decoding."""
     if not math.isfinite(confidence_threshold) or not 0.0 < confidence_threshold <= 1.0:
@@ -335,7 +342,7 @@ async def analyze_drawing(
         raise HTTPException(status_code=413, detail="Upload limit is 25 MB.")
 
     try:
-        image, source_info = decode_upload(data, filename)
+        image, source_info = decode_upload(data, filename, page_index=page_index)
     except OverflowError as exc:
         raise HTTPException(status_code=413, detail=str(exc)) from exc
     except ValueError as exc:
@@ -402,7 +409,7 @@ async def analyze_drawing(
         notes.append(
             f"Only the first {MAX_DIMENSION_CROPS} dimension-value candidates include review crops."
         )
-    if source_info["source_type"] == "pdf":
+    if source_info.get("note"):
         notes.append(source_info["note"])
 
     return {
