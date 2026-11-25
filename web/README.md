@@ -115,6 +115,30 @@ PLANLINE_RUN_MODEL_SMOKE=1 PLANLINE_SMOKE_IMAGE=/path/to/representative-scan.png
 
 Set `PLANLINE_SMOKE_DEVICE=cpu` to force CPU inference, or use the Ultralytics device value appropriate to the local installation. The test checks model loading, class names, output shape and finite in-bounds boxes. It does **not** measure detection accuracy or validate OCR, dimensions, scale or geometry. Use a representative scan that you are permitted to test.
 
+## Optional PaddleOCR recognition runner
+
+An optional offline runner applies PaddleOCR's recognition-only module to the dimension crops already identified by YOLO. The default is `en_PP-OCRv5_mobile_rec` (compact English recognizer); use `--model PP-OCRv5_server_rec` to compare the multilingual server recognizer.
+
+1. Install a compatible PaddlePaddle CPU or GPU package using the [official installation guide](https://www.paddleocr.ai/latest/en/version3.x/installation.html).
+2. Install the optional OCR package:
+
+```bash
+python -m pip install -r requirements-ocr-paddle.txt
+```
+
+3. Run recognition against the exact same raster image used to create the review export:
+
+```bash
+python -m planline.ocr_paddle \\
+  --review planline-review.json \\
+  --image original-scan.png \\
+  --output paddleocr-predictions.json
+```
+
+Use `--device gpu:0` only when a compatible PaddlePaddle GPU build is installed; the default is CPU. The first run may download model weights. This runner currently accepts raster images, not PDFs. It checks the source pixel dimensions against the review export and uses its saved crop bounds. It emits raw, unverified text and confidence only; it does not correct values, parse units or infer geometry.
+
+The default Planline install does not include PaddleOCR or PaddlePaddle. The optional runner is tested with a fake recognizer in CI; actual PaddlePaddle installation and inference remain environment-specific.
+
 ## OCR benchmark evaluation
 
 The manual transcription export can serve as ground truth for comparing OCR engines. The evaluator does not run OCR; it compares a predictions JSON file against **verified** entries in a Planline review export and reports exact-string rate, prediction coverage and character error rate (CER), overall and by printed/handwritten/unclear style.
