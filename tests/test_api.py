@@ -478,3 +478,24 @@ def test_update_check_endpoint_returns_current_release_metadata(monkeypatch) -> 
     assert response.status_code == 200
     assert response.json()["latest_version"] == "0.1.2"
     assert response.json()["install_available"] is True
+
+
+def test_dimension_chain_endpoint_proposes_single_missing_segment_without_verifying_it() -> None:
+    response = TestClient(api.app).post(
+        "/api/validate-dimension-chain",
+        json={
+            "segment_values": ["3000", None, "2500"],
+            "segment_verified": [True, False, True],
+            "overall_value": "10000",
+            "overall_verified": True,
+            "unit": "mm",
+            "tolerance": "0",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["candidate_available"] is True
+    assert payload["candidate_index"] == 1
+    assert payload["candidate_value"] == "4500"
+    assert payload["candidate_requires_confirmation"] is True
+    assert payload["status"] == "unresolved"
