@@ -164,25 +164,6 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             )
             assert max(alignment.values()) < 2
 
-            with page.expect_download() as download_info:
-                page.locator("#exportReview").click()
-            download = download_info.value
-            assert download.suggested_filename == "plan-planline-review.json"
-            exported = json.loads(Path(download.path()).read_text())
-            assert exported["schema_version"] == "planline-detection-review/v1"
-            schema = json.loads(
-                (Path(__file__).resolve().parents[2] / "schemas" / "planline-detection-review-v1.schema.json").read_text()
-            )
-            from jsonschema import Draft202012Validator, FormatChecker
-            Draft202012Validator(schema, format_checker=FormatChecker()).validate(exported)
-            assert exported["source"]["filename"] == "plan.png"
-            assert exported["analysis"]["confidence_threshold"] == 0.4
-            assert exported["detections"][0]["bbox"]["x1"] == 10
-            assert exported["manual_dimension_text_review"][0]["detection_id"] == "det-002"
-            assert exported["manual_dimension_text_review"][0]["raw_text"] == "4200"
-            assert exported["manual_dimension_text_review"][0]["verified"] is True
-            assert "preview_data_url" not in exported
-
             page.locator("#dimensionTextReview > summary").click()
             page.locator(".dimension-text-value").fill("4200")
             assert page.locator(".dimension-text-value").input_value() == "4200"
@@ -206,6 +187,25 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert submitted["segment_verified"] == [True, True]
             assert submitted["overall_value"] == "7500"
             assert "Chain matches" in page.locator("#chainResult").inner_text()
+
+            with page.expect_download() as download_info:
+                page.locator("#exportReview").click()
+            download = download_info.value
+            assert download.suggested_filename == "plan-planline-review.json"
+            exported = json.loads(Path(download.path()).read_text())
+            assert exported["schema_version"] == "planline-detection-review/v1"
+            schema = json.loads(
+                (Path(__file__).resolve().parents[2] / "schemas" / "planline-detection-review-v1.schema.json").read_text()
+            )
+            from jsonschema import Draft202012Validator, FormatChecker
+            Draft202012Validator(schema, format_checker=FormatChecker()).validate(exported)
+            assert exported["source"]["filename"] == "plan.png"
+            assert exported["analysis"]["confidence_threshold"] == 0.4
+            assert exported["detections"][0]["bbox"]["x1"] == 10
+            assert exported["manual_dimension_text_review"][0]["detection_id"] == "det-002"
+            assert exported["manual_dimension_text_review"][0]["raw_text"] == "4200"
+            assert exported["manual_dimension_text_review"][0]["verified"] is True
+            assert "preview_data_url" not in exported
 
             page.locator("#fitView").click()
             assert page.locator("#zoomLevel").inner_text() == "100%"
