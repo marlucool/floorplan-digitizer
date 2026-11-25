@@ -51,6 +51,7 @@
     $("#saveCorrectionButton").disabled = busy || !state.editingId;
     $("#deleteSampleButton").disabled = busy || !state.editingId;
     $("#buildSplitsButton").disabled = busy || !state.dataset || state.dataset.summary.samples < 1;
+    $("#auditDatasetButton").disabled = busy || !state.dataset || state.dataset.summary.samples < 1;
     refreshTrainingButtons();
   }
 
@@ -405,6 +406,68 @@
     finally { setBusy(false); }
   });
   $("#cancelEditButton").addEventListener("click", () => { state.editingId = null; clearEditMode(); renderSamples(); message("Label editing closed."); });
+
+
+  function renderQualityReport(report) {
+    const panel = $("#qualityPanel");
+    panel.classList.remove("hidden");
+    $("#qualityTitle").textContent = "Dataset quality report · " + report.dataset;
+    const ready = Boolean(report.ready_for_training);
+    $("#qualityReadiness").textContent = ready ? "BASIC CHECKS PASSED" : "NEEDS ATTENTION";
+    $("#qualityReadiness").dataset.ready = ready ? "true" : "false";
+    const stats = $("#qualityStats");
+    stats.replaceChildren();
+    [
+      [report.sample_count, "CROPS"],
+      [report.verified_count, "VERIFIED"],
+      [report.source_count, "DRAWINGS"],
+      [report.writer_count, "WRITERS"],
+      [report.duplicate_crop_count, "DUPLICATES"],
+      [report.conflicting_duplicate_image_count, "CONFLICTS"]
+    ].forEach(([value, label]) => {
+      const card = document.createElement("div"); card.className = "quality-stat";
+      const strong = document.createElement("strong"); strong.textContent = String(value ?? 0);
+      const small = document.createElement("span"); small.textContent = label;
+      card.append(strong, small); stats.append(card);
+    });
+    const warnings = $("#qualityWarnings"); warnings.replaceChildren();
+    const warningItems = Array.isArray(report.warnings) ? report.warnings : [];
+    if (!warningItems.length) {
+      const good = document.createElement("p"); good.className = "quality-good"; good.textContent = "No dataset hygiene warnings found."; warnings.append(good);
+    } else {
+      warningItems.forEach((item) => {
+        const row = document.createElement("div"); row.className = "quality-warning";
+        const code = document.createElement("strong"); code.textContent = String(item.code || "warning").replaceAll("_", " ");
+        const detail = document.createElement("span"); detail.textContent = item.message || "";
+        row.append(code, detail); warnings.append(row);
+      });
+    }
+    const chars = $("#qualityCharacters"); chars.replaceChildren();
+    const frequency = Object.entries(report.character_frequencies || {}).sort((a, b) => b[1] - a[1]);
+    frequency.slice(0, 36).forEach(([character, count]) => {
+      const pill = document.createElement("span"); pill.className = "quality-character";
+      const label = document.createElement("b"); label.textContent = character === " " ? "space" : character;
+      const number = document.createElement("small"); number.textContent = String(count);
+      pill.append(label, number); chars.append(pill);
+    });
+    if (!frequency.length) {
+      const empty = document.createElement("p"); empty.className = "quality-good"; empty.textContent = "No characters to report yet."; chars.append(empty);
+    }
+    const notes = Array.isArray(report.notes) ? report.notes : [];
+    $("#qualityNotes").textContent = notes.length
+      ? notes.join(" ") + " A clean audit is not evidence of model accuracy or sufficient data."
+      : "The audit is read-only. Basic hygiene checks do not prove that the dataset is large or representative enough to train a reliable model.";
+  }
+
+  $("#auditDatasetButton").addEventListener("click", async () => {
+    setBusy(true); message("Checking labels, duplicate crops and split leakage…");
+    try {
+      const report = await api("/api/ocr/datasets/" + encodeURIComponent(state.datasetId) + "/quality");
+      renderQualityReport(report);
+      message("Quality audit completed. It did not change your dataset.", "success");
+    } catch (error) { message(error.message, "error"); }
+    finally { setBusy(false); }
+  });
 
   $("#buildSplitsButton").addEventListener("click", async () => {
     setBusy(true); message("Grouping by source drawing and writer…");
