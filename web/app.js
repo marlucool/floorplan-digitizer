@@ -466,7 +466,10 @@ function updateWallDimensionCheckControls() {
   const selectedWall = state.geometry?.segments?.find((segment) => segment.id === state.geometry.selectedId);
   const hasCalibration = Number(state.calibration.applied?.pixels_per_mm) > 0;
   const hasDimension = Boolean(select?.selectedOptions?.[0]?.dataset.valueMm);
-  $("#checkWallDimension").disabled = !selectedWall || !hasDimension || !hasCalibration;
+  const toleranceText = $("#wallDimensionTolerance").value.trim();
+  const tolerance = Number(toleranceText);
+  const validTolerance = toleranceText !== "" && Number.isFinite(tolerance) && tolerance >= 0 && tolerance <= 10;
+  $("#checkWallDimension").disabled = !selectedWall || !hasDimension || !hasCalibration || !validTolerance;
   if (!hasCalibration) {
     $("#wallDimensionResult").textContent = "Apply a two-point scale reference before comparing metric dimensions.";
   } else if (!selectedWall) {
