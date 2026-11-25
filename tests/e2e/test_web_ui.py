@@ -342,11 +342,11 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.locator(".dimension-text-style").select_option("handwritten")
             assert page.locator(".dimension-text-value").input_value() == "4200"
             assert page.locator(".dimension-text-item").get_attribute("data-detection-id") == "det-004"
-            assert page.locator(".save-dimension-crop").is_disabled()
-            page.locator(".dimension-text-verified-input").check()
             page.locator("#drawingDatasetSelect").select_option("handwritten-dimensions")
             page.locator("#drawingSourceId").fill("plan-01")
             page.locator("#drawingWriterId").fill("writer-a")
+            assert page.locator(".save-dimension-crop").is_disabled()
+            page.locator(".dimension-text-verified-input").check()
             page.route("**/api/ocr/datasets/handwritten-dimensions/samples", save_crop)
             assert page.locator(".save-dimension-crop").is_enabled()
             page.locator(".save-dimension-crop").click()
