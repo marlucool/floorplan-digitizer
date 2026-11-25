@@ -1,0 +1,4 @@
+-r requirements-web.txt
+
+# Native desktop window (Windows uses WebView2; macOS/Linux use the system webview)
+pywebview>=5.4,<7
