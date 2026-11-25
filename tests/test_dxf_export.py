@@ -48,20 +48,22 @@ def test_dxf_contains_wall_lines_and_closed_room_polylines_in_mm() -> None:
     assert "LWPOLYLINE" in text
     assert "LINE" in text
     # Image y=10 in a 100px-high image maps to CAD y=45mm at 2px/mm.
-    pairs = text.splitlines()
-    assert pairs[pairs.index("10", pairs.index("LINE") + 1) + 1] == "10"
-    assert pairs[pairs.index("20", pairs.index("LINE") + 1) + 1] == "45"
-    assert pairs[pairs.index("11", pairs.index("LINE") + 1) + 1] == "30"
+    pairs = list(zip(text.splitlines()[0::2], text.splitlines()[1::2]))
+    line_index = pairs.index(("0", "LINE"))
+    assert pairs[line_index + 2] == ("10", "10")
+    assert pairs[line_index + 3] == ("20", "45")
+    assert pairs[line_index + 4] == ("30", "0")
+    assert pairs[line_index + 5] == ("11", "30")
 
 
 def test_dxf_without_calibration_is_explicitly_unitless_and_flips_y() -> None:
     request = sample_request(pixels_per_mm=None, rooms=[])
     text = export_manual_geometry_dxf(request).decode("ascii")
-    pairs = text.splitlines()
-    insunits = pairs.index("$INSUNITS")
-    assert pairs[insunits + 2] == "0"
-    line = pairs.index("LINE")
-    assert pairs[pairs.index("20", line) + 1] == "90"
+    pairs = list(zip(text.splitlines()[0::2], text.splitlines()[1::2]))
+    insunits = pairs.index(("9", "$INSUNITS"))
+    assert pairs[insunits + 1] == ("70", "0")
+    line = pairs.index(("0", "LINE"))
+    assert pairs[line + 3] == ("20", "90")
 
 
 def test_dxf_rejects_geometry_outside_source_bounds() -> None:
