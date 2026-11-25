@@ -1,0 +1,11 @@
+# The test suite does not load YOLO or either trained model.
+numpy>=1.26
+opencv-python-headless>=4.8
+fastapi>=0.115,<1.0
+pydantic>=2.7,<3.0
+Pillow>=10,<13
+python-multipart>=0.0.9,<1.0
+# Starlette TestClient now prefers httpx2; the legacy httpx adapter is deprecated.
+httpx2>=2.0,<3.0
+pytest>=8.0,<10.0
+jsonschema>=4.20,<5.0

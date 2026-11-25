@@ -4,45 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#f5f6f3" />
-  <title>Planline — 2D Floor Plan Digitiser</title>
+  <title>Planline — Scanned Floor Plan to 2D CAD</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar" aria-label="Main navigation">
-      <a class="brand" href="#workspace" aria-label="Planline home">
-        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
-        <span class="brand-name">planline<span>.</span></span>
-      </a>
-
-      <div class="workspace-switcher">
-        <span class="switcher-icon">W</span>
-        <span class="switcher-copy"><strong>Workspace</strong><small>Local project</small></span>
-        <span class="chevron">⌄</span>
-      </div>
-
-      <div class="nav-label">WORKSPACE</div>
-      <nav class="nav-list">
-        <a class="nav-item active" href="#workspace"><span class="nav-icon">▦</span> Digitiser</a>
-        <a class="nav-item" href="#review"><span class="nav-icon">☷</span> Review queue <span class="nav-count" id="navReviewCount">1</span></a>
-      </nav>
-
-      <div class="sidebar-bottom">
-        <div class="engine-card">
-          <div class="engine-top"><span class="status-dot muted"></span><span>Processing engine</span></div>
-          <strong>Not connected</strong>
-          <p>The interface is ready for a local OCR and geometry service.</p>
-          <span class="engine-tag">UI prototype</span>
-        </div>
-        <div class="profile-row">
-          <div class="avatar">PL</div>
-          <div><strong>Local session</strong><small>Nothing uploaded</small></div>
-          <span class="more">···</span>
-        </div>
-      </div>
-    </aside>
-
-    <main class="main-content" id="workspace">
+      <main class="main-content" id="workspace">
       <header class="topbar">
         <div class="breadcrumb"><span>Workspace</span><span class="crumb-sep">/</span><strong>Untitled project</strong></div>
         <div class="topbar-actions">
@@ -55,7 +22,7 @@
         <div>
           <div class="eyebrow">ONE WORKSPACE · 2D ONLY</div>
           <h1>Floor plan review</h1>
-          <p class="page-subtitle">Try the workflow with the sample plan. Uploaded drawings can be previewed; OCR and reconstruction are not connected yet.</p>
+          <p class="page-subtitle">Import a scanned plan, inspect its source quality, and review dimensions before any geometry is accepted.</p>
         </div>
         <div class="heading-status"><span class="status-pill status-demo"><span class="status-dot amber"></span> Demo project</span><span class="autosave-label">Local preview · no server connection</span></div>
       </section>
@@ -64,8 +31,8 @@
         <div class="project-file-icon">▤</div>
         <div class="project-file-copy"><strong id="projectFileName">sample-house-scan.png</strong><small id="projectFileMeta">Illustrative sample · 2D residential plan</small></div>
         <div class="strip-divider"></div>
-        <div class="project-metric"><span>DRAWING TYPE</span><strong>Residential · 2D</strong></div>
-        <div class="project-metric"><span>UNITS</span><strong>Millimetres (mm)</strong></div>
+        <div class="project-metric"><span>DRAWING TYPE</span><strong id="projectDrawingType">Residential · 2D</strong></div>
+        <div class="project-metric"><span>UNITS</span><strong id="projectUnits">Millimetres (mm)</strong></div>
         <div class="strip-spacer"></div>
         <button class="button button-quiet" id="resetButton" type="button">Reset sample</button>
       </section>
@@ -105,9 +72,9 @@
                     <text x="160" y="151">BED 1</text><text x="352" y="151">BED 2</text><text x="260" y="263">LIVING</text><text x="463" y="148">KITCHEN</text><text x="95" y="280">GARAGE</text>
                   </g>
                   <g fill="#8b5142" font-family="Georgia,serif" font-style="italic" font-size="17" opacity=".92">
-                    <text x="150" y="29" transform="rotate(-1 150 29)">3000</text><text x="355" y="29" transform="rotate(1 355 29)">4500</text><text x="530" y="180" transform="rotate(90 530 180)">2500</text><text x="295" y="370" transform="rotate(-1 295 370)">10000 overall</text>
+                    <text x="185" y="29" transform="rotate(-1 185 29)">3000</text><text x="355" y="29" transform="rotate(1 355 29)">4500</text><text x="510" y="29" transform="rotate(1 510 29)">2500</text><text x="550" y="180" transform="rotate(90 550 180)">7000 overall</text><text x="295" y="370" transform="rotate(-1 295 370)">10000 overall</text>
                   </g>
-                  <g stroke="#8b5142" stroke-width="1.2" fill="none" opacity=".7"><path d="M112 39 H260 M112 34 V44 M260 34 V44 M260 39 H455 M260 34 V44 M455 34 V44"/><path d="M542 92 V225 M537 92 H547 M537 225 H547"/></g>
+                  <g stroke="#8b5142" stroke-width="1.2" fill="none" opacity=".7"><path d="M112 39 H260 M112 34 V44 M260 34 V44 M260 39 H455 M455 34 V44 M455 39 H580 M580 34 V44"/><path d="M542 92 V225 M537 92 H547 M537 225 H547"/></g>
                   <g fill="#77746b" font-size="10" font-family="sans-serif"><text x="522" y="386">SAMPLE / NOT TO SCALE</text></g>
                 </svg>
                 <span class="paper-stamp">ARCHIVE COPY</span>
@@ -136,7 +103,7 @@
               <li class="pipeline-stage" data-pipeline-stage="reconstruct"><span class="pipeline-stage-icon">5</span><span><strong>Build 2D plan</strong><small>Not run</small></span></li>
             </ol>
           </section>
-          <div class="step-actions step-actions-end"><span class="step-hint">Files are previewed in this browser. Nothing is uploaded.</span><button class="button button-primary step-next" id="nextToReview" type="button">Continue to review <span>→</span></button></div>
+          <div class="step-actions step-actions-end"><span class="step-hint" id="sourceHandlingHint">Sample preview · the local API can store imported files on this computer.</span><button class="button button-primary step-next" id="nextToReview" type="button">Continue to review <span>→</span></button></div>
       </section>
 
       <section id="stepPage2" class="step-page" aria-labelledby="reviewTitle">
@@ -146,8 +113,18 @@
               <div><div class="panel-kicker">STEP 2 · HUMAN CHECK</div><h2 id="reviewTitle">Review dimensions</h2></div>
               <div class="panel-tools"><span class="small-chip amber-chip" id="reviewModeChip">SAMPLE DATA</span><span class="review-count" id="reviewCount">1 needs review</span></div>
             </div>
-            <p class="panel-intro">Check the value, confidence, and dimension-chain total. Uncertain readings stay marked until you confirm them.</p>
-            <div class="upload-notice hidden" id="uploadNotice" role="status" aria-live="polite"><strong>No analysis has run on this file.</strong>The values shown are sample placeholders, not readings from your upload. OCR and reconstruction are not connected yet.</div>
+            <div class="analysis-empty hidden" id="analysisBlocked" role="status" aria-live="polite">
+              <div class="analysis-empty-mark" aria-hidden="true">—</div>
+              <div class="analysis-empty-copy">
+                <div class="panel-kicker">ANALYSIS NOT AVAILABLE</div>
+                <h3 id="analysisBlockedTitle">No measurements have been generated</h3>
+                <p id="analysisBlockedMessage">The uploaded drawing is a source file only. No OCR, dimension detection, or geometry reconstruction has run.</p>
+                <ul class="preflight-findings" id="analysisFindings"></ul>
+                <p class="analysis-empty-foot">The sample readings below are intentionally hidden for uploaded files. They must never be mistaken for measurements from this drawing.</p>
+              </div>
+            </div>
+            <div id="sampleReviewContent">
+            <p class="panel-intro">Check each example value and its contribution to the horizontal dimension chain. Uncertain readings stay marked until you confirm them.</p>
             <div class="review-summary">
               <div><strong id="verifiedCount">2 <span>/ 3</span></strong><small>Sample dimensions checked</small></div>
               <div class="summary-progress"><div class="progress-track"><div class="progress-value" id="progressValue" style="width:66.66%"></div></div><small id="progressLabel">67% reviewed</small></div>
@@ -155,15 +132,15 @@
             <div class="table-heading"><span>DIMENSION · VALUE</span><span>CONFIDENCE</span></div>
             <div class="measurement-list" id="measurementList">
               <article class="measurement-row verified" data-id="a">
-                <div class="measurement-main"><span class="measurement-index">A</span><div class="measurement-copy"><label for="value-a">Horizontal span</label><div class="measurement-input-wrap"><input id="value-a" class="dimension-input" type="number" min="1" step="1" value="3000" aria-label="Dimension A in millimetres"><span>mm</span></div></div></div>
+                <div class="measurement-main"><span class="measurement-index">A</span><div class="measurement-copy"><label for="value-a">Horizontal chain segment</label><div class="measurement-input-wrap"><input id="value-a" class="dimension-input" type="number" min="1" step="1" value="3000" aria-label="Dimension A in millimetres"><span>mm</span></div></div></div>
                 <div class="confidence-cell"><span class="confidence-score high">98%</span><span class="confidence-caption">High</span><button class="verify-toggle checked" type="button" aria-label="Mark dimension A unverified" aria-pressed="true">✓</button></div>
               </article>
               <article class="measurement-row verified" data-id="b">
-                <div class="measurement-main"><span class="measurement-index">B</span><div class="measurement-copy"><label for="value-b">Horizontal span</label><div class="measurement-input-wrap"><input id="value-b" class="dimension-input" type="number" min="1" step="1" value="4500" aria-label="Dimension B in millimetres"><span>mm</span></div></div></div>
+                <div class="measurement-main"><span class="measurement-index">B</span><div class="measurement-copy"><label for="value-b">Horizontal chain segment</label><div class="measurement-input-wrap"><input id="value-b" class="dimension-input" type="number" min="1" step="1" value="4500" aria-label="Dimension B in millimetres"><span>mm</span></div></div></div>
                 <div class="confidence-cell"><span class="confidence-score high">96%</span><span class="confidence-caption">High</span><button class="verify-toggle checked" type="button" aria-label="Mark dimension B unverified" aria-pressed="true">✓</button></div>
               </article>
               <article class="measurement-row needs-review" data-id="c">
-                <div class="measurement-main"><span class="measurement-index">C</span><div class="measurement-copy"><label for="value-c">Horizontal span</label><div class="measurement-input-wrap"><input id="value-c" class="dimension-input" type="number" min="1" step="1" value="2500" aria-label="Dimension C in millimetres"><span>mm</span></div><span class="row-note">Confirm this reading</span></div></div>
+                <div class="measurement-main"><span class="measurement-index">C</span><div class="measurement-copy"><label for="value-c">Horizontal chain segment</label><div class="measurement-input-wrap"><input id="value-c" class="dimension-input" type="number" min="1" step="1" value="2500" aria-label="Dimension C in millimetres"><span>mm</span></div><span class="row-note">Confirm this reading</span></div></div>
                 <div class="confidence-cell"><span class="confidence-score medium">76%</span><span class="confidence-caption">Review</span><button class="verify-toggle" type="button" aria-label="Verify dimension C" aria-pressed="false">✓</button></div>
               </article>
             </div>
@@ -175,6 +152,7 @@
             <div class="overall-input-row"><label for="overallValue">Overall dimension</label><div class="overall-input-wrap"><input id="overallValue" type="number" min="1" step="1" value="10000"><span>mm</span></div></div>
             <button class="button button-dark button-full" id="verifyAllButton" type="button">Confirm all sample dimensions <span>✓</span></button>
             <p class="fine-print">The sample confidence values are illustrative; they are not OCR results.</p>
+            </div>
           </section>
         </div>
         <div class="step-actions step-actions-between"><button class="button button-quiet step-back" type="button" data-go-step="1">← Back to drawing</button><button class="button button-primary step-next" id="nextToPreview" type="button" disabled>Continue to preview <span>→</span></button></div>
@@ -206,7 +184,7 @@
         <div class="step-actions step-actions-between"><button class="button button-quiet step-back" type="button" data-go-step="2">← Back to dimensions</button><span class="step-hint">Sample geometry only · uploaded drawings are not reconstructed.</span></div>
       </section>
 
-      <footer class="app-footer"><span>PLANLINE <span class="footer-dot">·</span> 2D FLOOR PLAN DIGITISER</span><span>Prototype 0.1 <span class="footer-dot">·</span> Local-only interface</span></footer>
+      <footer class="app-footer"><span>PLANLINE <span class="footer-dot">·</span> 2D FLOOR PLAN DIGITISER</span><span>Prototype <span class="footer-dot">·</span> Local-first workflow</span></footer>
     </main>
   </div>
 
