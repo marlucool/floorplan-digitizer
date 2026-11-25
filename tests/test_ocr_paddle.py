@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import csv
 import json
+import sys
+import types
 
 import numpy as np
 import pytest
 from PIL import Image
 
 from planline.dataset import import_crop_csv
-from planline.ocr_paddle import recognize_dataset_crops, recognize_review_crops
+from planline.ocr_paddle import main as run_ocr_paddle, recognize_dataset_crops, recognize_review_crops
 
 
 class FakeResult:
@@ -118,3 +120,42 @@ def test_recognize_dataset_crops_uses_crop_ids_and_validated_images(tmp_path) ->
     }]
     assert skipped == 0
     assert recognizer.seen_shapes == [(12, 24, 3)]
+
+
+def test_ocr_runner_accepts_exported_model_directory(tmp_path, monkeypatch) -> None:
+    crop_path = tmp_path / "crop.png"
+    Image.new("RGB", (24, 12), "white").save(crop_path)
+    annotations = tmp_path / "labels.csv"
+    with annotations.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["image", "text", "source_id", "text_style", "verified"])
+        writer.writeheader()
+        writer.writerow({"image": crop_path.name, "text": "4200 mm", "source_id": "plan-a",
+                         "text_style": "handwritten", "verified": "true"})
+    dataset = tmp_path / "dataset"
+    import_crop_csv(annotations, dataset)
+    model_dir = tmp_path / "trained-model"
+    model_dir.mkdir()
+    (model_dir / "inference.pdiparams").write_bytes(b"weights")
+    selected: dict[str, str] = {}
+
+    class FakeTextRecognition(FakeRecognizer):
+        def __init__(self, *, model_dir: str, device: str) -> None:
+            selected["model_dir"] = model_dir
+            selected["device"] = device
+            super().__init__()
+
+    paddleocr = types.ModuleType("paddleocr")
+    paddleocr.TextRecognition = FakeTextRecognition
+    monkeypatch.setitem(sys.modules, "paddleocr", paddleocr)
+    output_path = tmp_path / "predictions.json"
+    result = run_ocr_paddle([
+        "--dataset", str(dataset), "--output", str(output_path),
+        "--model-dir", str(model_dir), "--device", "cpu",
+    ])
+
+    assert result == 0
+    assert selected == {"model_dir": str(model_dir.resolve()), "device": "cpu"}
+    output = json.loads(output_path.read_text(encoding="utf-8"))
+    assert output["model"] == str(model_dir.resolve())
+    assert len(output["predictions"]) == 1
+
