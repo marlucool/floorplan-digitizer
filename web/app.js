@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1 } };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null } };
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -469,6 +469,16 @@ function renderGeometryControls() {
   } else {
     $("#geometryStatus").textContent = "Manual only: detector boxes are not converted into walls or rooms.";
   }
+  const selectedWall = geometry.segments.find((segment) => segment.id === geometry.selectedId);
+  if (selectedWall) {
+    const lengthPx = Math.hypot(selectedWall.end_px.x - selectedWall.start_px.x, selectedWall.end_px.y - selectedWall.start_px.y);
+    const pixelsPerMm = state.calibration.applied?.pixels_per_mm;
+    $("#wallLength").textContent = pixelsPerMm
+      ? (lengthPx / pixelsPerMm / 1000).toFixed(3) + " m (user-supplied scale; not verified)"
+      : lengthPx.toFixed(1) + " px · apply calibration for metric length";
+  } else {
+    $("#wallLength").textContent = "Select a wall to view its length.";
+  }
   const selectedRoom = geometry.rooms.find((room) => room.id === geometry.selectedRoomId);
   if (selectedRoom) {
     const areaPx = polygonAreaPx2(selectedRoom.vertices_px);
@@ -491,6 +501,7 @@ function setGeometryMode(mode) {
     renderCalibrationStatus();
   }
   state.geometry.mode = mode;
+  state.geometry.drag = null;
   if (mode !== "draw_wall") state.geometry.pendingPoint = null;
   if (mode !== "draw_room") state.geometry.pendingRoom = [];
   if (mode !== "select") { state.geometry.selectedId = null; state.geometry.selectedRoomId = null; }
@@ -733,6 +744,49 @@ $("#clearWalls").addEventListener("click", clearManualWalls);
 $("#exportGeometry").addEventListener("click", exportManualGeometrySvg);
 
 $("#previewImage").addEventListener("click", handleDrawingClick);
+function beginWallEndpointDrag(event) {
+  if (event.button !== 0 || !state.result || state.geometry.mode !== "select" || !state.geometry.selectedId) return;
+  const segment = state.geometry.segments.find((item) => item.id === state.geometry.selectedId);
+  const point = getSourcePoint(event);
+  if (!segment || !point) return;
+  const endpoints = [
+    { key: "start_px", point: segment.start_px },
+    { key: "end_px", point: segment.end_px }
+  ];
+  endpoints.sort((a, b) =>
+    Math.hypot(point.x - a.point.x, point.y - a.point.y) -
+    Math.hypot(point.x - b.point.x, point.y - b.point.y)
+  );
+  const nearest = endpoints[0];
+  if (Math.hypot(point.x - nearest.point.x, point.y - nearest.point.y) > 14) return;
+  state.geometry.drag = { segmentId: segment.id, endpoint: nearest.key, pointerId: event.pointerId };
+  event.currentTarget.setPointerCapture(event.pointerId);
+  event.preventDefault();
+}
+
+function moveWallEndpointDrag(event) {
+  const drag = state.geometry.drag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  const segment = state.geometry.segments.find((item) => item.id === drag.segmentId);
+  const point = getSourcePoint(event);
+  if (!segment || !point) return;
+  segment[drag.endpoint] = { x: Number(point.x.toFixed(2)), y: Number(point.y.toFixed(2)) };
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+}
+
+function endWallEndpointDrag(event) {
+  if (!state.geometry.drag || state.geometry.drag.pointerId !== event.pointerId) return;
+  state.geometry.drag = null;
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+}
+
+$("#previewImage").addEventListener("pointerdown", beginWallEndpointDrag);
+$("#previewImage").addEventListener("pointermove", moveWallEndpointDrag);
+$("#previewImage").addEventListener("pointerup", endWallEndpointDrag);
+$("#previewImage").addEventListener("pointercancel", endWallEndpointDrag);
+
 
 function renderResults(payload) {
   const detections = payload.detections || [];

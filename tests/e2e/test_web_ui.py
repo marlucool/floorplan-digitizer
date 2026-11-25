@@ -198,12 +198,22 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.locator("#previewImage").click(position={"x": 60, "y": 220})
             page.locator("#previewImage").click(position={"x": 300, "y": 220})
             assert page.locator("#geometryCount").inner_text() == "1 manual wall"
+            page.locator("#selectWallTool").click()
+            page.locator("#previewImage").click(position={"x": 180, "y": 220})
+            assert "2.800 m" in page.locator("#wallLength").inner_text()
+            image_box = page.locator("#previewImage").bounding_box()
+            page.mouse.move(image_box["x"] + 60, image_box["y"] + 220)
+            page.mouse.down()
+            page.mouse.move(image_box["x"] + 70, image_box["y"] + 230, steps=4)
+            page.mouse.up()
+            assert "2.686 m" in page.locator("#wallLength").inner_text()
             with page.expect_download() as svg_download_info:
                 page.locator("#exportGeometry").click()
             svg_download = svg_download_info.value
             assert svg_download.suggested_filename == "plan-manual-geometry.svg"
             svg_text = Path(svg_download.path()).read_text()
             assert "<svg" in svg_text and 'id="manual-wall-002"' in svg_text
+            assert 'x1="70" y1="230"' in svg_text
             page.locator("#drawRoomTool").click()
             page.locator("#previewImage").click(position={"x": 50, "y": 40})
             page.locator("#previewImage").click(position={"x": 150, "y": 40})
@@ -309,6 +319,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert len(project_payload["rooms"]) == 1
             assert project_payload["rooms"][0]["id"] == "manual-room-001"
             assert project_payload["geometry"][0]["id"] == "manual-wall-002"
+            assert project_payload["geometry"][0]["start_px"] == {"x": 70, "y": 230}
             project_schema = json.loads(
                 (Path(__file__).resolve().parents[2] / "schemas" / "planline-project-v1.schema.json").read_text()
             )
