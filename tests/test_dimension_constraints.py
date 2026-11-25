@@ -53,6 +53,17 @@ def test_wall_dimension_comparison_rejects_zero_or_invalid_values() -> None:
         )
 
 
+def test_wall_dimension_comparison_accepts_full_precision_scale_values() -> None:
+    result = compare_wall_dimension(WallDimensionCheckRequest(
+        wall_length_px="230.2172886583",
+        pixels_per_mm="0.08571428571428572",
+        dimension_mm="2685",
+        tolerance_percent="1.0",
+    ))
+    assert result["status"] == "within_tolerance"
+    assert result["geometry_modified"] is False
+
+
 def test_wall_dimension_endpoint_returns_review_only_result() -> None:
     response = TestClient(app).post(
         "/api/validate-wall-dimension",
