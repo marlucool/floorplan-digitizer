@@ -4,7 +4,7 @@ Planline is a local-first project for turning scanned or hand-drawn 2D floor pla
 
 The important problem is not tracing pixels. Survey drawings can be skewed, faded, low-resolution, or drawn approximately rather than to scale. Planline is being developed to read written dimensions, relate them to the correct parts of the drawing, detect contradictions, and keep uncertain results in a human review workflow.
 
-> **Current status: drawing review plus OCR Studio workbench.** The local app now includes a crop editor, verified-label library, source/writer-safe dataset splits, background PP-OCRv5 fine-tuning jobs and held-out benchmark reporting. OCR Studio is available at `/ocr` in the browser app or in the native desktop window. The drawing-analysis workflow now ranks geometric candidates linking dimension-value regions to dimension lines and wall spans, with explicit human confirmation. OCR is still manual/optional; scale calibration, measured reconstruction and verified DXF output are not implemented.
+> **Current status: drawing review plus OCR Studio workbench.** The local app now includes a crop editor, verified-label library, source/writer-safe dataset splits, background PP-OCRv5 fine-tuning jobs and held-out benchmark reporting. The desktop app opens the drawing workspace first; OCR Studio is available from the global navigation at `/ocr`, and application settings and GitHub release updates are available at `/settings`. The drawing-analysis workflow now ranks geometric candidates linking dimension-value regions to dimension lines and wall spans, with explicit human confirmation. OCR is still manual/optional; scale calibration, measured reconstruction and verified DXF output are not implemented.
 
 ![Example survey drawing](docs/rysunek.png)
 
@@ -58,7 +58,7 @@ A detector score is **not** OCR confidence or a probability that a measurement i
 3. The installer downloads a private Python runtime, installs the application dependencies and WebView2 when needed, checks CUDA, and creates the Start-menu and optional desktop shortcuts.
 4. Open **Planline** from the shortcut. The app launches its local service automatically and opens the desktop workspace.
 
-No system Python, package installation commands, PATH edits, or administrator account are required. The installer does not silently install or replace NVIDIA display drivers. If CUDA cannot initialise, it installs the CPU runtime instead.
+No system Python, package installation commands, PATH edits, or administrator account are required. The Settings → Updates page checks the latest stable GitHub Release and can verify, download and install its Windows installer. Updates keep the private Python and CPU/CUDA runtime in place. The installer does not silently install or replace NVIDIA display drivers. If CUDA cannot initialise, it installs the CPU runtime instead.
 
 The installer is built automatically by the Windows installer workflow. Until the first tagged release is published, its test build is available from the repository's **Actions → Windows installer → Planline-Setup-windows-x64** artifact.
 

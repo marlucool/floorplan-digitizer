@@ -90,9 +90,16 @@ jobs:
           name: Planline-Setup-windows-x64
           path: release-assets
 
+      - name: Create installer checksum manifest
+        run: |
+          cd release-assets
+          sha256sum Planline-Setup.exe > checksums.txt
+
       - name: Publish the installer
         uses: softprops/action-gh-release@v2
         with:
-          files: release-assets/Planline-Setup.exe
+          files: |
+            release-assets/Planline-Setup.exe
+            release-assets/checksums.txt
           fail_on_unmatched_files: true
           generate_release_notes: true

@@ -23,6 +23,8 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from . import __version__, updater
+
 from .association import associate_dimensions
 from .constraints import DimensionChainRequest, validate_dimension_chain
 from .ocr_studio_api import router as ocr_studio_router
@@ -36,7 +38,7 @@ ALLOWED_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff", ".pdf"}
 
 app = FastAPI(
     title="Planline API",
-    version="0.1.0",
+    version=__version__,
     description="Local API for floor-plan region detection and review.",
 )
 _model_lock = Lock()
@@ -277,6 +279,24 @@ def health() -> dict[str, Any]:
     }
 
 
+@app.get("/api/updates/check")
+def check_for_updates() -> dict[str, Any]:
+    """Check the latest stable Planline GitHub release without changing files."""
+    try:
+        return updater.check_for_updates()
+    except updater.UpdateError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.post("/api/updates/install")
+def install_update() -> dict[str, str]:
+    """Download, verify and hand off a stable Windows release update."""
+    try:
+        return updater.stage_and_launch_update()
+    except updater.UpdateError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @app.post("/api/validate-dimension-chain")
 def validate_dimension_chain_endpoint(
     request: DimensionChainRequest,
@@ -403,6 +423,12 @@ async def analyze_drawing(
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
+
+
+@app.get("/settings", response_class=FileResponse)
+def settings_page() -> FileResponse:
+    """Serve application settings and the in-app release updater."""
+    return FileResponse(WEB_DIR / "settings.html")
 
 
 @app.get("/ocr", response_class=FileResponse)
