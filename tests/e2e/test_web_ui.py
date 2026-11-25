@@ -477,3 +477,25 @@ def test_pdf_page_selector_submits_selected_page() -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_dimension_chain_offers_single_missing_value_as_unverified_candidate(page):
+    page.goto("/")
+    page.locator("#chainChecker > summary").click()
+    page.locator(".segment-value").nth(0).fill("3000")
+    page.locator(".segment-verified").nth(0).check()
+    page.locator("#addSegment").click()
+    page.locator(".segment-value").nth(1).fill("2500")
+    page.locator(".segment-verified").nth(1).check()
+    page.locator("#addSegment").click()
+    page.locator("#overallValue").fill("10000")
+    page.locator("#overallVerified").check()
+    page.locator("#checkChain").click()
+    page.wait_for_selector(".chain-candidate")
+    assert "Segment 2: 4500 mm" in page.locator(".chain-candidate").inner_text()
+    page.locator(".chain-candidate button").click()
+    assert page.locator(".segment-value").nth(2).input_value() == "4500"
+    assert not page.locator(".segment-verified").nth(2).is_checked()
+    assert "verify this value manually" in page.locator(".chain-candidate button").inner_text().lower()
+
+
