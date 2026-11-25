@@ -45,7 +45,7 @@ The Drawing workspace includes a user-driven wall-segment layer. The reviewer se
 
 ### Manual wall geometry
 
-The Drawing workspace includes a user-driven wall-segment layer. The reviewer selects Draw wall and clicks a start and end point in source-image coordinates. Segments can be selected, deleted, undone or cleared, and exported as SVG. These lines are explicitly user-created; detector boxes are never promoted to walls automatically. SVG physical sizing uses the user-supplied scale reference when present and records that it is not verified geometry. This is not DXF export or automatic topology reconstruction.
+The Drawing workspace includes a user-driven wall-segment layer. The reviewer selects Draw wall and clicks a start and end point in source-image coordinates. Segments can be selected, deleted, undone or cleared, and exported as SVG. These lines are explicitly user-created; detector boxes are never promoted to walls automatically. SVG physical sizing uses the user-supplied scale reference when present and records that it is not verified geometry. DXF export is available for these user-authored segments and room polygons only. Calibrated exports use millimetres based on the user-supplied, unverified reference; uncalibrated exports are unitless source pixels. This is not automatic topology reconstruction or dimension-driven measured CAD.
 
 ### Image intensity preparation
 
