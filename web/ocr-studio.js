@@ -1,5 +1,17 @@
 (() => {
   const $ = (selector) => document.querySelector(selector);
+  const themeButton = $("#themeToggle");
+  function setTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    themeButton.textContent = theme === "dark" ? "Light mode" : "Dark mode";
+    try { localStorage.setItem("planline-theme", theme); } catch (_) {}
+  }
+  let initialTheme = "light";
+  try { initialTheme = localStorage.getItem("planline-theme") || "light"; } catch (_) {}
+  setTheme(initialTheme === "dark" ? "dark" : "light");
+  themeButton.addEventListener("click", () => {
+    setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+  });
   const state = {
     datasets: [], datasetId: null, dataset: null, queue: [], queueIndex: 0,
     image: null, imageFile: null, cropBlob: null, cropRect: null,
