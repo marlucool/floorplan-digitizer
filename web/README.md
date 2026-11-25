@@ -21,6 +21,49 @@ Open http://127.0.0.1:8000. The default bind address is loopback-only. To make t
 
 The application does not intentionally save an uploaded drawing as a project file. However, FastAPI/Starlette receive multipart uploads using a spooled temporary file: smaller uploads may remain in memory, while larger uploads can roll over to temporary disk storage before this endpoint reads them. The endpoint then reads the file into memory for decoding and closes the upload. For raster images, Pillow checks the header dimensions against the pixel limit before OpenCV allocates the decoded raster; the limit is checked again after decode. PDF page dimensions are checked before rasterisation. Therefore, this is **not a guarantee of memory-only handling**. Review the operating-system temporary directory, container storage, reverse-proxy buffering, server logs and browser caches before processing sensitive drawings. The 25 MB application check is performed after multipart parsing, so it is not a pre-parser disk-spooling limit.
 
+## Desktop OCR Studio
+
+Open /ocr in the local app. It is a separate workspace within the same FastAPI application, not a disconnected demo.
+
+### Launch
+
+Browser mode:
+
+~~~bash
+python -m pip install -r requirements-web.txt
+python -m uvicorn planline.api:app --host 127.0.0.1 --port 8000
+~~~
+
+Then open http://127.0.0.1:8000/ocr.
+
+Native desktop mode:
+
+~~~powershell
+py -3 -m pip install -r requirements-desktop.txt
+.\run_planline_desktop.bat
+~~~
+
+On macOS/Linux, install requirements-desktop.txt and run ./run_planline_desktop.sh. The desktop launcher selects a free loopback port, starts the same FastAPI app and opens a native WebView window. Keep the service loopback-only; it has no user authentication and must not be exposed directly to a LAN or the public internet.
+
+### Crop and label workflow
+
+1. Create or select a local dataset.
+2. Add one scan or multiple crops from the same source drawing.
+3. Drag around one complete dimension string, keeping punctuation and units inside the selection.
+4. Enter the exact text as written, choose printed/handwritten/unclear/unknown, and confirm the transcription against the source before saving.
+5. Reuse the same source ID for all crops from the same drawing. Use a stable pseudonymous writer ID for one handwriting author when evaluating generalisation across writers.
+6. Review, correct or delete saved labels in the sample library. Any label/group change invalidates the previous split plan.
+
+Only the selected crop is sent to the local API. The full input scan stays in the browser. Saved crop images and manifests are written below datasets/ocr/, which is ignored by Git. The OCR Studio endpoint accepts raster images only; add PDF pages through the drawing workflow or rasterise the desired page locally before adding it as an image. Do not commit personal property information or complete source plans into the repository.
+
+### Training and evaluation
+
+Install a PaddlePaddle build compatible with the local Python/CUDA environment, then install requirements-ocr-paddle.txt into the same environment used to launch Planline. Fine-tuning additionally needs a local PaddleOCR source checkout and a matching PP-OCRv5 .pdparams checkpoint. The mobile recogniser and a conservative batch size are the initial low-VRAM option; the server model has a higher memory requirement.
+
+Build drawing-safe splits before training. Samples sharing a source drawing or writer ID are kept in one connected group so crops from one drawing/author cannot leak across train, validation and test. Fine-tuning receives train and validation data only; the held-out test split is excluded from optimisation. Benchmark runs generate predictions and calculate exact full-string match, prediction coverage and character error rate on the held-out test group.
+
+A small number of crops validates the workflow, not model quality. No claim of useful recognition accuracy is made until representative, independent drawings have been labelled and the model has been evaluated on a sufficiently varied held-out set. All OCR predictions remain candidates; this workbench does not associate a dimension with a wall, calibrate scale or generate measured CAD geometry.
+
 ## API
 
 - `GET /api/health` — lightweight service/model readiness status; does not load the detector.
@@ -73,8 +116,11 @@ Values use decimal arithmetic. The endpoint does not parse OCR text, convert uni
 | First-page PDF rasterisation | Implemented; multi-page selection is not |
 | YOLO candidate detection | Implemented when the tracked weights are present |
 | Detection list, class filter, box selection | Implemented in the UI |
-| Manual transcription of dimension-value crops | Implemented; user-entered text only, not OCR |
-| OCR of printed/handwritten dimensions | Not implemented in this web workflow |
+| Manual transcription of dimension-value crops in drawing review | Implemented; user-entered text only, not OCR |
+| OCR Studio crop annotation and verified label library | Implemented at /ocr; only selected raster crops are uploaded |
+| Source/writer-grouped splits and OCR dataset audit | Implemented; held-out test set remains separate |
+| PP-OCRv5 fine-tuning and benchmark orchestration | Implemented; requires local PaddlePaddle/PaddleOCR dependencies and checkpoint |
+| Automatic OCR of all drawing detections in the main drawing workflow | Not implemented; OCR Studio currently captures human-selected crops |
 | Dimension-to-wall association | Not implemented |
 | Dimension-chain constraint solving | Not implemented |
 | Scale calibration from written dimensions | Not implemented |
