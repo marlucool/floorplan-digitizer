@@ -133,10 +133,21 @@ def interpret_dimension_text(text: str) -> dict[str, Any]:
     if feet_inches:
         feet = Decimal(feet_inches.group("feet"))
         inches = _parse_fraction(feet_inches.group("inches") or "0")
-        if inches is None or inches >= 12:
-            return _result(raw, "unrecognized", dimension_type, reason="The inches component is invalid.")
+        if inches is None or inches >= 12 or feet < 0 or (feet == 0 and inches <= 0):
+            return _result(raw, "unrecognized", dimension_type, reason="The feet/inches components must describe a positive length.")
         millimetres = feet * UNIT_TO_MM["ft"] + inches * UNIT_TO_MM["in"]
         return _result(raw, "parsed", dimension_type, value_mm=_format_mm(millimetres), unit="ft/in")
+
+    # Standalone fractional inches: 1/2", 2 1/2 in.
+    fractional_inches = re.fullmatch(
+        r"(?P<number>\d+\s+\d+/\d+|\d+/\d+)\s*(?:in|inch(?:es)?|\")",
+        value,
+        re.IGNORECASE,
+    )
+    if fractional_inches:
+        number = _parse_fraction(fractional_inches.group("number"))
+        millimetres = number * UNIT_TO_MM["in"]
+        return _result(raw, "parsed", dimension_type, value_mm=_format_mm(millimetres), value=format(number.normalize(), "f"), unit="in")
 
     # Explicitly suffixed metric/imperial dimension.
     explicit = re.fullmatch(
@@ -149,8 +160,10 @@ def interpret_dimension_text(text: str) -> dict[str, Any]:
         if error:
             return _result(raw, "ambiguous" if "ambiguous" in error or "may be" in error else "unrecognized", dimension_type, reason=error)
         unit = UNIT_ALIASES[explicit.group("unit").lower()]
+        if number <= 0:
+            return _result(raw, "unrecognized", dimension_type, reason="A dimension length must be greater than zero.")
         millimetres = number * UNIT_TO_MM[unit]
-        return _result(raw, "parsed", dimension_type, value_mm=_format_mm(millimetres), value= format(number.normalize(), "f"), unit=unit)
+        return _result(raw, "parsed", dimension_type, value_mm=_format_mm(millimetres), value=format(number.normalize(), "f"), unit=unit)
 
     # Bare number or fraction: deliberately do not assume millimetres.
     bare = _parse_fraction(value)
