@@ -76,19 +76,32 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                     {"dataset_id": "handwritten-dimensions", "summary": {"samples": 2}}
                 ]}),
             )
-            page.route(
-                "**/api/interpret-dimension",
-                lambda route: route.fulfill(json={
-                    "raw_text": "4200",
-                    "status": "unit_missing",
-                    "dimension_type": "linear",
-                    "value": "4200",
-                    "unit": None,
-                    "value_mm": None,
-                    "reason": "A unit is not written; no conversion to millimetres was made.",
-                    "requires_review": True,
-                }),
-            )
+            def interpret_dimension(route) -> None:
+                text = json.loads(route.request.post_data or "{}").get("text", "")
+                if text == "2685 mm":
+                    route.fulfill(json={
+                        "raw_text": text,
+                        "status": "parsed",
+                        "dimension_type": "linear",
+                        "value": "2685",
+                        "unit": "mm",
+                        "value_mm": "2685",
+                        "reason": None,
+                        "requires_review": True,
+                    })
+                else:
+                    route.fulfill(json={
+                        "raw_text": text,
+                        "status": "unit_missing",
+                        "dimension_type": "linear",
+                        "value": "4200",
+                        "unit": None,
+                        "value_mm": None,
+                        "reason": "A unit is not written; no conversion to millimetres was made.",
+                        "requires_review": True,
+                    })
+
+            page.route("**/api/interpret-dimension", interpret_dimension)
             crop_saved: dict[str, str] = {}
 
             def save_crop(route) -> None:
@@ -211,6 +224,25 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                 )
 
             page.route("**/api/export-dxf", export_dxf)
+
+            wall_check_request: dict[str, object] = {}
+
+            def validate_wall_dimension(route) -> None:
+                wall_check_request.update(json.loads(route.request.post_data or "{}"))
+                route.fulfill(json={
+                    "status": "within_tolerance",
+                    "measured_length_mm": "2685.2",
+                    "dimension_value_mm": "2685",
+                    "delta_mm": "0.2",
+                    "difference_percent": "0.01",
+                    "tolerance_percent": "1",
+                    "calibration_source": "user_supplied_two_point_reference",
+                    "requires_review": True,
+                    "geometry_modified": False,
+                    "note": "Review only; no geometry changed.",
+                })
+
+            page.route("**/api/validate-wall-dimension", validate_wall_dimension)
             page.goto(f"http://127.0.0.1:{server.server_port}/")
             page.set_input_files(
                 "#fileInput",
@@ -332,6 +364,18 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert len(dxf_submitted["rooms"]) == 1
             assert dxf_submitted["segments"][0]["id"] == "manual-wall-002"
             assert dxf_submitted["rooms"][0]["id"] == "manual-room-001"
+
+            page.locator("#selectWallTool").click()
+            page.locator("#previewImage").click(position={"x": 185, "y": 225})
+            assert page.locator("#wallDimensionSelect").input_value() == "det-004"
+            assert page.locator("#checkWallDimension").is_enabled()
+            page.locator("#checkWallDimension").click()
+            page.wait_for_function("document.querySelector('#wallDimensionResult').dataset.status === 'within_tolerance'")
+            assert "Within the selected tolerance" in page.locator("#wallDimensionResult").inner_text()
+            assert wall_check_request["dimension_mm"] == "2685"
+            assert wall_check_request["pixels_per_mm"] > 0
+            assert abs(wall_check_request["wall_length_px"] - 230.217) < 1
+            assert wall_check_request["tolerance_percent"] == 1
             page.locator("#detectionSearch").fill("dimension_value")
             assert page.locator(".detection-row:visible").count() == 1
             page.locator("#detectionSearch").fill("does-not-exist")
@@ -357,18 +401,21 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.wait_for_function("document.querySelector('.dimension-interpretation').dataset.status === 'unit_missing'")
             assert "No unit is written" in page.locator(".dimension-interpretation").inner_text()
             assert "millimetres" in page.locator(".dimension-interpretation").inner_text()
-            assert page.locator(".dimension-text-value").input_value() == "4200"
+            assert page.locator(".dimension-text-value").input_value() == "2685 mm"
             assert page.locator(".dimension-text-item").get_attribute("data-detection-id") == "det-004"
+            page.locator(".dimension-text-value").fill("2685 mm")
+            page.locator(".interpret-dimension-button").click()
+            page.wait_for_function("document.querySelector('.dimension-text-item').dataset.parsedValueMm === '2685'")
+            assert "2685 mm" in page.locator(".dimension-interpretation").inner_text()
+            page.locator(".dimension-text-verified-input").check()
             page.locator("#drawingDatasetSelect").select_option("handwritten-dimensions")
             page.locator("#drawingSourceId").fill("plan-01")
             page.locator("#drawingWriterId").fill("writer-a")
-            assert page.locator(".save-dimension-crop").is_disabled()
-            page.locator(".dimension-text-verified-input").check()
             page.route("**/api/ocr/datasets/handwritten-dimensions/samples", save_crop)
             assert page.locator(".save-dimension-crop").is_enabled()
             page.locator(".save-dimension-crop").click()
             page.wait_for_function("document.querySelector('.save-dimension-crop').textContent.includes('Saved to')")
-            assert "4200" in crop_saved["body"]
+            assert "2685 mm" in crop_saved["body"]
             assert "handwritten" in crop_saved["body"]
             assert "plan-01" in crop_saved["body"]
             assert "writer-a" in crop_saved["body"]
