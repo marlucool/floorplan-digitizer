@@ -411,6 +411,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.wait_for_function("document.querySelector('.dimension-text-item').dataset.parsedValueMm === '2685'")
             assert "2685 mm" in page.locator(".dimension-interpretation").inner_text()
             page.locator(".dimension-text-verified-input").check()
+            page.wait_for_function("Array.from(document.querySelector('#wallDimensionSelect').options).some(option => option.value === 'det-004')")
             page.locator("#drawingDatasetSelect").select_option("handwritten-dimensions")
             page.locator("#drawingSourceId").fill("plan-01")
             page.locator("#drawingWriterId").fill("writer-a")
