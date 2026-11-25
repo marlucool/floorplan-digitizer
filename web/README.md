@@ -54,7 +54,7 @@ On macOS/Linux, install requirements-desktop.txt and run sh run_planline_desktop
 5. Reuse the same source ID for all crops from the same drawing. Use a stable pseudonymous writer ID for one handwriting author when evaluating generalisation across writers.
 6. Review, correct or delete saved labels in the sample library. Any label/group change invalidates the previous split plan.
 
-Only the selected crop is sent to the local API. The full input scan stays in the browser. Saved crop images and manifests are written below datasets/ocr/ for source/development runs. Installed Windows builds use %LOCALAPPDATA%/Planline/ocr, outside the application folder. The OCR Studio endpoint accepts raster images only; add PDF pages through the drawing workflow or rasterise the desired page locally before adding it as an image. Do not commit personal property information or complete source plans into the repository.
+Only the selected crop is sent to the local API. The full input scan stays in the browser. The Drawing workspace can also send an individual dimension crop directly into a selected OCR dataset after its transcription is manually verified. Saved crop images and manifests are written below datasets/ocr/ for source/development runs. Installed Windows builds use %LOCALAPPDATA%/Planline/ocr, outside the application folder. The OCR Studio endpoint accepts raster images only; add PDF pages through the drawing workflow or rasterise the desired page locally before adding it as an image. Do not commit personal property information or complete source plans into the repository.
 
 ### Training and evaluation
 
