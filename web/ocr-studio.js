@@ -501,7 +501,7 @@
     const modelDir = trained ? ($("#trainedModelSelect").value || state.lastTrainedModel) : null;
     if (trained && !modelDir) return message("Select a fine-tuned model to benchmark.", "error");
     const payload = {
-      model: $("#modelVariant").value === "mobile" ? "en_PP-OCRv5_mobile_rec" : "PP-OCRv5_server_rec", model_dir: modelDir,
+      model: $("#modelVariant").value === "mobile" ? "PP-OCRv5_mobile_rec" : "PP-OCRv5_server_rec", model_dir: modelDir,
       device: $("#useGpu").checked ? "gpu:0" : "cpu"
     };
     setBusy(true); message(trained ? "Benchmarking your fine-tuned recogniser…" : "Benchmarking the base recogniser…");
