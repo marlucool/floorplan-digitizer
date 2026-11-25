@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.Win32;
 using System.Windows.Forms;
 
@@ -15,7 +16,7 @@ internal static class Program
     internal const string ProductName = "Planline";
     internal const string InstallMarker = ".planline-installed.json";
     internal const string DataDirectoryName = "Planline";
-    internal const string Version = "0.1.1";
+    internal const string Version = "0.1.2";
 
     [STAThread]
     private static int Main(string[] args)
@@ -367,7 +368,13 @@ internal sealed class SetupForm : Form
     private readonly RadioButton _cpuOption = new();
     private readonly Label _gpuDetection = new();
     private readonly Label _status = new();
+    private readonly Label _progressDetail = new();
+    private readonly Label _phaseLabel = new();
+    private readonly ListView _assetProgress = new();
+    private readonly Panel _setupOptions = new();
+    private readonly Panel _workPanel = new();
     private readonly ProgressBar _progressBar = new();
+    private readonly Dictionary<string, ListViewItem> _assetRows = new(StringComparer.OrdinalIgnoreCase);
     private readonly Button _installButton = new();
     private readonly CheckBox _desktopShortcut = new();
     private readonly CheckBox _launchAfterInstall = new();
@@ -381,7 +388,7 @@ internal sealed class SetupForm : Form
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = true;
-        ClientSize = new Size(720, 565);
+        ClientSize = new Size(820, 700);
         Font = new Font("Segoe UI", 9.5f);
         BackColor = Color.FromArgb(248, 249, 251);
 
@@ -439,7 +446,7 @@ internal sealed class SetupForm : Form
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 145));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 126));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 76));
         Controls.Add(root);
 
         var header = new Panel { Dock = DockStyle.Fill };
@@ -518,7 +525,8 @@ internal sealed class SetupForm : Form
         hardware.Controls.Add(_gpuDetection);
         root.Controls.Add(hardware, 0, 2);
 
-        var options = new Panel { Dock = DockStyle.Fill };
+        var options = _setupOptions;
+        options.Dock = DockStyle.Fill;
         _desktopShortcut.Text = "Create a desktop shortcut";
         _desktopShortcut.Checked = true;
         _desktopShortcut.AutoSize = true;
@@ -540,6 +548,40 @@ internal sealed class SetupForm : Form
         options.Controls.Add(_launchAfterInstall);
         options.Controls.Add(info);
         root.Controls.Add(options, 0, 3);
+
+        _workPanel.Dock = DockStyle.Fill;
+        _workPanel.Visible = false;
+        var workLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 3,
+            Padding = new Padding(0, 2, 0, 0),
+        };
+        workLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        workLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 25));
+        workLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        _phaseLabel.Text = "Preparing installation…";
+        _phaseLabel.Font = new Font("Segoe UI Semibold", 10.5f, FontStyle.Bold);
+        _phaseLabel.ForeColor = Color.FromArgb(28, 37, 49);
+        _phaseLabel.Dock = DockStyle.Fill;
+        _progressDetail.Text = "Individual downloads and package assets will appear below.";
+        _progressDetail.ForeColor = Color.FromArgb(90, 101, 116);
+        _progressDetail.Dock = DockStyle.Fill;
+        _assetProgress.Dock = DockStyle.Fill;
+        _assetProgress.View = View.Details;
+        _assetProgress.FullRowSelect = true;
+        _assetProgress.GridLines = true;
+        _assetProgress.HeaderStyle = ColumnHeaderStyle.Nonclickable;
+        _assetProgress.Columns.Add("Component / asset", 360);
+        _assetProgress.Columns.Add("Downloaded", 120);
+        _assetProgress.Columns.Add("Progress", 100);
+        _assetProgress.Columns.Add("Status", 150);
+        workLayout.Controls.Add(_phaseLabel, 0, 0);
+        workLayout.Controls.Add(_progressDetail, 0, 1);
+        workLayout.Controls.Add(_assetProgress, 0, 2);
+        _workPanel.Controls.Add(workLayout);
+        root.Controls.Add(_workPanel, 0, 3);
 
         var footer = new TableLayoutPanel
         {
@@ -673,7 +715,12 @@ internal sealed class SetupForm : Form
         _installPath.Enabled = false;
         _progressBar.Visible = true;
         _progressBar.Style = ProgressBarStyle.Marquee;
-        _progressBar.MarqueeAnimationSpeed = 28;
+        _progressBar.MarqueeAnimationSpeed = 24;
+        _setupOptions.Visible = false;
+        _workPanel.Visible = true;
+        _assetProgress.Items.Clear();
+        _assetRows.Clear();
+        _progressDetail.Text = "Starting setup. Large machine-learning packages can take several minutes.";
 
         string installDirectory = "";
         bool useGpu = _gpuOption.Checked;
@@ -974,6 +1021,7 @@ internal sealed class SetupForm : Form
             new[]
             {
                 "-m", "pip", "install",
+                "--progress-bar", "on",
                 "--disable-pip-version-check",
                 "--index-url", indexUrl,
                 "torch==2.10.0",
@@ -985,14 +1033,44 @@ internal sealed class SetupForm : Form
 
     private Task SetStatusAsync(string message)
     {
-        if (InvokeRequired)
+        void Update()
         {
-            Invoke((Action)(() => _status.Text = message));
-            return Task.CompletedTask;
+            _status.Text = message;
+            _phaseLabel.Text = message;
+            _status.Refresh();
         }
-        _status.Text = message;
-        _status.Refresh();
+        if (InvokeRequired) BeginInvoke((Action)Update);
+        else Update();
         return Task.CompletedTask;
+    }
+
+    private void UpdateAsset(string name, long downloaded, long? total, string status)
+    {
+        void Update()
+        {
+            if (!_assetRows.TryGetValue(name, out ListViewItem? item))
+            {
+                item = new ListViewItem(name);
+                item.SubItems.Add("—");
+                item.SubItems.Add("—");
+                item.SubItems.Add(status);
+                _assetProgress.Items.Add(item);
+                _assetRows[name] = item;
+            }
+            item.SubItems[1].Text = total is > 0
+                ? $"{FormatBytes(downloaded)} / {FormatBytes(total.Value)}"
+                : FormatBytes(downloaded);
+            item.SubItems[2].Text = total is > 0
+                ? $"{Math.Clamp(downloaded * 100 / total.Value, 0, 100)}%"
+                : "—";
+            item.SubItems[3].Text = status;
+            item.EnsureVisible();
+        }
+        if (IsHandleCreated && !IsDisposed)
+        {
+            if (InvokeRequired) BeginInvoke((Action)Update);
+            else Update();
+        }
     }
 
     private async Task DownloadFileAsync(string url, string destination)
@@ -1001,6 +1079,8 @@ internal sealed class SetupForm : Form
         response.EnsureSuccessStatusCode();
 
         long? totalBytes = response.Content.Headers.ContentLength;
+        string assetName = Path.GetFileName(destination);
+        UpdateAsset(assetName, 0, totalBytes, "Downloading");
         await using Stream input = await response.Content.ReadAsStreamAsync();
         await using var output = new FileStream(
             destination,
@@ -1022,13 +1102,15 @@ internal sealed class SetupForm : Form
             if (totalBytes is > 0)
             {
                 int percent = (int)Math.Clamp(totalRead * 100 / totalBytes.Value, 0, 100);
-                _progressBar.Style = ProgressBarStyle.Continuous;
-                _progressBar.Value = percent;
+                if (InvokeRequired) BeginInvoke((Action)(() => { _progressBar.Style = ProgressBarStyle.Continuous; _progressBar.Value = percent; }));
+                else { _progressBar.Style = ProgressBarStyle.Continuous; _progressBar.Value = percent; }
             }
-            _status.Text = totalBytes is > 0
-                ? $"Downloading… {FormatBytes(totalRead)} of {FormatBytes(totalBytes.Value)}"
-                : $"Downloading… {FormatBytes(totalRead)}";
+            UpdateAsset(assetName, totalRead, totalBytes, "Downloading");
+            _progressDetail.Text = totalBytes is > 0
+                ? $"{assetName}: {FormatBytes(totalRead)} of {FormatBytes(totalBytes.Value)}"
+                : $"{assetName}: {FormatBytes(totalRead)} downloaded";
         }
+        UpdateAsset(assetName, totalRead, totalBytes, "Downloaded");
     }
 
     private static async Task VerifySha256Async(string path, string expected)
