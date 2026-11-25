@@ -4,7 +4,7 @@ Planline is a local-first project for turning scanned or hand-drawn 2D floor pla
 
 The important problem is not tracing pixels. Survey drawings can be skewed, faded, low-resolution, or drawn approximately rather than to scale. Planline is being developed to read written dimensions, relate them to the correct parts of the drawing, detect contradictions, and keep uncertain results in a human review workflow.
 
-> **Current status: detection and review prototype.** The browser app and local FastAPI API are working. The app can preview raster/PDF input, run the bundled YOLO detector, display candidate regions and bounded dimension crops, export a versioned review JSON file, and validate a manually entered dimension chain. OCR is not yet part of the browser workflow; an optional standalone PaddleOCR runner can recognise saved crops. Automatic dimension-to-wall association, metric reconstruction, and verified DXF export are not implemented.
+> **Current status: drawing review plus OCR Studio workbench.** The local app now includes a crop editor, verified-label library, source/writer-safe dataset splits, background PP-OCRv5 fine-tuning jobs and held-out benchmark reporting. OCR Studio is available at `/ocr` in the browser app or in the native desktop window. The drawing-analysis workflow still does not automatically run OCR, associate dimensions with walls, calibrate scale, reconstruct measured geometry or generate verified DXF output.
 
 ![Example survey drawing](docs/rysunek.png)
 
@@ -24,20 +24,23 @@ The important problem is not tracing pixels. Survey drawings can be skewed, fade
 | OCR evaluation | Compare predictions against verified review labels or curated crop datasets using exact-match rate, coverage and character error rate |
 | Crop dataset curation | Export verified full-string crops or import manual crops; validate manifests and create source/writer-safe splits |
 | OCR dataset quality | Read-only audit of label quality, character coverage, duplicate crops, source/writer counts and split leakage |
+| OCR Studio | Crop editor, verified label library, dataset management, split creation and training-job monitor |
+| Fine-tuning | Local PaddleOCR PP-OCRv5 mobile/server training from a matching `.pdparams` checkpoint |
+| Benchmarking | Base and fine-tuned recogniser evaluation on the held-out test split only |
 
 ### Audit an OCR dataset before training
 
 Run a read-only quality report after collecting and splitting crops:
 
 ```bash
-python -m planline.ocr_quality --dataset datasets/handwriting --output datasets/handwriting/quality-report.json
+python -m planline.ocr_quality --dataset datasets/ocr/handwriting --output datasets/ocr/handwriting/quality-report.json
 ```
 
 The report flags duplicate images, conflicting labels, suspicious transcription formatting, weak source/writer coverage and split problems. It also reports character frequencies so the recogniser's supported character set can be checked. See [the OCR dataset quality guide](docs/OCR_DATASET_QUALITY.md). A clean report is only a data-hygiene check; it does not prove the dataset is large or representative enough to train a reliable model.
 
 ### Start collecting handwritten dimension samples
 
-The repository now includes a local dataset curation tool. It does not train a model yet; it turns your reviewed crops into a traceable OCR dataset so we can benchmark recognisers and decide what to fine-tune.
+Open OCR Studio at `http://127.0.0.1:8000/ocr` to create a dataset, add one or more scans, draw around each complete dimension string, enter the exact reading, and verify it before saving. The crop is stored under the ignored `datasets/ocr/` directory; the full source scan remains in the browser and is not sent to the OCR dataset endpoint.
 
 For new drawings, crop the **whole dimension string** as one image (for example, “4,200 mm”), not individual digits. Transcribe exactly what is visible, preserve decimals and units, and only mark a label verified after checking it against the drawing. Keep crops from one plan under the same source ID. Use the same pseudonymous writer ID for samples written by the same person.
 
@@ -54,7 +57,17 @@ python -m pip install -r requirements-web.txt
 python -m uvicorn planline.api:app --host 127.0.0.1 --port 8000
 ```
 
-Open http://127.0.0.1:8000.
+Open http://127.0.0.1:8000. The drawing review workspace is the home page; open **OCR Studio** from the header or go directly to `/ocr`.
+
+For a native desktop window on Windows, run:
+
+```powershell
+py -3 -m pip install -r requirements-desktop.txt
+.\run_planline_desktop.bat
+```
+
+On macOS/Linux, install `requirements-desktop.txt` and run `./run_planline_desktop.sh`. The desktop launcher starts the API on a loopback-only random port and opens OCR Studio. The optional native window needs a platform WebView (Windows WebView2, or the system webview on macOS/Linux).
+
 
 The API binds to loopback by default. Do not expose the development server directly to the public internet. If remote access is ever required, put an authenticated, encrypted access layer in front of it and configure the deployment deliberately.
 
@@ -66,7 +79,7 @@ Planline does not intentionally save uploaded drawings as project files. However
 
 ## What is not implemented yet
 
-- OCR integrated into the browser analysis workflow.
+- Automatic OCR directly in the drawing-analysis workflow (OCR Studio currently uses human-selected crops and user-verified transcriptions for dataset capture).
 - Automatic association between a recognised number, its dimension line and the measured wall/span.
 - Reliable unit interpretation or scale calibration from written dimensions.
 - Automatic dimension-chain solving across a floor plan.
@@ -89,7 +102,7 @@ The target is a reviewable 2D digitisation pipeline:
 
 The OCR direction is deliberately numeric-first. General English room-label and note recognition is not an initial dependency unless evaluation shows it materially improves the dimension workflow. The optional PaddleOCR recogniser is a baseline to measure, not a claim that OCR is solved.
 
-The first dataset-capture, validation and grouped-split utilities are implemented. The optional PaddleOCR runner can recognise the curated crops, and the evaluator can score the held-out test split. Full model training and a browser-integrated OCR stage remain future work. Evaluation must be split by original drawing and writer, not by individual crops. Measure exact full-dimension accuracy, prediction coverage, dimension association, chain consistency, topology/export correctness and human correction time.
+Dataset capture, validation, grouped splits, a local fine-tuning interface and held-out benchmark orchestration are implemented. Actual training still requires a compatible local PaddlePaddle installation, a PaddleOCR source checkout and the matching pretrained checkpoint; no model has been trained on the user's own plan crops yet. OCR Studio does not claim a recogniser is reliable until it has been evaluated on representative, independent held-out drawings. Evaluation must be split by original drawing and writer, not by individual crops.
 
 The existing RTX 2080 Ti (11 GB VRAM) is the initial local development target. Compact models, tiled inference, conservative batch sizes and staged processing are preferred over a large end-to-end model. Model selection should follow representative-plan evaluation.
 
@@ -122,6 +135,7 @@ python -m pip install -r requirements-dev.txt
 PYTHONPATH=. python -m pytest -q tests/test_*.py
 python -m planline.dataset --help
 node --check web/app.js
+node --check web/ocr-studio.js
 ```
 
 Optional browser smoke test (requires Playwright and a local Chromium installation):
