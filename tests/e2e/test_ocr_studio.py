@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import struct
-import shutil
+import threading
 import zlib
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -31,9 +33,14 @@ def test_ocr_studio_manual_crop_and_typed_label() -> None:
             "samples": samples,
         }
 
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True)
-        page = browser.new_page(viewport={"width": 1440, "height": 1000})
+    handler = partial(SimpleHTTPRequestHandler, directory=str(web_dir))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1440, "height": 1000})
 
         def api_mock(route) -> None:
             request = route.request
@@ -55,25 +62,26 @@ def test_ocr_studio_manual_crop_and_typed_label() -> None:
             else:
                 route.fulfill(status=404, json={"detail": f"Unexpected test route: {path}"})
 
-        page.route("**/api/ocr/**", api_mock)
-        page.set_content('<!doctype html><base href="http://planline.test/"><body>' +
-                         (web_dir / "ocr.html").read_text(encoding="utf-8").split("<body>", 1)[1].split("</body>", 1)[0] +
-                         '</body>')
-        page.add_script_tag(content=(web_dir / "ocr-studio.js").read_text(encoding="utf-8"))
-        page.wait_for_function("document.querySelector('#datasetSelect option[value=handwriting]') !== null")
-        page.set_input_files("#cropFiles", {"name": "old-plan.png", "mimeType": "image/png", "buffer": png})
-        page.wait_for_function("document.querySelector('#cropCanvas').width > 0")
-        canvas_box = page.locator("#cropCanvas").bounding_box()
-        assert canvas_box is not None
-        page.mouse.move(canvas_box["x"] + 30, canvas_box["y"] + 35)
-        page.mouse.down()
-        page.mouse.move(canvas_box["x"] + 250, canvas_box["y"] + 100, steps=4)
-        page.mouse.up()
-        page.wait_for_function("document.querySelector('#cropSelectionInfo').textContent.includes('px crop')")
-        page.locator("#sampleText").fill("4,200 mm")
-        page.wait_for_function("!document.querySelector('#saveCropButton').disabled")
-        page.locator("#saveCropButton").click()
-        page.wait_for_selector(".sample-row")
-        assert page.locator(".sample-row-info strong").inner_text() == "4,200 mm"
-        assert "QUEUE COMPLETE" in page.locator("#queueStatus").inner_text()
-        browser.close()
+            page.route("**/api/ocr/**", api_mock)
+            page.goto(f"http://127.0.0.1:{server.server_port}/ocr.html")
+            page.wait_for_function("document.querySelector('#datasetSelect option[value=handwriting]') !== null")
+            page.set_input_files("#cropFiles", {"name": "old-plan.png", "mimeType": "image/png", "buffer": png})
+            page.wait_for_function("document.querySelector('#cropCanvas').width > 0")
+            canvas_box = page.locator("#cropCanvas").bounding_box()
+            assert canvas_box is not None
+            page.mouse.move(canvas_box["x"] + 30, canvas_box["y"] + 35)
+            page.mouse.down()
+            page.mouse.move(canvas_box["x"] + 250, canvas_box["y"] + 100, steps=4)
+            page.mouse.up()
+            page.wait_for_function("document.querySelector('#cropSelectionInfo').textContent.includes('px crop')")
+            page.locator("#sampleText").fill("4,200 mm")
+            page.wait_for_function("!document.querySelector('#saveCropButton').disabled")
+            page.locator("#saveCropButton").click()
+            page.wait_for_selector(".sample-row")
+            assert page.locator(".sample-row-info strong").inner_text() == "4,200 mm"
+            assert "QUEUE COMPLETE" in page.locator("#queueStatus").inner_text()
+            browser.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)
