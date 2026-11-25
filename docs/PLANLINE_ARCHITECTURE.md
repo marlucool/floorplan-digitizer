@@ -18,7 +18,7 @@ The current web integration is intentionally a detection-and-review slice:
 - PNG/JPG/WEBP/TIFF and PDF uploads are accepted within the configured limits.
 - Multi-page PDFs support explicit 1-based page selection in the drawing workspace; each selected page is rasterised independently and source page identity is preserved in the review result.
 - The existing YOLO weights detect candidate `wall`, `dimension_line`, and `dimension_value` regions.
-- The UI displays the preview, candidate boxes, class counts, detector scores, a configurable confidence threshold, filtering, selected-box highlighting, zoom/fit controls and a scrollable zoomed view.
+- The UI displays the preview, candidate boxes, class counts, detector scores, a configurable confidence threshold, brightness/contrast preparation, filtering, selected-box highlighting, zoom/fit controls and a scrollable zoomed view.
 - A candidate-review JSON export preserves source pixel dimensions, detector metadata, bounding boxes, scores, optional user-entered dimension-text transcriptions, and optional user-supplied two-point scale calibration under a versioned schema; it excludes source/crop pixels and is not a measurement record.
 - The dimension-value crop panel returns bounded crops from the original raster for manual transcription. User-entered text, a printed/handwritten/unclear style label and verification flags are included in the review JSON; this does not run OCR or associate text with geometry.
 - The application does not automatically persist source drawings or upload them to a server. Users can explicitly save a portable `.planline` project containing the embedded source file, analysis payload and manual review state; the file remains under the user’s control. No measured DXF is emitted.
@@ -30,6 +30,10 @@ The current web integration is intentionally a detection-and-review slice:
 ### Portable project files
 
 The Drawing workspace supports explicit save/open of versioned `.planline` JSON project files. A project embeds the original source file (up to the existing 25 MB source limit), current analysis payload, manual dimension transcriptions, association selections and scale calibration. Saving is user-initiated; there is no background project upload or server-side project storage. Project import validates the format version and source byte count before replacing the current workspace. Keep project files in a trusted local location because they contain the source drawing.
+
+### Image intensity preparation
+
+The Drawing workspace exposes bounded brightness (-100 to +100) and contrast (0.5× to 2×) adjustments before detection and crop generation. This is a linear intensity transform only: image dimensions and pixel coordinates are unchanged, so existing source-coordinate annotations and two-point calibration remain aligned. The original uploaded file is embedded unchanged in a saved project. These controls do not deskew, dewarp or crop a drawing.
 
 ### Manual scale calibration
 

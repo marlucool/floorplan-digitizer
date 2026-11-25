@@ -20,6 +20,10 @@ function resetWorkspace() {
   if ($("#detectionSearch")) $("#detectionSearch").value = "";
   if ($("#detectionSort")) $("#detectionSort").value = "original";
   $("#fileInput").value = "";
+  $("#brightnessControl").value = "0";
+  $("#contrastControl").value = "1";
+  $("#brightnessValue").textContent = "0";
+  $("#contrastValue").textContent = "1.00×";
   $("#fileCard").classList.add("hidden");
   $("#pdfPageControl").classList.add("hidden");
   $("#pdfPageNumber").value = "1";
@@ -82,6 +86,10 @@ function setFile(file) {
   $("#previewImage").onload = null;
   $("#previewImage").onerror = null;
   state.file = file;
+  $("#brightnessControl").value = "0";
+  $("#contrastControl").value = "1";
+  $("#brightnessValue").textContent = "0";
+  $("#contrastValue").textContent = "1.00×";
   state.objectUrl = URL.createObjectURL(file);
   state.result = null;
   state.previewUrl = null;
@@ -354,6 +362,10 @@ function renderResults(payload) {
   }
   $("#exportReview").disabled = false;
   $("#saveProject").disabled = false;
+  $("#brightnessControl").value = String(payload.preprocessing?.brightness ?? 0);
+  $("#contrastControl").value = String(payload.preprocessing?.contrast ?? 1);
+  $("#brightnessValue").textContent = String(payload.preprocessing?.brightness ?? 0);
+  $("#contrastValue").textContent = Number(payload.preprocessing?.contrast ?? 1).toFixed(2) + "×";
   $("#startCalibration").disabled = false;
   renderCalibrationStatus();
   $("#sourceState").textContent = "Analysed";
@@ -709,6 +721,8 @@ async function analyse() {
     form.append("file", file);
     form.append("confidence_threshold", $("#confidenceThreshold").value);
     form.append("page_index", String(isPdf ? pageNumber - 1 : 0));
+    form.append("brightness", $("#brightnessControl").value);
+    form.append("contrast", $("#contrastControl").value);
     const response = await fetch("/api/analyze", { method: "POST", body: form, signal: controller.signal });
     const payload = await response.json().catch(() => ({}));
     if (state.controller !== controller) return;
@@ -748,6 +762,7 @@ function buildReviewObject() {
       model: "yolo_floorplan.pt",
       confidence_threshold: result.confidence_threshold ?? 0.25,
       status: "candidate_detection_only",
+      preprocessing: result.preprocessing || { brightness: 0, contrast: 1, method: "linear_intensity_only" },
       coordinate_system: "pixel coordinates; origin at top-left; x increases right; y increases down"
     },
     counts: {
@@ -993,6 +1008,18 @@ $("#openProject").addEventListener("click", () => $("#projectInput").click());
 $("#projectInput").addEventListener("change", (event) => openProjectFile(event.target.files?.[0]));
 
 $("#exportReview").addEventListener("click", exportReviewJson);
+$("#brightnessControl").addEventListener("input", () => {
+  $("#brightnessValue").textContent = $("#brightnessControl").value;
+});
+$("#contrastControl").addEventListener("input", () => {
+  $("#contrastValue").textContent = Number($("#contrastControl").value).toFixed(2) + "×";
+});
+$("#resetImageCleanup").addEventListener("click", () => {
+  $("#brightnessControl").value = "0";
+  $("#contrastControl").value = "1";
+  $("#brightnessValue").textContent = "0";
+  $("#contrastValue").textContent = "1.00×";
+});
 $("#confidenceThreshold").addEventListener("input", () => {
   $("#confidenceValue").textContent = Number($("#confidenceThreshold").value).toFixed(2);
 });

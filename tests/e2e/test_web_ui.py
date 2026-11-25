@@ -67,9 +67,12 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                 request_body = route.request.post_data or ""
                 assert "confidence_threshold" in request_body
                 assert "0.4" in request_body
+                assert "brightness" in request_body and "20" in request_body
+                assert "contrast" in request_body and "1.25" in request_body
                 route.fulfill(
                     json={
                         "confidence_threshold": 0.4,
+                        "preprocessing": {"brightness": 20, "contrast": 1.25, "method": "linear_intensity_only"},
                         "image": {"width": 400, "height": 300},
                         "counts": {"wall": 2, "dimension_line": 1, "dimension_value": 1},
                         "detections": [
@@ -160,6 +163,8 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             )
             page.locator("#zoomIn").click()
             assert page.locator("#zoomLevel").inner_text() == "125%"
+            page.locator("#brightnessControl").evaluate("(element) => { element.value = String(20); element.dispatchEvent(new Event('input', { bubbles: true })); }")
+            page.locator("#contrastControl").evaluate("(element) => { element.value = String(1.25); element.dispatchEvent(new Event('input', { bubbles: true })); }")
             page.locator("#confidenceThreshold").evaluate(
                 "(element) => { element.value = '0.4'; element.dispatchEvent(new Event('input', { bubbles: true })); }"
             )
@@ -239,6 +244,8 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             Draft202012Validator(schema, format_checker=FormatChecker()).validate(exported)
             assert exported["source"]["filename"] == "plan.png"
             assert exported["analysis"]["confidence_threshold"] == 0.4
+            assert exported["analysis"]["preprocessing"]["brightness"] == 20
+            assert exported["analysis"]["preprocessing"]["contrast"] == 1.25
             assert exported["calibration"]["method"] == "user_two_point_reference"
             assert exported["calibration"]["input_unit"] == "m"
             assert exported["calibration"]["known_distance_mm"] == 3500
@@ -284,6 +291,8 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert page.locator(".dimension-association-verified-input").is_checked()
             assert page.locator("#calibrationState").inner_text() == "Applied"
             assert page.locator("#fileName").inner_text() == "plan.png"
+            assert page.locator("#brightnessControl").input_value() == "20"
+            assert page.locator("#contrastControl").input_value() == "1.25"
 
             page.locator("#fitView").click()
             assert page.locator("#zoomLevel").inner_text() == "100%"

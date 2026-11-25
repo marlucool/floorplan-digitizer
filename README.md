@@ -17,6 +17,7 @@ The important problem is not tracing pixels. Survey drawings can be skewed, fade
 | PDF handling | Select and analyse any page in a multi-page PDF without re-uploading the source |
 | Scale calibration | Manual two-point reference in mm, cm, m, inches or feet; exported with provenance and explicitly not treated as geometry validation |
 | Projects | Save/open portable `.planline` files with the source drawing, analysis, manual review and calibration; saving is explicit and local |
+| Image preparation | Bounded brightness/contrast adjustments before detection and crop generation; source coordinates remain unchanged |
 | Detection | Bundled YOLO model proposes wall, dimension_line and dimension_value regions |
 | Review | Detection overlays, zoom, confidence-threshold control, class filtering, selected-box highlighting and dimension-region crops |
 | Manual transcription | Reviewer-entered text can be linked to detection IDs and marked as printed, handwritten or unclear |

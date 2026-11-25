@@ -29,6 +29,7 @@ class FakeDetector:
     def predict(self, **kwargs):
         assert kwargs["conf"] == self.expected_conf
         assert kwargs["imgsz"] == 640
+        self.source = kwargs["source"]
         return [FakeResult()]
 
 
@@ -37,6 +38,22 @@ def image_bytes() -> bytes:
     ok, encoded = cv2.imencode(".png", image)
     assert ok
     return encoded.tobytes()
+
+
+def test_apply_image_adjustments_changes_intensity_without_changing_coordinates() -> None:
+    source = np.array([[[50, 100, 200]]], dtype=np.uint8)
+    adjusted = api.apply_image_adjustments(source, brightness=10, contrast=2)
+    assert adjusted.shape == source.shape
+    assert adjusted.tolist() == [[[110, 210, 255]]]
+    assert source.tolist() == [[[50, 100, 200]]]
+
+
+def test_apply_image_adjustments_rejects_out_of_range_values() -> None:
+    source = np.zeros((2, 2, 3), dtype=np.uint8)
+    with pytest.raises(ValueError, match="Brightness"):
+        api.apply_image_adjustments(source, brightness=101)
+    with pytest.raises(ValueError, match="Contrast"):
+        api.apply_image_adjustments(source, contrast=2.1)
 
 
 def test_serialise_detections_clamps_and_labels_boxes() -> None:
@@ -76,6 +93,26 @@ def test_serialise_detections_skips_non_finite_predictions() -> None:
         boxes = InvalidBoxes()
 
     assert api.serialise_detections(InvalidResult(), (100, 100, 3)) == []
+
+
+def test_analyse_uses_adjusted_image_for_detection_and_reports_settings(monkeypatch) -> None:
+    detector = FakeDetector()
+    monkeypatch.setattr(api, "get_detector", lambda: detector)
+    source = np.full((160, 240, 3), 50, dtype=np.uint8)
+    ok, encoded = cv2.imencode(".png", source)
+    assert ok
+    response = TestClient(api.app).post(
+        "/api/analyze",
+        data={"brightness": "10", "contrast": "1.5"},
+        files={"file": ("plan.png", encoded.tobytes(), "image/png")},
+    )
+    assert response.status_code == 200
+    assert detector.source[0, 0].tolist() == [85, 85, 85]
+    assert response.json()["preprocessing"] == {
+        "brightness": 10,
+        "contrast": 1.5,
+        "method": "linear_intensity_only",
+    }
 
 
 def test_analyse_returns_regions_without_fabricating_ocr(monkeypatch) -> None:
@@ -305,6 +342,22 @@ def test_rejects_unsupported_file_type() -> None:
     assert response.status_code == 415
 
 
+def test_analyse_validates_image_cleanup_ranges() -> None:
+    client = TestClient(api.app)
+    response = client.post(
+        "/api/analyze",
+        data={"brightness": "101"},
+        files={"file": ("plan.png", image_bytes(), "image/png")},
+    )
+    assert response.status_code == 422
+    response = client.post(
+        "/api/analyze",
+        data={"contrast": "2.1"},
+        files={"file": ("plan.png", image_bytes(), "image/png")},
+    )
+    assert response.status_code == 422
+
+
 def test_rejects_invalid_image() -> None:
     response = TestClient(api.app).post(
         "/api/analyze",
@@ -342,6 +395,8 @@ def test_web_ui_assets_and_architecture_notes_are_served() -> None:
     assert 'id="applyCalibration"' in page.text
     assert 'id="openProject"' in page.text
     assert 'id="saveProject"' in page.text
+    assert 'id="brightnessControl"' in page.text
+    assert 'id="contrastControl"' in page.text
 
     script = client.get("/app.js")
     assert "user_two_point_reference" in script.text
@@ -350,6 +405,8 @@ def test_web_ui_assets_and_architecture_notes_are_served() -> None:
     assert "restoreProjectReview" in script.text
     assert "encodeFileBase64" in script.text
     assert "openProjectFile" in script.text
+    assert "brightness" in script.text
+    assert "contrast" in script.text
     assert script.status_code == 200
     assert "renderDetectionRows" in script.text
     assert "applyImageScale" in script.text

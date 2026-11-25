@@ -48,6 +48,14 @@
           <input id="confidenceThreshold" type="range" min="0.05" max="0.80" step="0.05" value="0.25">
           <small>Lower values show more candidate boxes. Scores are not calibrated measurement confidence.</small>
         </div>
+        <section class="image-cleanup-panel" aria-labelledby="cleanupHeading">
+          <div class="cleanup-heading"><strong id="cleanupHeading">Image cleanup</strong><button id="resetImageCleanup" class="toolbar-button" type="button">Reset</button></div>
+          <label for="brightnessControl">Brightness <output id="brightnessValue">0</output></label>
+          <input id="brightnessControl" type="range" min="-100" max="100" step="5" value="0">
+          <label for="contrastControl">Contrast <output id="contrastValue">1.00×</output></label>
+          <input id="contrastControl" type="range" min="0.5" max="2" step="0.05" value="1">
+          <small>Adjusts pixel intensity before detection and crop generation. It does not rotate, crop or move any coordinates.</small>
+        </section>
         <section class="calibration-panel" aria-labelledby="calibrationHeading">
           <div class="calibration-heading"><strong id="calibrationHeading">Scale calibration</strong><span class="calibration-state" id="calibrationState">Not set</span></div>
           <p>Pick two points on a known dimension line. This records a user-supplied pixel scale; it does not verify walls or measurements.</p>

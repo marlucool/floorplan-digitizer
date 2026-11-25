@@ -173,3 +173,13 @@ html[data-theme="dark"] .calibration-panel{background:#202620;border-color:var(-
 #saveProject{border-color:#9eb49a;color:var(--green-dark)}
 html[data-theme="dark"] .project-controls{background:#202620;border-color:var(--line)}
 @media(max-width:600px){#saveProject{flex:1 1 100%}}
+
+/* Reversible intensity-only image preparation */
+.image-cleanup-panel{margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);display:grid;gap:8px}
+.cleanup-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cleanup-heading strong{font:600 12px Manrope;color:var(--ink)}
+.image-cleanup-panel label{display:flex;justify-content:space-between;gap:8px;font:10px 'DM Mono';color:var(--muted);text-transform:uppercase}
+.image-cleanup-panel output{color:var(--ink);font-weight:600}
+.image-cleanup-panel input[type=range]{width:100%;margin:0;accent-color:var(--green)}
+.image-cleanup-panel small{font-size:9px;line-height:1.5;color:var(--muted)}
+html[data-theme="dark"] .image-cleanup-panel{background:#202620;border-color:var(--line)}

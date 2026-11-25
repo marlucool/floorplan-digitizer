@@ -73,6 +73,30 @@
         "coordinate_system": {
           "type": "string",
           "minLength": 1
+        },
+        "preprocessing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "brightness",
+            "contrast",
+            "method"
+          ],
+          "properties": {
+            "brightness": {
+              "type": "number",
+              "minimum": -100,
+              "maximum": 100
+            },
+            "contrast": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 2
+            },
+            "method": {
+              "const": "linear_intensity_only"
+            }
+          }
         }
       }
     },
