@@ -33,7 +33,7 @@ The Drawing workspace supports explicit save/open of versioned `.planline` JSON 
 
 ### OCR suggestions in Drawing
 
-The Drawing workspace can send dimension-candidate crops to the optional local PaddleOCR runtime. The reviewer can choose a base recogniser or an exported fine-tuned model from a local OCR dataset, and choose CPU or a compatible Paddle GPU runtime. OCR output is presented as a suggestion with recogniser confidence; it is never marked verified automatically. The reviewer must explicitly apply the suggestion and check every character against the source crop. OCR does not parse units, correct values, associate dimensions to walls or create geometry.
+The Drawing workspace can send dimension-candidate crops to the optional local PaddleOCR runtime. The reviewer can choose a base recogniser or an exported fine-tuned model from a local OCR dataset, and choose CPU or a compatible Paddle GPU runtime. OCR output is presented as a suggestion with recogniser confidence; it is never marked verified automatically. The reviewer must explicitly apply the suggestion and check every character against the source crop. A manually verified dimension crop can be saved directly to a selected OCR dataset with source/writer grouping metadata; only the crop is uploaded, not the full source drawing. OCR does not parse units, correct values, associate dimensions to walls or create geometry.
 
 ### Manual room boundaries and area
 
