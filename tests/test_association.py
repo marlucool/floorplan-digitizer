@@ -1,18 +1,21 @@
+
 from __future__ import annotations
 
-from planline.association import associate_dimensions
+from planline.association import _maximum_weight_assignment, associate_dimensions
 
 
 def detection(item_id: str, kind: str, box: tuple[float, float, float, float]) -> dict:
     x1, y1, x2, y2 = box
     return {
         "id": item_id, "class_name": kind,
-        "bbox": {"x1": x1, "y1": y1, "x2": x2, "y2": y2,
-                 "width": x2 - x1, "height": y2 - y1},
+        "bbox": {
+            "x1": x1, "y1": y1, "x2": x2, "y2": y2,
+            "width": x2 - x1, "height": y2 - y1,
+        },
     }
 
 
-def test_horizontal_value_to_line_to_vertical_wall_pair() -> None:
+def test_horizontal_value_to_line_to_vertical_wall_gap() -> None:
     detections = [
         detection("value-1", "dimension_value", (75, 31, 125, 49)),
         detection("line-near", "dimension_line", (20, 54, 180, 58)),
@@ -27,10 +30,12 @@ def test_horizontal_value_to_line_to_vertical_wall_pair() -> None:
     assert span["wall_ids"] == ["wall-left", "wall-right"]
     assert span["span_px"] == 160
     assert span["method"] == "between_vertical_walls"
+    assert span["text_center_offset_px"] == 0
     assert result["confirmed"] is False
+    assert result["candidate_lines"][0]["globally_assigned"] is True
 
 
-def test_vertical_value_to_line_to_horizontal_wall_pair() -> None:
+def test_vertical_value_to_line_to_horizontal_wall_gap() -> None:
     detections = [
         detection("value-v", "dimension_value", (30, 75, 48, 125)),
         detection("line-v", "dimension_line", (54, 20, 58, 180)),
@@ -45,11 +50,50 @@ def test_vertical_value_to_line_to_horizontal_wall_pair() -> None:
     assert span["method"] == "between_horizontal_walls"
 
 
-def test_close_line_fits_are_ambiguous_not_auto_selected() -> None:
+def test_gap_model_ranks_a_label_by_its_position_between_walls() -> None:
+    detections = [
+        detection("value", "dimension_value", (65, 31, 85, 49)),
+        detection("line", "dimension_line", (10, 54, 190, 58)),
+        detection("wall-left", "wall", (10, 60, 20, 180)),
+        detection("wall-middle", "wall", (90, 60, 100, 180)),
+        detection("wall-right", "wall", (180, 60, 190, 180)),
+    ]
+    result = associate_dimensions(detections)[0]
+    spans = result["candidate_lines"][0]["wall_spans"]
+    assert spans[0]["wall_ids"] == ["wall-left", "wall-middle"]
+    assert spans[0]["text_center_offset_px"] < 0
+
+
+def test_value_outside_all_wall_gaps_is_not_assigned_to_a_span() -> None:
+    detections = [
+        detection("value", "dimension_value", (195, 31, 215, 49)),
+        detection("line", "dimension_line", (10, 54, 230, 58)),
+        detection("wall-left", "wall", (10, 60, 20, 180)),
+        detection("wall-right", "wall", (180, 60, 190, 180)),
+    ]
+    result = associate_dimensions(detections)[0]
+    assert result["status"] == "unmatched"
+    assert result["candidate_lines"][0]["wall_spans"] == []
+
+
+def test_walls_outside_the_local_dimension_corridor_are_rejected() -> None:
+    detections = [
+        detection("value", "dimension_value", (75, 31, 125, 49)),
+        detection("line", "dimension_line", (20, 54, 180, 58)),
+        detection("wall-left", "wall", (10, 500, 20, 620)),
+        detection("wall-right", "wall", (180, 500, 190, 620)),
+    ]
+    result = associate_dimensions(detections)[0]
+    assert result["candidate_lines"][0]["wall_spans"] == []
+
+
+def test_close_line_fits_are_reported_as_ambiguous_not_auto_confirmed() -> None:
     detections = [
         detection("value", "dimension_value", (70, 30, 130, 48)),
-        detection("line-a", "dimension_line", (20, 53, 180, 57)),
-        detection("line-b", "dimension_line", (20, 54, 180, 58)),
+        detection("line-a", "dimension_line", (20, 52, 180, 56)),
+        detection("line-b", "dimension_line", (20, 53, 180, 57)),
+        detection("wall-left", "wall", (10, 58, 20, 180)),
+        detection("wall-right", "wall", (180, 58, 190, 180)),
     ]
     result = associate_dimensions(detections)[0]
     assert result["status"] == "ambiguous"
@@ -57,18 +101,47 @@ def test_close_line_fits_are_ambiguous_not_auto_selected() -> None:
     assert result["confirmed"] is False
 
 
-def test_missing_wall_pair_remains_unmatched() -> None:
+def test_global_assignment_avoids_the_old_greedy_matching_trap() -> None:
+    # Greedy would consume column 0 for row 0 (0.90) and leave row 1 unmatched.
+    # The global optimum assigns row 1 to column 0 and row 0 to column 1.
+    assignment = _maximum_weight_assignment([
+        [0.90, 0.80],
+        [0.85, 0.10],
+    ])
+    assert assignment[0] == 1
+    assert assignment[1] == 0
+
+
+def test_two_text_regions_are_not_globally_recommended_the_same_dimension_line() -> None:
     detections = [
-        detection("value", "dimension_value", (70, 30, 130, 48)),
-        detection("line", "dimension_line", (20, 52, 180, 56)),
-        detection("only-one-wall", "wall", (10, 60, 20, 180)),
+        detection("value-a", "dimension_value", (75, 31, 125, 49)),
+        detection("value-b", "dimension_value", (75, 32, 125, 50)),
+        detection("line", "dimension_line", (20, 54, 180, 58)),
+        detection("wall-left", "wall", (10, 60, 20, 180)),
+        detection("wall-right", "wall", (180, 60, 190, 180)),
+    ]
+    results = associate_dimensions(detections)
+    assert len(results) == 2
+    assert sum(
+        candidate["globally_assigned"]
+        for result in results for candidate in result["candidate_lines"]
+    ) == 1
+
+
+def test_non_adjacent_wall_pairs_remain_available_for_overall_dimensions() -> None:
+    detections = [
+        detection("value", "dimension_value", (85, 31, 115, 49)),
+        detection("line", "dimension_line", (10, 54, 190, 58)),
+        detection("wall-left", "wall", (10, 60, 20, 180)),
+        detection("wall-inner", "wall", (90, 60, 100, 180)),
+        detection("wall-right", "wall", (180, 60, 190, 180)),
     ]
     result = associate_dimensions(detections)[0]
-    assert result["candidate_lines"][0]["wall_spans"] == []
-    assert result["candidate_lines"][0]["wall_span_status"] == "unmatched"
+    wall_pairs = [span["wall_ids"] for span in result["candidate_lines"][0]["wall_spans"]]
+    assert ["wall-left", "wall-right"] in wall_pairs or result["candidate_lines"][0]["wall_spans"][0]["intervening_wall_count"] > 0
 
 
-def test_invalid_boxes_and_non_axis_aligned_candidates_are_ignored() -> None:
+def test_invalid_boxes_and_ambiguous_orientations_are_not_forced() -> None:
     detections = [
         detection("value", "dimension_value", (70, 30, 130, 48)),
         detection("square-line", "dimension_line", (60, 60, 70, 70)),
