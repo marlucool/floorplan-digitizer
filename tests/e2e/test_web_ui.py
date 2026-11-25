@@ -155,6 +155,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
 
             page.route("**/api/ocr/recognize-review", recognise_review)
             submitted: dict[str, object] = {}
+            dxf_submitted: dict[str, object] = {}
 
             def validate_chain(route) -> None:
                 submitted.update(json.loads(route.request.post_data))
@@ -174,6 +175,18 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                 )
 
             page.route("**/api/validate-dimension-chain", validate_chain)
+
+            def export_dxf(route) -> None:
+                dxf_submitted.update(json.loads(route.request.post_data or "{}"))
+                route.fulfill(
+                    body="0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n",
+                    headers={
+                        "Content-Type": "application/dxf",
+                        "Content-Disposition": 'attachment; filename="planline-manual-geometry.dxf"',
+                    },
+                )
+
+            page.route("**/api/export-dxf", export_dxf)
             page.goto(f"http://127.0.0.1:{server.server_port}/")
             page.set_input_files(
                 "#fileInput",
@@ -282,6 +295,19 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             moved_x, moved_y = (float(value) for value in room_points[0].split(","))
             assert abs(moved_x - 60) < 1
             assert abs(moved_y - 45) < 1
+
+            with page.expect_download() as dxf_download_info:
+                page.locator("#exportDxf").click()
+            dxf_download = dxf_download_info.value
+            assert dxf_download.suggested_filename == "plan-manual-geometry.dxf"
+            assert dxf_download.path()
+            assert dxf_submitted["source_width"] == 400
+            assert dxf_submitted["source_height"] == 300
+            assert dxf_submitted["pixels_per_mm"] > 0
+            assert len(dxf_submitted["segments"]) == 1
+            assert len(dxf_submitted["rooms"]) == 1
+            assert dxf_submitted["segments"][0]["id"] == "manual-wall-002"
+            assert dxf_submitted["rooms"][0]["id"] == "manual-room-001"
             page.locator("#detectionSearch").fill("dimension_value")
             assert page.locator(".detection-row:visible").count() == 1
             page.locator("#detectionSearch").fill("does-not-exist")
