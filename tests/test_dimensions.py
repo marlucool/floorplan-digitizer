@@ -23,6 +23,7 @@ from planline.dimensions import interpret_dimension_text
         ("4 ft 6 in", "1371.6", "linear"),
         ("Ø12 mm", "12", "diameter"),
         ("R 25 mm", "25", "radius"),
+        ("R25mm", "25", "radius"),
     ],
 )
 def test_explicit_dimension_formats_convert_to_mm(text: str, expected_mm: str, expected_type: str) -> None:
@@ -47,7 +48,7 @@ def test_dot_thousands_separator_is_reported_as_ambiguous() -> None:
     assert result["value_mm"] is None
 
 
-@pytest.mark.parametrize("text", ["0 mm", "-12 cm", "4 ft 12 in", "not a dimension"])
+@pytest.mark.parametrize("text", ["0 mm", "-12 cm", "4 ft 12 in", "1/0 in", "999999999999 m", "not a dimension"])
 def test_invalid_or_non_positive_dimensions_are_not_parsed(text: str) -> None:
     result = interpret_dimension_text(text)
     assert result["status"] != "parsed"
