@@ -479,23 +479,65 @@ def test_pdf_page_selector_submits_selected_page() -> None:
         thread.join(timeout=2)
 
 
-def test_dimension_chain_offers_single_missing_value_as_unverified_candidate(page):
-    page.goto("/")
-    page.locator("#chainChecker > summary").click()
-    page.locator(".segment-value").nth(0).fill("3000")
-    page.locator(".segment-verified").nth(0).check()
-    page.locator("#addSegment").click()
-    page.locator(".segment-value").nth(1).fill("2500")
-    page.locator(".segment-verified").nth(1).check()
-    page.locator("#addSegment").click()
-    page.locator("#overallValue").fill("10000")
-    page.locator("#overallVerified").check()
-    page.locator("#checkChain").click()
-    page.wait_for_selector(".chain-candidate")
-    assert "Segment 2: 4500 mm" in page.locator(".chain-candidate").inner_text()
-    page.locator(".chain-candidate button").click()
-    assert page.locator(".segment-value").nth(2).input_value() == "4500"
-    assert not page.locator(".segment-verified").nth(2).is_checked()
-    assert "verify this value manually" in page.locator(".chain-candidate button").inner_text().lower()
+def test_dimension_chain_offers_single_missing_value_as_unverified_candidate() -> None:
+    web_dir = Path(__file__).resolve().parents[2] / "web"
+    handler = partial(QuietHandler, directory=str(web_dir))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
 
-
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.route(
+                "**/api/health",
+                lambda route: route.fulfill(json={
+                    "status": "ok",
+                    "detector_weights_present": True,
+                    "ocr_available": False,
+                    "dimension_chain_validation_available": True,
+                }),
+            )
+            page.route(
+                "**/api/validate-dimension-chain",
+                lambda route: route.fulfill(json={
+                    "status": "unresolved",
+                    "segment_total": None,
+                    "overall_value": "10000",
+                    "difference": None,
+                    "tolerance": "0",
+                    "unit": "mm",
+                    "unresolved_indices": [2],
+                    "overall_unresolved": False,
+                    "unverified_indices": [],
+                    "overall_verified": True,
+                    "candidate_index": 2,
+                    "candidate_value": "4500",
+                    "candidate_available": True,
+                    "candidate_reason": None,
+                    "candidate_requires_confirmation": True,
+                }),
+            )
+            page.goto(f"http://127.0.0.1:{server.server_port}/")
+            page.locator("#chainChecker > summary").click()
+            page.locator(".segment-value").nth(0).fill("3000")
+            page.locator(".segment-verified").nth(0).check()
+            page.locator("#addSegment").click()
+            page.locator(".segment-value").nth(1).fill("2500")
+            page.locator(".segment-verified").nth(1).check()
+            page.locator("#addSegment").click()
+            page.locator("#overallValue").fill("10000")
+            page.locator("#overallVerified").check()
+            page.locator("#checkChain").click()
+            page.wait_for_selector(".chain-candidate")
+            assert "Segment 3: 4500 mm" in page.locator(".chain-candidate").inner_text()
+            page.locator(".chain-candidate button").click()
+            assert page.locator(".segment-value").nth(2).input_value() == "4500"
+            assert not page.locator(".segment-verified").nth(2).is_checked()
+            assert "verify this value manually" in page.locator(".chain-candidate button").inner_text().lower()
+            browser.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
