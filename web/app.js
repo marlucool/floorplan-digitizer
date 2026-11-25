@@ -273,6 +273,7 @@ function renderDimensionTextReview(regions) {
     return;
   }
   panel.classList.remove("hidden");
+  panel.open = true;
   regions.forEach((region, index) => {
     const row = document.createElement("article");
     row.className = "dimension-text-item";
@@ -584,7 +585,9 @@ function exportReviewJson() {
       const selectedLine = (association.candidate_lines || []).find(
         (candidate) => candidate.dimension_line_id === lineSelect?.value
       );
-      const selectedSpan = selectedLine?.wall_spans?.[Number(spanSelect?.value)];
+      const selectedSpan = spanSelect?.value !== ""
+        ? selectedLine?.wall_spans?.[Number(spanSelect.value)]
+        : null;
       return {
         detection_id: region.id,
         raw_text: textInputs[index]?.value || "",

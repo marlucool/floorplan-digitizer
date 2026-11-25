@@ -71,41 +71,43 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                     json={
                         "confidence_threshold": 0.4,
                         "image": {"width": 400, "height": 300},
-                        "counts": {"wall": 1, "dimension_line": 0, "dimension_value": 1},
+                        "counts": {"wall": 2, "dimension_line": 1, "dimension_value": 1},
                         "detections": [
-                            {
-                                "id": "det-001",
-                                "class_name": "wall",
-                                "bbox": {
-                                    "x1": 10, "y1": 20, "x2": 110, "y2": 70,
-                                    "width": 100, "height": 50,
-                                },
-                                "confidence": 0.95,
-                            },
-                            {
-                                "id": "det-002",
-                                "class_name": "dimension_value",
-                                "bbox": {
-                                    "x1": 120, "y1": 80, "x2": 180, "y2": 110,
-                                    "width": 60, "height": 30,
-                                },
-                                "confidence": 0.77,
-                            }
+                            {"id": "det-001", "class_name": "wall", "bbox": {"x1": 100, "y1": 60, "x2": 110, "y2": 250, "width": 10, "height": 190}, "confidence": 0.95},
+                            {"id": "det-002", "class_name": "dimension_line", "bbox": {"x1": 110, "y1": 50, "x2": 290, "y2": 54, "width": 180, "height": 4}, "confidence": 0.88},
+                            {"id": "det-003", "class_name": "wall", "bbox": {"x1": 290, "y1": 60, "x2": 300, "y2": 250, "width": 10, "height": 190}, "confidence": 0.92},
+                            {"id": "det-004", "class_name": "dimension_value", "bbox": {"x1": 170, "y1": 25, "x2": 230, "y2": 45, "width": 60, "height": 20}, "confidence": 0.77}
                         ],
                         "dimension_regions": [
                             {
-                                "id": "det-002",
+                                "id": "det-004",
                                 "class_name": "dimension_value",
-                                "bbox": {
-                                    "x1": 120, "y1": 80, "x2": 180, "y2": 110,
-                                    "width": 60, "height": 30,
-                                },
+                                "bbox": {"x1": 170, "y1": 25, "x2": 230, "y2": 45, "width": 60, "height": 20},
                                 "confidence": 0.77,
-                                "crop_bbox": {
-                                    "x1": 111, "y1": 72, "x2": 189, "y2": 118,
-                                    "width": 78, "height": 46,
+                                "association": {
+                                    "dimension_value_id": "det-004",
+                                    "status": "candidate",
+                                    "confirmed": false,
+                                    "candidate_lines": [
+                                        {
+                                            "dimension_line_id": "det-002",
+                                            "orientation": "horizontal",
+                                            "score": 0.84,
+                                            "wall_span_status": "candidate",
+                                            "wall_spans": [
+                                                {
+                                                    "wall_ids": ["det-001", "det-003"],
+                                                    "orientation": "horizontal",
+                                                    "method": "between_vertical_walls",
+                                                    "span_px": 180,
+                                                    "score": 0.91
+                                                }
+                                            ]
+                                        }
+                                    ]
                                 },
-                                "crop_data_url": preview_data_url,
+                                "crop_bbox": {"x1": 161, "y1": 17, "x2": 239, "y2": 53, "width": 78, "height": 36},
+                                "crop_data_url": preview_data_url
                             }
                         ],
                         "preview_data_url": preview_data_url,
@@ -165,9 +167,9 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert page.locator("#noDetectionMatches").is_visible()
             page.locator("#detectionSearch").fill("")
             page.locator("#detectionSort").select_option("confidence")
-            page.locator('.detection-row[data-detection-id="det-002"]').click()
+            page.locator('.detection-row[data-detection-id="det-004"]').click()
             assert page.locator("#selectedDetection").is_visible()
-            assert "det-002" in page.locator("#selectedDetection").inner_text().lower().lower()
+            assert "det-004" in page.locator("#selectedDetection").inner_text().lower()
             page.locator("#themeToggle").click()
             assert page.locator("html").get_attribute("data-theme") == "dark"
             page.locator("#themeToggle").click()
@@ -177,12 +179,15 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             )
             assert max(alignment.values()) < 2
 
-            page.locator("#dimensionTextReview > summary").click()
+            assert page.locator("#dimensionTextReview").evaluate("(node) => node.open")
             page.locator(".dimension-text-value").fill("4200")
             page.locator(".dimension-text-style").select_option("handwritten")
             assert page.locator(".dimension-text-value").input_value() == "4200"
-            assert page.locator(".dimension-text-item").get_attribute("data-detection-id") == "det-002"
+            assert page.locator(".dimension-text-item").get_attribute("data-detection-id") == "det-004"
             page.locator(".dimension-text-verified-input").check()
+            page.locator(".dimension-line-select").select_option("det-002")
+            page.locator(".dimension-wall-span-select").select_option("0")
+            page.locator(".dimension-association-verified-input").check()
 
             page.locator("#chainChecker > summary").click()
             page.locator(".segment-value").nth(0).fill("3000")
@@ -215,11 +220,14 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             Draft202012Validator(schema, format_checker=FormatChecker()).validate(exported)
             assert exported["source"]["filename"] == "plan.png"
             assert exported["analysis"]["confidence_threshold"] == 0.4
-            assert exported["detections"][0]["bbox"]["x1"] == 10
-            assert exported["manual_dimension_text_review"][0]["detection_id"] == "det-002"
+            assert exported["detections"][0]["bbox"]["x1"] == 100
+            assert exported["manual_dimension_text_review"][0]["detection_id"] == "det-004"
             assert exported["manual_dimension_text_review"][0]["raw_text"] == "4200"
             assert exported["manual_dimension_text_review"][0]["text_style"] == "handwritten"
             assert exported["manual_dimension_text_review"][0]["verified"] is True
+            assert exported["manual_dimension_text_review"][0]["association"]["dimension_line_id"] == "det-002"
+            assert exported["manual_dimension_text_review"][0]["association"]["wall_ids"] == ["det-001", "det-003"]
+            assert exported["manual_dimension_text_review"][0]["association"]["confirmed"] is True
             assert "preview_data_url" not in exported
 
             page.locator("#fitView").click()
