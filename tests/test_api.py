@@ -337,6 +337,7 @@ def test_web_ui_assets_and_architecture_notes_are_served() -> None:
     assert page.status_code == 200
     assert 'id="classFilter"' in page.text
     assert 'id="overlayToggle"' in page.text
+    assert 'id="pdfPageNumber"' in page.text
 
     script = client.get("/app.js")
     assert script.status_code == 200
