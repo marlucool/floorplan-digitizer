@@ -44,7 +44,7 @@ def test_audit_reports_valid_dataset_and_grouped_splits(tmp_path: Path) -> None:
     report = audit_dataset(_make_dataset(tmp_path))
     assert report["valid"] is True
     assert report["sample_count"] == 4
-    assert report["verified_count"] == 3
+    assert report["verified_count"] == 4
     assert report["splits"]["present"] is True
     assert "4" in report["character_frequencies"]
     assert any(item["code"] == "small_dataset" for item in report["warnings"])
