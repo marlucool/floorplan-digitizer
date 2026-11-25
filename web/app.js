@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1, calibration: { points: [], picking: false, applied: null } };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], mode: "select", pendingPoint: null, selectedId: null, nextId: 1 } };
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -16,7 +16,9 @@ function resetWorkspace() {
   state.detections = []; state.selectedId = null; state.activeFilter = "all";
   state.overlayVisible = true; state.resizeObserver = null; state.resizeHandler = null; state.zoom = 1;
   state.searchQuery = ""; state.sortMode = "original";
+  state.geometry = { segments: [], mode: "select", pendingPoint: null, selectedId: null, nextId: 1 };
   clearCalibration();
+  renderGeometryControls();
   if ($("#detectionSearch")) $("#detectionSearch").value = "";
   if ($("#detectionSort")) $("#detectionSort").value = "original";
   $("#fileInput").value = "";
@@ -94,6 +96,8 @@ function setFile(file) {
   state.result = null;
   state.previewUrl = null;
   clearCalibration();
+  state.geometry = { segments: [], mode: "select", pendingPoint: null, selectedId: null, nextId: 1 };
+  renderGeometryControls();
   state.selectedId = null;
   state.detections = [];
   state.overlayVisible = true;
@@ -231,6 +235,28 @@ function drawDetections(previewUrl, detections, imageSize) {
         ctx.fillText(String(index + 1), point.x, point.y);
       });
     }
+    (state.geometry.segments || []).forEach((segment) => {
+      const selected = segment.id === state.geometry.selectedId;
+      ctx.beginPath();
+      ctx.strokeStyle = selected ? "#d34e3e" : "#172b4d";
+      ctx.lineWidth = selected ? Math.max(6, canvas.width / 300) : Math.max(4, canvas.width / 420);
+      ctx.lineCap = "round";
+      ctx.moveTo(segment.start_px.x * sx, segment.start_px.y * sy);
+      ctx.lineTo(segment.end_px.x * sx, segment.end_px.y * sy);
+      ctx.stroke();
+      [segment.start_px, segment.end_px].forEach((point) => {
+        ctx.beginPath();
+        ctx.fillStyle = selected ? "#d34e3e" : "#172b4d";
+        ctx.arc(point.x * sx, point.y * sy, Math.max(4, canvas.width / 450), 0, Math.PI * 2);
+        ctx.fill();
+      });
+    });
+    if (state.geometry.pendingPoint) {
+      ctx.beginPath();
+      ctx.fillStyle = "#c47734";
+      ctx.arc(state.geometry.pendingPoint.x * sx, state.geometry.pendingPoint.y * sy, Math.max(6, canvas.width / 300), 0, Math.PI * 2);
+      ctx.fill();
+    }
     canvas.classList.toggle("hidden", !state.overlayVisible);
   };
   img.onload = paint;
@@ -279,6 +305,9 @@ function renderCalibrationStatus() {
 
 function startCalibration() {
   if (!state.result) return;
+  state.geometry.mode = "select";
+  state.geometry.pendingPoint = null;
+  renderGeometryControls();
   state.calibration = { points: [], picking: true, applied: null };
   $("#calibrationResult").textContent = "Click the first point, then the second point on the drawing.";
   renderCalibrationStatus();
@@ -346,7 +375,172 @@ function applyCalibration() {
 $("#startCalibration").addEventListener("click", startCalibration);
 $("#applyCalibration").addEventListener("click", applyCalibration);
 $("#clearCalibration").addEventListener("click", clearCalibration);
-$("#previewImage").addEventListener("click", addCalibrationPoint);
+function getSourcePoint(event) {
+  if (!state.result) return null;
+  const rect = $("#previewImage").getBoundingClientRect();
+  if (!rect.width || !rect.height) return null;
+  return {
+    x: Math.max(0, Math.min(state.result.image.width, ((event.clientX - rect.left) / rect.width) * state.result.image.width)),
+    y: Math.max(0, Math.min(state.result.image.height, ((event.clientY - rect.top) / rect.height) * state.result.image.height))
+  };
+}
+
+function pointToSegmentDistance(point, start, end) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (!lengthSquared) return Math.hypot(point.x - start.x, point.y - start.y);
+  const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared));
+  return Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy));
+}
+
+function renderGeometryControls() {
+  const geometry = state.geometry;
+  const count = geometry?.segments?.length || 0;
+  if (!$("#geometryCount")) return;
+  $("#geometryCount").textContent = count + (count === 1 ? " manual wall" : " manual walls");
+  $("#drawWallTool").disabled = !state.result;
+  $("#selectWallTool").disabled = !state.result;
+  $("#undoWall").disabled = count === 0;
+  $("#deleteWall").disabled = !geometry.selectedId;
+  $("#clearWalls").disabled = count === 0;
+  $("#exportGeometry").disabled = count === 0;
+  $("#drawWallTool").classList.toggle("active-tool", geometry.mode === "draw_wall");
+  $("#selectWallTool").classList.toggle("active-tool", geometry.mode === "select");
+  $("#previewImage").classList.toggle("geometry-drawing", geometry.mode === "draw_wall");
+  if (geometry.mode === "draw_wall") {
+    $("#geometryStatus").textContent = geometry.pendingPoint ? "Start point set. Click the end point." : "Draw mode: click a wall start, then its end.";
+  } else if (geometry.selectedId) {
+    $("#geometryStatus").textContent = "Selected " + geometry.selectedId + ". Delete it or draw another wall.";
+  } else {
+    $("#geometryStatus").textContent = "Manual only: detector boxes are not converted into walls.";
+  }
+}
+
+function setGeometryMode(mode) {
+  if (!state.result) return;
+  if (state.calibration.picking) {
+    state.calibration.picking = false;
+    renderCalibrationStatus();
+  }
+  state.geometry.mode = mode;
+  state.geometry.pendingPoint = null;
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+}
+
+function addManualWallPoint(point) {
+  if (!point) return;
+  if (!state.geometry.pendingPoint) {
+    state.geometry.pendingPoint = point;
+  } else {
+    const start = state.geometry.pendingPoint;
+    const length = Math.hypot(point.x - start.x, point.y - start.y);
+    if (length < 3) {
+      $("#geometryStatus").textContent = "That segment is too short. Choose a more distant end point.";
+      return;
+    }
+    const id = "manual-wall-" + String(state.geometry.nextId++).padStart(3, "0");
+    state.geometry.segments.push({
+      id,
+      type: "wall_segment",
+      start_px: { x: Number(start.x.toFixed(2)), y: Number(start.y.toFixed(2)) },
+      end_px: { x: Number(point.x.toFixed(2)), y: Number(point.y.toFixed(2)) },
+      source_page_index: state.result?.source?.page_index ?? 0,
+      created_by_user: true
+    });
+    state.geometry.pendingPoint = null;
+    state.geometry.selectedId = id;
+  }
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+}
+
+function selectManualWall(point) {
+  if (!point) return;
+  let closest = null;
+  let closestDistance = 12;
+  for (const segment of state.geometry.segments) {
+    const distance = pointToSegmentDistance(point, segment.start_px, segment.end_px);
+    if (distance <= closestDistance) {
+      closest = segment;
+      closestDistance = distance;
+    }
+  }
+  state.geometry.selectedId = closest?.id || null;
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+}
+
+function handleDrawingClick(event) {
+  if (!state.result) return;
+  if (state.calibration.picking) return addCalibrationPoint(event);
+  const point = getSourcePoint(event);
+  if (state.geometry.mode === "draw_wall") return addManualWallPoint(point);
+  if (state.geometry.mode === "select") return selectManualWall(point);
+}
+
+function undoManualWall() {
+  if (!state.geometry.segments.length) return;
+  const removed = state.geometry.segments.pop();
+  if (state.geometry.selectedId === removed.id) state.geometry.selectedId = null;
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+}
+
+function deleteSelectedManualWall() {
+  if (!state.geometry.selectedId) return;
+  state.geometry.segments = state.geometry.segments.filter((segment) => segment.id !== state.geometry.selectedId);
+  state.geometry.selectedId = null;
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+}
+
+function clearManualWalls() {
+  state.geometry.segments = [];
+  state.geometry.pendingPoint = null;
+  state.geometry.selectedId = null;
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+}
+
+function exportManualGeometrySvg() {
+  if (!state.result || !state.geometry.segments.length) return;
+  const width = state.result.image.width;
+  const height = state.result.image.height;
+  const scale = state.calibration.applied?.pixels_per_mm;
+  const physicalWidth = scale ? (width / scale).toFixed(3) + "mm" : width + "px";
+  const physicalHeight = scale ? (height / scale).toFixed(3) + "mm" : height + "px";
+  const lines = state.geometry.segments.map((segment) =>
+    '<line id="' + segment.id + '" x1="' + segment.start_px.x + '" y1="' + segment.start_px.y +
+    '" x2="' + segment.end_px.x + '" y2="' + segment.end_px.y +
+    '" stroke="#172b4d" stroke-width="6" stroke-linecap="round" />'
+  ).join("\n  ");
+  const svg = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<svg xmlns="http://www.w3.org/2000/svg" width="' + physicalWidth + '" height="' + physicalHeight +
+    '" viewBox="0 0 ' + width + ' ' + height + '">\n' +
+    '  <metadata>Planline manually drawn wall segments. Coordinates are in original source-image pixels. ' +
+    (scale ? 'Physical scale uses a user-supplied two-point reference; it is not verified geometry.' : 'No physical scale is embedded.') +
+    '</metadata>\n  ' + lines + '\n</svg>';
+  const blob = new Blob([svg], { type: "image/svg+xml" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = ((state.file?.name || "drawing").replace(/\.[^.]+$/, "") || "drawing") + "-manual-geometry.svg";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+$("#drawWallTool").addEventListener("click", () => setGeometryMode("draw_wall"));
+$("#selectWallTool").addEventListener("click", () => setGeometryMode("select"));
+$("#undoWall").addEventListener("click", undoManualWall);
+$("#deleteWall").addEventListener("click", deleteSelectedManualWall);
+$("#clearWalls").addEventListener("click", clearManualWalls);
+$("#exportGeometry").addEventListener("click", exportManualGeometrySvg);
+
+$("#previewImage").addEventListener("click", handleDrawingClick);
 
 function renderResults(payload) {
   const detections = payload.detections || [];
@@ -368,6 +562,7 @@ function renderResults(payload) {
   $("#contrastValue").textContent = Number(payload.preprocessing?.contrast ?? 1).toFixed(2) + "×";
   $("#startCalibration").disabled = false;
   renderCalibrationStatus();
+  renderGeometryControls();
   $("#sourceState").textContent = "Analysed";
   $("#viewTag").textContent = "DETECTION OVERLAY";
   $("#imageDimensions").textContent = payload.image.width + " × " + payload.image.height + " px";
@@ -777,6 +972,7 @@ function buildReviewObject() {
       bbox: detection.bbox,
       centre: detection.centre
     })),
+    manual_geometry: state.geometry.segments.map((segment) => ({ ...segment })),
     manual_dimension_text_review: (result.dimension_regions || []).map((region, index) => {
       const textInputs = document.querySelectorAll(".dimension-text-value");
       const verifiedInputs = document.querySelectorAll(".dimension-text-verified-input");
@@ -837,6 +1033,7 @@ function buildReviewObject() {
         ? "A two-point scale was supplied by the user and recorded as pixels per millimetre; it is not an independently verified measurement or validated geometry."
         : "No pixel-to-unit scale or measured geometry has been inferred.",
       "Bounding boxes are detector candidates, not measured wall geometry.",
+      "Manual wall segments are user-created linework and have not been independently validated or topologically connected.",
       "No measured DXF geometry is included."
     ]
   };
@@ -893,6 +1090,8 @@ async function saveProject() {
       data_base64: await encodeFileBase64(state.file)
     },
     analysis_result: state.result,
+    geometry: state.geometry.segments,
+    geometry_next_id: state.geometry.nextId,
     review
   };
   const safeStem = (state.file.name || "drawing")
@@ -961,6 +1160,30 @@ function restoreProjectReview(review) {
   }
 }
 
+function isValidProjectGeometry(project) {
+  const segments = project.geometry ?? [];
+  if (!Array.isArray(segments)) return false;
+  if (project.geometry_next_id !== undefined &&
+      (!Number.isInteger(project.geometry_next_id) || project.geometry_next_id < 1)) return false;
+  const ids = new Set();
+  return segments.every((segment) => {
+    if (!segment || typeof segment.id !== "string" || !/^manual-wall-[0-9]{3,}$/.test(segment.id) ||
+        ids.has(segment.id) || segment.type !== "wall_segment" ||
+        segment.created_by_user !== true || !Number.isInteger(segment.source_page_index) ||
+        segment.source_page_index < 0 || segment.source_page_index !== (project.analysis_result.source?.page_index ?? 0)) return false;
+    ids.add(segment.id);
+    const points = [segment.start_px, segment.end_px];
+    if (!points.every((point) => point && Number.isFinite(point.x) && Number.isFinite(point.y) &&
+        point.x >= 0 && point.y >= 0 &&
+        point.x <= project.analysis_result.image.width &&
+        point.y <= project.analysis_result.image.height)) return false;
+    return Math.hypot(
+      segment.end_px.x - segment.start_px.x,
+      segment.end_px.y - segment.start_px.y
+    ) >= 3;
+  });
+}
+
 async function openProjectFile(file) {
   if (!file) return;
   if (file.size > 100 * 1024 * 1024) {
@@ -974,6 +1197,7 @@ async function openProjectFile(file) {
         !project.analysis_result?.image || !Array.isArray(project.analysis_result.detections) ||
         !project.analysis_result.preview_data_url || !project.review ||
         !Array.isArray(project.review.manual_dimension_text_review) ||
+        !isValidProjectGeometry(project) ||
         !/\\.(png|jpe?g|webp|tiff?|pdf)$/i.test(project.source.filename) ||
         !Number.isInteger(project.source.size_bytes) || project.source.size_bytes < 1 || project.source.size_bytes > 25 * 1024 * 1024 ||
         !Number.isFinite(project.analysis_result.image.width) || project.analysis_result.image.width < 1 ||
@@ -990,9 +1214,14 @@ async function openProjectFile(file) {
     });
     setFile(sourceFile);
     state.result = project.analysis_result;
+    state.geometry.segments = Array.isArray(project.geometry) ? project.geometry : [];
+    state.geometry.nextId = Number.isInteger(project.geometry_next_id) ? project.geometry_next_id : state.geometry.segments.length + 1;
+    state.geometry.selectedId = null;
+    state.geometry.pendingPoint = null;
     state.previewUrl = project.analysis_result.preview_data_url;
     state.detections = project.analysis_result.detections || [];
     renderResults(state.result);
+    renderGeometryControls();
     restoreProjectReview(project.review);
     $("#saveProject").disabled = false;
     showNotice("Project opened", "The source drawing, previous analysis, manual transcriptions, associations and calibration were restored locally.");

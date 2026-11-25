@@ -139,6 +139,77 @@
         }
       },
       "additionalProperties": true
+    },
+    "geometry": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "type",
+          "start_px",
+          "end_px",
+          "source_page_index",
+          "created_by_user"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "const": "wall_segment"
+          },
+          "start_px": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "type": "number",
+                "minimum": 0
+              },
+              "y": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          },
+          "end_px": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "type": "number",
+                "minimum": 0
+              },
+              "y": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          },
+          "source_page_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "created_by_user": {
+            "const": true
+          }
+        }
+      }
+    },
+    "geometry_next_id": {
+      "type": "integer",
+      "minimum": 1
     }
   }
 }

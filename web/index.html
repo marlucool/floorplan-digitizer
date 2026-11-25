@@ -74,6 +74,23 @@
           </div>
           <output id="calibrationResult" aria-live="polite">No scale applied.</output>
         </section>
+        <section class="geometry-panel" aria-labelledby="geometryHeading">
+          <div class="geometry-heading"><strong id="geometryHeading">Manual wall geometry</strong><span id="geometryCount">0 manual walls</span></div>
+          <p>Draw your own wall segments over the source image. These are user-created lines, not automatic wall detections or verified CAD geometry.</p>
+          <div class="geometry-tools">
+            <button id="drawWallTool" class="toolbar-button" type="button" disabled>Draw wall</button>
+            <button id="selectWallTool" class="toolbar-button active-tool" type="button" disabled>Select</button>
+          </div>
+          <div class="geometry-tools">
+            <button id="undoWall" class="toolbar-button" type="button" disabled>Undo last drawn</button>
+            <button id="deleteWall" class="toolbar-button" type="button" disabled>Delete selected</button>
+          </div>
+          <div class="geometry-tools">
+            <button id="clearWalls" class="toolbar-button" type="button" disabled>Clear all</button>
+            <button id="exportGeometry" class="toolbar-button" type="button" disabled>Export SVG</button>
+          </div>
+          <output id="geometryStatus" aria-live="polite">Analyse a drawing to start manually tracing wall segments.</output>
+        </section>
         <div class="privacy-note"><span class="lock">▣</span><span><strong>Local-first processing</strong><br>Nothing is saved automatically. Use Save project to create a local .planline file containing the source drawing and review state. Multipart uploads may use temporary storage during receipt; request files are closed after processing.</span></div>
         <div class="panel-heading section-gap"><span>02 / PIPELINE STATUS</span></div>
         <ol class="pipeline">
