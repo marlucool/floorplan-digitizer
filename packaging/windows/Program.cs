@@ -1048,6 +1048,13 @@ internal sealed class SetupForm : Form
         return Task.CompletedTask;
     }
 
+    private void SetProgressDetail(string message)
+    {
+        if (!IsHandleCreated || IsDisposed) return;
+        if (InvokeRequired) BeginInvoke((Action)(() => _progressDetail.Text = message));
+        else _progressDetail.Text = message;
+    }
+
     private void UpdateAsset(string name, long downloaded, long? total, string status)
     {
         void Update()
@@ -1192,7 +1199,7 @@ internal sealed class SetupForm : Form
                         activeDownloadSize = ParseAssetBytes(sizeMatch.Groups["n"].Value, sizeMatch.Groups["u"].Value);
                 }
                 UpdateAsset(activeDownload, 0, activeDownloadSize, "Downloading");
-                _progressDetail.Text = $"Downloading package: {activeDownload}";
+                SetProgressDetail($"Downloading package: {activeDownload}");
             }
 
             if (activeDownload is not null)
@@ -1206,7 +1213,7 @@ internal sealed class SetupForm : Form
                     long total = ParseAssetBytes(progress.Groups["t"].Value, progress.Groups["tu"].Value);
                     activeDownloadSize = total;
                     UpdateAsset(activeDownload, done, total, "Downloading");
-                    _progressDetail.Text = $"{activeDownload}: {FormatBytes(done)} of {FormatBytes(total)} ({progress.Groups["p"].Value}%)";
+                    SetProgressDetail($"{activeDownload}: {FormatBytes(done)} of {FormatBytes(total)} ({progress.Groups["p"].Value}%)");
                 }
                 if (trimmed.Contains("Installing collected packages", StringComparison.OrdinalIgnoreCase) ||
                     trimmed.Contains("Successfully installed", StringComparison.OrdinalIgnoreCase))
