@@ -37,7 +37,7 @@ A reviewer can create a room polygon by clicking at least three corners and expl
 
 ### Manual wall geometry
 
-The Drawing workspace includes a user-driven wall-segment layer. The reviewer selects Draw wall and clicks a start and end point in source-image coordinates. Segments can be selected, deleted, undone or cleared, and exported as SVG. These lines are explicitly user-created; detector boxes are never promoted to walls automatically. SVG physical sizing uses the user-supplied scale reference when present and records that it is not verified geometry. This is not DXF export or automatic topology reconstruction.
+The Drawing workspace includes a user-driven wall-segment layer. The reviewer selects Draw wall and clicks a start and end point in source-image coordinates. Segments can be selected, have either endpoint dragged to correct the line, deleted, undone or cleared, and exported as SVG. Selected wall lengths are shown in pixels or derived metres when a user-supplied scale is available. These lines are explicitly user-created; detector boxes are never promoted to walls automatically. SVG physical sizing uses the user-supplied scale reference when present and records that it is not verified geometry. This is not DXF export or automatic topology reconstruction.
 
 ### Manual wall geometry
 

@@ -202,3 +202,5 @@ html[data-theme="dark"] .geometry-tools button.active-tool{background:#263c2c;co
 .room-heading strong{font:600 11px Manrope;color:var(--ink)}
 .room-heading span{font:9px 'DM Mono';color:var(--green)}
 #roomArea{font:10px/1.5 'DM Mono';color:var(--ink);padding:8px;background:var(--panel);border-radius:6px}
+
+#wallLength{font:10px/1.5 "DM Mono";color:var(--ink);padding:8px;background:var(--panel);border-radius:6px}
