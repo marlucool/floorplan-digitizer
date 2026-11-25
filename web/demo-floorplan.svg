@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="850" viewBox="0 0 1200 850">
+<rect width="1200" height="850" fill="#f8f7f2"/>
+<g stroke="#333b35" stroke-width="14" fill="none" stroke-linecap="square" stroke-linejoin="miter">
+<path d="M127 122H1073V728H127Z"/>
+<path d="M577 122V420M577 421H1073M797 421V728"/>
+</g>
+<g stroke="#333b35" stroke-width="7" fill="none">
+<path d="M577 235V305M577 330V395M797 525V595"/>
+<path d="M127 275H200M127 500H200"/>
+</g>
+<g stroke="#8c958a" stroke-width="2" fill="none">
+<path d="M127 122V72M1073 122V72M127 58H1073M120 122H60M120 728H60M68 122V728"/>
+<path d="M577 122V90M797 421V385M1073 421V385M577 402H797M797 402H1073"/>
+</g>
+<g stroke="#8c958a" stroke-width="2" fill="none">
+<path d="M127 58l12 -5v10zM1073 58l-12 -5v10zM68 122l-5 12h10zM68 728l-5 -12h10z"/>
+</g>
+<g stroke="#b47a2e" stroke-width="2" fill="none">
+<path d="M577 330a90 90 0 0 1 90 90M797 595a75 75 0 0 0 75 75"/>
+</g>
+<g fill="#9aa397" opacity=".22">
+<rect x="175" y="190" width="290" height="190" rx="3"/>
+<rect x="190" y="465" width="260" height="185" rx="3"/>
+<rect x="625" y="170" width="375" height="185" rx="3"/>
+<rect x="835" y="470" width="190" height="200" rx="3"/>
+</g>
+<g stroke="#8c958a" stroke-width="4" fill="none">
+<rect x="220" y="235" width="200" height="100" rx="4"/>
+<path d="M245 235v100M395 235v100"/>
+<rect x="230" y="510" width="180" height="95" rx="4"/>
+<path d="M250 510v95M390 510v95"/>
+<rect x="690" y="220" width="250" height="85" rx="4"/>
+<path d="M715 220v85M915 220v85"/>
+<rect x="865" y="520" width="120" height="105" rx="4"/>
+</g>
+<g fill="#58675a" font-family="Arial,sans-serif" font-size="24" letter-spacing="2" text-anchor="middle">
+<text x="355" y="420">LIVING</text>
+<text x="350" y="680">BEDROOM</text>
+<text x="812" y="385">KITCHEN</text>
+<text x="920" y="690">STUDY</text>
+</g>
+<g fill="#68736a" font-family="Arial,sans-serif" font-size="22" text-anchor="middle">
+<text x="600" y="45">9 200</text>
+<text x="38" y="430" transform="rotate(-90 38 430)">6 100</text>
+<text x="685" y="395" font-size="16">2 400</text>
+</g>
+<g stroke="#a8aea4" stroke-width="1" fill="none" opacity=".8">
+<path d="M577 122V160M1073 122V160M577 145H1073M127 728V770M1073 728V770M127 755H1073"/>
+</g>
+<g fill="#8a9288" font-family="Arial,sans-serif" font-size="13">
+<text x="125" y="815">DEMO FLOOR PLAN · NOT TO SCALE</text>
+<text x="1075" y="815" text-anchor="end">PLANLINE UI PREVIEW</text>
+</g>
+</svg>

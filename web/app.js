@@ -1,4 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
+const PREVIEW_MODE = window.PLANLINE_PREVIEW === true;
 const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, ocrReady: false, ocrModels: [], ocrDatasets: [], ocrPredictions: {}, ocrRunning: false, ocrModelId: null, ocrDevice: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
 
 function formatBytes(bytes) {
@@ -1383,7 +1384,9 @@ function updateOcrControls() {
   const hasCandidates = Boolean(state.result?.dimension_regions?.length);
   $("#runOcrButton").disabled = !state.ocrReady || !hasCandidates || state.ocrRunning || !$("#ocrModelSelect").value;
   if (!state.ocrReady) {
-    $("#ocrAssistStatus").textContent = "Optional PaddleOCR runtime not detected. Manual transcription and dataset tools remain available.";
+    $("#ocrAssistStatus").textContent = PREVIEW_MODE
+      ? "OCR is disabled in this static UI preview. No recognition or training runs here."
+      : "Optional PaddleOCR runtime not detected. Manual transcription and dataset tools remain available.";
   } else if (state.ocrRunning) {
     $("#ocrAssistStatus").textContent = "Recognising dimension crops…";
   } else if (!hasCandidates) {
@@ -1394,6 +1397,13 @@ function updateOcrControls() {
 }
 
 async function loadOcrCapabilities() {
+  if (PREVIEW_MODE) {
+    state.ocrReady = false;
+    state.ocrModels = [];
+    state.ocrDatasets = [];
+    updateOcrControls();
+    return;
+  }
   try {
     const [statusResponse, modelsResponse, datasetsResponse] = await Promise.all([
       fetch("/api/ocr/status"),
@@ -2158,20 +2168,25 @@ const dropzone = $("#dropzone");
   event.preventDefault(); dropzone.classList.remove("dragover");
 }));
 dropzone.addEventListener("drop", (event) => setFile(event.dataTransfer.files[0]));
-fetch("/api/health").then((r) => r.json()).then((health) => {
-  const meta = $(".top-meta");
-  if (health.status === "ok") {
-    $("#apiStatus").textContent = health.detector_weights_present ? "API ready · detector weights found" : "API ready · detector missing";
-    if (!health.detector_weights_present) showNotice("Detector model missing", "The UI and API are available, but yolo_floorplan.pt must be present in the repository root before analysis can run.");
-  } else {
-    meta.classList.add("api-error");
-    $("#apiStatus").textContent = "API not ready";
-  }
-}).catch(() => {
-  $(".top-meta").classList.add("api-error");
-  $("#apiStatus").textContent = "API unavailable";
-  showNotice("API unavailable", "Start the local Planline API to enable drawing analysis.");
-});
+if (PREVIEW_MODE) {
+  $("#apiStatus").textContent = "Static UI preview · backend disabled";
+  $(".local-dot").classList.add("preview-mode");
+} else {
+  fetch("/api/health").then((r) => r.json()).then((health) => {
+    const meta = $(".top-meta");
+    if (health.status === "ok") {
+      $("#apiStatus").textContent = health.detector_weights_present ? "API ready · detector weights found" : "API ready · detector missing";
+      if (!health.detector_weights_present) showNotice("Detector model missing", "The UI and API are available, but yolo_floorplan.pt must be present in the repository root before analysis can run.");
+    } else {
+      meta.classList.add("api-error");
+      $("#apiStatus").textContent = "API not ready";
+    }
+  }).catch(() => {
+    $(".top-meta").classList.add("api-error");
+    $("#apiStatus").textContent = "API unavailable";
+    showNotice("API unavailable", "Start the local Planline API to enable drawing analysis.");
+  });
+}
 
 $("#drawingDatasetSelect").addEventListener("change", updateDatasetCaptureButtons);
 $("#drawingSourceId").addEventListener("input", updateDatasetCaptureButtons);
