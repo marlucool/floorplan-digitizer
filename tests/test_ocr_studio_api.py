@@ -41,6 +41,11 @@ def test_local_ocr_studio_dataset_and_annotation_routes(tmp_path: Path, monkeypa
     splits = client.post(f"/api/ocr/datasets/{dataset_id}/splits", json={"seed": 42, "force": True})
     assert splits.status_code == 200, splits.text
     assert set(splits.json()["splits"]["sample_counts"]) == {"train", "validation", "test"}
+    quality = client.get(f"/api/ocr/datasets/{dataset_id}/quality")
+    assert quality.status_code == 200, quality.text
+    assert quality.json()["sample_count"] == 3
+    assert quality.json()["splits"]["present"] is True
+    assert "character_frequencies" in quality.json()
 
     edited = client.patch(
         f"/api/ocr/datasets/{dataset_id}/samples/{crop_id}",
