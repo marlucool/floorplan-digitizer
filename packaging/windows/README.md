@@ -1,6 +1,6 @@
 # Windows installer
 
-The Windows installer is a native, single-file WinForms application. The person installing Planline downloads and opens **Planline-Setup.exe**; no terminal, system Python installation, or package commands are required.
+The Windows installer is a native, single-file WinForms application. Setup displays live byte counts and percentages for direct downloads, plus a per-asset activity list; package installation progress is surfaced separately from download progress. The person installing Planline downloads and opens **Planline-Setup.exe**; no terminal, system Python installation, or package commands are required.
 
 ## What the installer does
 
