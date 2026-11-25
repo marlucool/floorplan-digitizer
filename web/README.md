@@ -91,6 +91,30 @@ A detection score is the model's confidence for a class prediction. It is not OC
 - Browser overlay alignment is based on the reduced preview and source-image coordinate dimensions. It is a visual review aid, not an annotation-authoring or measurement surface.
 - The current detector endpoint is synchronous. Large or concurrent jobs may need a background-job design and explicit resource limits before multi-user deployment.
 
+
+## Real-weight smoke test (opt-in)
+
+The regular CI suite uses a fake detector so it stays lightweight and deterministic. To verify that the actual `yolo_floorplan.pt` loads and runs inference on a representative scan, install the web dependencies and run the opt-in integration test.
+
+PowerShell:
+
+```powershell
+python -m pip install -r requirements-web.txt
+$env:PLANLINE_RUN_MODEL_SMOKE = "1"
+$env:PLANLINE_SMOKE_IMAGE = "C:\\path\\to\\representative-scan.png"
+python -m pytest -m integration tests/test_real_model_smoke.py -q
+```
+
+Bash:
+
+```bash
+python -m pip install -r requirements-web.txt
+PLANLINE_RUN_MODEL_SMOKE=1 PLANLINE_SMOKE_IMAGE=/path/to/representative-scan.png \\
+  python -m pytest -m integration tests/test_real_model_smoke.py -q
+```
+
+Set `PLANLINE_SMOKE_DEVICE=cpu` to force CPU inference, or use the Ultralytics device value appropriate to the local installation. The test checks model loading, class names, output shape and finite in-bounds boxes. It does **not** measure detection accuracy or validate OCR, dimensions, scale or geometry. Use a representative scan that you are permitted to test.
+
 ## Development checks
 
 ```bash
