@@ -32,7 +32,7 @@ def test_horizontal_value_to_line_to_vertical_wall_gap() -> None:
     assert span["method"] == "between_vertical_walls"
     assert span["text_center_offset_px"] == 0
     assert result["confirmed"] is False
-    assert result["candidate_lines"][0]["globally_assigned"] is True
+    assert result["candidate_lines"][0]["wall_spans"][0]["globally_assigned"] is True
 
 
 def test_vertical_value_to_line_to_horizontal_wall_gap() -> None:
@@ -112,7 +112,7 @@ def test_global_assignment_avoids_the_old_greedy_matching_trap() -> None:
     assert assignment[1] == 0
 
 
-def test_two_text_regions_are_not_globally_recommended_the_same_dimension_line() -> None:
+def test_two_text_regions_are_not_globally_recommended_the_same_wall_gap() -> None:
     detections = [
         detection("value-a", "dimension_value", (75, 31, 125, 49)),
         detection("value-b", "dimension_value", (75, 32, 125, 50)),
