@@ -21,7 +21,7 @@ The sample readings and confidence percentages are demonstration data. They are 
 
 ## Run the web app
 
-Run these commands from the repository root. The web app uses the smaller backend requirements file; installing the root `requirements.txt` also installs the heavier experimental ML stack.
+Run these commands from the repository root with **Python 3.11 or newer**. The web app uses the smaller backend requirements file; installing the root `requirements.txt` also installs the heavier experimental ML stack.
 
 ```bash
 python -m venv .venv

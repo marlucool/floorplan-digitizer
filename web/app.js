@@ -130,6 +130,7 @@
       state.apiAvailable = health.status === 'ok';
       if (state.apiAvailable) {
         $('#apiStatus').innerHTML = '<span class="status-dot"></span> Local backend connected';
+        $('#sourceHandlingHint').textContent = 'Local API available · imported files stay on this computer.';
       }
     } catch {
       $('#apiStatus').innerHTML = '<span class="status-dot amber"></span> Local preview mode';
@@ -144,6 +145,7 @@
     if (!response.ok) throw new Error('The local service could not store this drawing.');
     const project = await response.json();
     state.projectId = project.id;
+    $('#sourceHandlingHint').textContent = 'Stored locally on this computer · no remote model service is used.';
     $('#projectFileMeta').textContent = `${Math.max(1, Math.round(project.size_bytes / 1024))} KB · stored locally · not analysed`;
     const analysis = await fetch(`/api/projects/${project.id}/analyze`, { method: 'POST' });
     if (!analysis.ok) throw new Error('The local service stored the drawing, but could not start analysis.');
@@ -168,6 +170,9 @@
     state.file = file;
     state.sample = false;
     state.projectId = null;
+    $('#projectDrawingType').textContent = 'Unclassified · 2D';
+    $('#projectUnits').textContent = 'Not confirmed';
+    $('#sourceHandlingHint').textContent = state.apiAvailable ? 'Ready to store with the local API on this computer.' : 'Browser preview only · local API is not connected.';
     updateFileMeta(file);
     if (isPdf) {
       $('#pdfName').textContent = file.name;
@@ -200,6 +205,7 @@
     } catch (error) {
       renderPipelineStatus('preview');
       renderPreflightNotice(null, error);
+      $('#sourceHandlingHint').textContent = 'Browser preview only · the local API could not store this file.';
       showToast(error.message || 'Drawing previewed, but the local service was unavailable.');
     }
   }
@@ -220,6 +226,9 @@
     state.overall = 10000;
     $('#projectFileName').textContent = 'sample-house-scan.png';
     $('#projectFileMeta').textContent = 'Illustrative sample · 2D residential plan';
+    $('#projectDrawingType').textContent = 'Residential · 2D';
+    $('#projectUnits').textContent = 'Millimetres (mm)';
+    $('#sourceHandlingHint').textContent = 'Sample preview · no source file is uploaded.';
     $('#sourceTypeChip').textContent = 'SAMPLE SCAN';
     $('#sourceDimensions').textContent = 'Illustrative scan · 650 × 400';
     $('.status-pill').innerHTML = '<span class="status-dot amber"></span> Demo project';
