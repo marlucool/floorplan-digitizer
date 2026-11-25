@@ -1,0 +1,4 @@
+# Optional OCR runtime only; not part of the default Planline install.
+# Install a matching PaddlePaddle CPU or GPU wheel first:
+# https://www.paddleocr.ai/latest/en/version3.x/installation.html
+paddleocr==3.3.1
