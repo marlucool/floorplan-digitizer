@@ -409,7 +409,7 @@ async def analyze_drawing(
         notes.append(
             f"Only the first {MAX_DIMENSION_CROPS} dimension-value candidates include review crops."
         )
-    if source_info["source_type"] == "pdf":
+    if source_info.get("note"):
         notes.append(source_info["note"])
 
     return {
