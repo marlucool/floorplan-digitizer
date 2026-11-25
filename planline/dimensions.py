@@ -113,8 +113,11 @@ def _format_mm(value: Decimal) -> str:
 
 def interpret_dimension_text(text: str) -> dict[str, Any]:
     raw = text
-    value = unicodedata.normalize("NFKC", text).strip()
-    value = value.replace("′", "'").replace("’", "'").replace("″", '"').replace("“", '"').replace("”", '"')
+    # Replace architectural prime marks before NFKC: NFKC decomposes U+2033
+    # DOUBLE PRIME into two single primes, which would otherwise become two apostrophes.
+    value = text.replace("″", '"').replace("′", "'").replace("’", "'")
+    value = value.replace("“", '"').replace("”", '"')
+    value = unicodedata.normalize("NFKC", value).strip()
     value = value.replace("⌀", "Ø").replace("ø", "Ø")
     value = re.sub(r"\s+", " ", value)
     dimension_type = "linear"
