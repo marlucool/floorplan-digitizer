@@ -166,6 +166,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
 
             page.locator("#dimensionTextReview > summary").click()
             page.locator(".dimension-text-value").fill("4200")
+            page.locator(".dimension-text-style").select_option("handwritten")
             assert page.locator(".dimension-text-value").input_value() == "4200"
             assert page.locator(".dimension-text-item").get_attribute("data-detection-id") == "det-002"
             page.locator(".dimension-text-verified-input").check()
@@ -204,6 +205,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert exported["detections"][0]["bbox"]["x1"] == 10
             assert exported["manual_dimension_text_review"][0]["detection_id"] == "det-002"
             assert exported["manual_dimension_text_review"][0]["raw_text"] == "4200"
+            assert exported["manual_dimension_text_review"][0]["text_style"] == "handwritten"
             assert exported["manual_dimension_text_review"][0]["verified"] is True
             assert "preview_data_url" not in exported
 
