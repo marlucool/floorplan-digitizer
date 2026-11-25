@@ -118,7 +118,7 @@ def interpret_dimension_text(text: str) -> dict[str, Any]:
     value = value.replace("⌀", "Ø").replace("ø", "Ø")
     value = re.sub(r"\s+", " ", value)
     dimension_type = "linear"
-    prefix = re.match(r"^(Ø|R(?:ADIUS)?\b)\s*", value, re.IGNORECASE)
+    prefix = re.match(r"^(Ø|R(?:ADIUS)?)(?=\s*\d)\s*", value, re.IGNORECASE)
     if prefix:
         dimension_type = "diameter" if prefix.group(1).upper() == "Ø" else "radius"
         value = value[prefix.end():].strip()
@@ -141,7 +141,7 @@ def interpret_dimension_text(text: str) -> dict[str, Any]:
         return _result(raw, "parsed", dimension_type, value_mm=_format_mm(millimetres), unit="ft/in")
 
     # Whole or fractional inches, including the architectural double-quote mark.
-    quoted_inches = re.fullmatch(r"(?P<number>\\d+(?:[.,]\\d+)?)\\s*(?:in|inch(?:es)?|\")", value, re.IGNORECASE)
+    quoted_inches = re.fullmatch(r"(?P<number>\d+(?:[.,]\d+)?)\s*(?:in|inch(?:es)?|\")", value, re.IGNORECASE)
     if quoted_inches:
         number, error = _normalise_number(quoted_inches.group("number"))
         if error or number is None or number <= 0:
