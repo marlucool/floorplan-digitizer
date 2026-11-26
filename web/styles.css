@@ -236,3 +236,9 @@ html[data-theme="dark"] .ocr-assist-controls{background:#202620;border-color:var
 .interpret-dimension-button{margin:8px 0 4px}
 .dimension-interpretation{display:block;padding:8px 10px;border-left:2px solid var(--accent);background:var(--panel);font-size:11px;line-height:1.55;color:var(--ink);margin-bottom:8px}
 .dimension-interpretation[data-status="ambiguous"],.dimension-interpretation[data-status="unit_missing"]{border-left-color:var(--warning,#b88736)}
+
+/* Accessible icon-only theme switch shared by all workspaces. */
+.theme-toggle{width:36px;height:36px;min-width:36px;padding:8px;display:inline-grid;place-items:center;border-radius:9px}
+.theme-toggle svg{display:block;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.theme-toggle:hover{border-color:var(--green);color:var(--green-dark)}
+.theme-toggle:focus-visible{outline:3px solid #8ba982;outline-offset:3px}
