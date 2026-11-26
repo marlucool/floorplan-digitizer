@@ -113,7 +113,7 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     expect(page.locator(".architecture-toc")).to_be_visible()
                     expect(page.get_by_role("link", name="View Markdown source")).to_be_visible()
                     expect(page.locator("html")).to_have_attribute("data-theme", "dark")
-                    expect(page.locator(".architecture-prose h2").count()).to_be_greater_than(5)
+                    assert page.locator(".architecture-prose h2").count() > 5
 
 
                     assert not api_requests, f"The static preview attempted backend requests: {api_requests}"
