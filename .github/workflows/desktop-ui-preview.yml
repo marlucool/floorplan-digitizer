@@ -85,8 +85,11 @@ jobs:
             echo "Building static preview for PR #$number"
             git fetch --no-tags --depth=1 origin "refs/pull/$number/head"
             tmp="$(mktemp -d)"
-            mkdir -p "$tmp/scripts"
+            mkdir -p "$tmp/scripts" "$tmp/planline"
             cp scripts/build_ui_preview.py "$tmp/scripts/"
+            # Import only the trusted documentation renderer; PR Python code is
+            # never executed by the Pages preview workflow.
+            cp planline/__init__.py planline/documentation.py "$tmp/planline/"
             git archive --format=tar FETCH_HEAD web docs | tar -xf - -C "$tmp"
 
             # The preview harness is trusted build infrastructure, not PR code.
