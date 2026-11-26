@@ -346,14 +346,14 @@ def render_documentation_index(
 def _render_toc(rendered_html: str) -> str:
     """Build a sidebar TOC from the heading IDs generated in rendered HTML."""
     heading_pattern = re.compile(
-        r'<h([2-4])\\b[^>]*\\bid="([^"]+)"[^>]*>(.*?)</h[2-4]>',
+        r'<h([2-4])\b[^>]*\bid="([^"]+)"[^>]*>(.*?)</h[2-4]>',
         re.IGNORECASE | re.DOTALL,
     )
     entries = []
     for match in heading_pattern.finditer(rendered_html):
         level, anchor_id, inner_html = match.groups()
         label = re.sub(r"<[^>]+>", "", inner_html)
-        label = re.sub(r"\\s+", " ", html.unescape(label)).strip()
+        label = re.sub(r"\s+", " ", html.unescape(label)).strip()
         if not label:
             continue
         entries.append(
