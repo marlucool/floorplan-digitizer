@@ -3,24 +3,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f4f2ec">
+  <meta name="theme-color" content="#171b18">
   <title>Planline — Dashboard</title>
 <script>
-  try { document.documentElement.dataset.theme = localStorage.getItem("planline-theme") || "dark"; }
-  catch (_) { document.documentElement.dataset.theme = "dark"; }
+  try {
+    document.documentElement.dataset.theme = localStorage.getItem("planline-theme-v2") === "light" ? "light" : "dark";
+  } catch (_) {
+    document.documentElement.dataset.theme = "dark";
+  }
 </script>
     <link rel="stylesheet" href="/styles.css">
-  <link rel="stylesheet" href="/dashboard.css">
+  <script src="/theme.js" defer></script>
   <script src="/dashboard.js" defer></script>
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/dashboard" aria-label="Planline dashboard"><span class="brand-mark">P</span><span>planline<span class="brand-dot">.</span></span></a>
+    <a class="brand" href="/" aria-label="Planline dashboard"><span class="brand-mark">P</span><span>planline<span class="brand-dot">.</span></span></a>
     <div class="top-meta"><span class="local-dot" id="healthDot"></span><span id="healthLabel">Checking local services…</span><span class="divider">/</span> Dashboard</div>
     <div class="top-links">
       <button id="themeToggle" class="toolbar-button theme-toggle" type="button" aria-label="Switch to dark theme" title="Switch to dark theme" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.2 15.1A8.5 8.5 0 0 1 8.9 3.8 8.7 8.7 0 1 0 20.2 15.1Z"/></svg></button>
       <a class="repo-link active" href="/dashboard" aria-current="page">Dashboard</a>
-      <a class="repo-link" href="/">Drawing</a>
+      <a class="repo-link" href="/drawing">Drawing</a>
       <a class="repo-link" href="/ocr">OCR Studio</a>
       <a class="repo-link" href="/settings">Settings</a>
     </div>
@@ -31,7 +34,7 @@
       <div class="dashboard-health" id="healthCard" role="status" aria-live="polite"><span class="health-mark">●</span><div><strong id="healthTitle">Connecting to local API</strong><span id="healthDetails">Checking application readiness…</span></div><button id="refreshHealth" class="toolbar-button" type="button">Refresh</button></div>
     </section>
     <section class="workspace-grid" aria-label="Planline workspaces">
-      <a class="workspace-card drawing-card" href="/">
+      <a class="workspace-card drawing-card" href="/drawing">
         <span class="workspace-number">01 / ANALYSE</span><span class="workspace-icon" aria-hidden="true">▧</span>
         <h2>Drawing workspace</h2><p>Import floor plans, inspect detections, trace manual walls and rooms, review dimensions, and export geometry.</p><span class="workspace-action">Open drawing workspace <b>→</b></span>
       </a>
