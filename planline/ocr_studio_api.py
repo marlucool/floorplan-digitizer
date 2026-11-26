@@ -125,11 +125,16 @@ def _dataset_summary(dataset_dir: Path) -> dict[str, Any]:
     if summary["splits_present"]:
         try:
             split_data = json.loads((dataset_dir / SPLITS_NAME).read_text(encoding="utf-8"))
+            if not isinstance(split_data, dict):
+                raise ValueError(f"{SPLITS_NAME} must contain a JSON object.")
             summary["split_counts"] = split_data.get("sample_counts", {})
             summary["split_group_counts"] = split_data.get("group_counts", {})
-        except (OSError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
             summary["split_counts"] = {}
             summary["split_group_counts"] = {}
+            summary["split_error"] = str(exc)
+            summary["valid"] = False
+            summary.setdefault("validation_error", str(exc))
     else:
         summary["split_counts"] = {}
         summary["split_group_counts"] = {}
@@ -143,9 +148,13 @@ def _dataset_payload(dataset_id: str, dataset_dir: Path) -> dict[str, Any]:
     if split_path.is_file():
         try:
             split_data = json.loads(split_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
+        except (OSError, json.JSONDecodeError):
             split_data = {}
+    if not isinstance(split_data, dict):
+        split_data = {}
     assignments = split_data.get("assignments", {})
+    if not isinstance(assignments, dict):
+        assignments = {}
     samples = []
     for item in entries:
         crop_id = item.get("crop_id")
