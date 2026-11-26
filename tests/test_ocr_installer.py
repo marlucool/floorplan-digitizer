@@ -18,6 +18,7 @@ def test_windows_installer_provisions_a_verified_paddleocr_runtime() -> None:
     assert "capability > 75" in installer
     assert "paddlepaddle-gpu=={PaddleVersion}" in installer
     assert "paddlepaddle=={PaddleVersion}" in installer
+    assert 'new[] { "-m", "pip", "check" }' in installer
     assert "paddle.utils.run_check()" in installer
     assert "PADDLE_OCR_READY=" in installer
     assert "paddleocr==3.3.1" in requirements
