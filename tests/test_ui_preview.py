@@ -11,6 +11,7 @@ def test_preview_contains_all_available_workspaces_and_static_assets(tmp_path: P
     assert (output / "index.html").is_file()  # Dashboard is the site landing page.
     assert (output / "drawing.html").is_file()
     assert (output / "app.js").is_file()
+    assert (output / "theme.js").is_file()
     assert (output / "styles.css").is_file()
     assert (output / "preview.js").is_file()
     assert (output / "demo-floorplan.svg").is_file()
@@ -32,7 +33,9 @@ def test_preview_contains_all_available_workspaces_and_static_assets(tmp_path: P
     assert (output / "ocr.html").is_file()
     assert (output / "settings.html").is_file()
     assert (output / "dashboard.js").is_file()
-    assert (output / "dashboard.css").is_file()
+    assert not (output / "dashboard.css").exists()
+    assert not (output / "settings.css").exists()
+    assert not (output / "ocr-studio.css").exists()
     if (Path("docs") / "PLANLINE_ARCHITECTURE.md").is_file():
         assert (output / "architecture.md").is_file()
     assert not (output / "api").exists()
@@ -46,10 +49,12 @@ def test_preview_rewrites_routes_and_injects_preview_guard(tmp_path: Path) -> No
     assert 'href="styles.css"' in dashboard
     assert 'src="preview.js" defer></script>' in dashboard
     assert 'src="dashboard.js" defer></script>' in dashboard
+    assert 'src="theme.js" defer></script>' in dashboard
     assert 'href="drawing.html"' in dashboard
     assert 'href="settings.html"' in dashboard
     assert 'href="styles.css"' in drawing
     assert 'src="app.js" defer></script>' in drawing
+    assert 'src="theme.js" defer></script>' in drawing
     assert 'href="index.html"' in drawing
     assert 'href="ocr.html"' in drawing
     assert 'href="settings.html"' in drawing
@@ -76,4 +81,6 @@ def test_preview_build_supports_nested_pr_subdirectory_urls(tmp_path: Path) -> N
     assert 'href="styles.css"' in html
     assert 'src="dashboard.js" defer></script>' in html
     assert 'src="app.js" defer></script>' in drawing
+    assert 'src="theme.js" defer></script>' in drawing
+    assert 'src="dashboard.js" defer></script>' in html
     assert (output / "demo-floorplan.svg").is_file()
