@@ -395,7 +395,7 @@ def render_document_page(
             f'alt="{html.escape(title, quote=True)}" loading="lazy"><figcaption>{html.escape(path)} · {html.escape(mime)}</figcaption></figure>'
         )
     elif kind == "pdf":
-        raw_href = f"docs/{path}" if static_site else f"/docs/{quote(path, safe='/')}"
+        raw_href = f"docs/{quote(path, safe='/')}" if static_site else f"/docs/{quote(path, safe='/')}"
         if static_site:
             raw_href = posixpath.relpath(raw_href, posixpath.dirname(current_output_path) or ".")
         body_content = (
@@ -420,7 +420,7 @@ def render_document_page(
             f'<p><a class="documentation-download" href="{html.escape(raw_href, quote=True)}" download>Download {html.escape(Path(path).name)} ↓</a></p>'
         )
 
-    source_href = f"docs/{path}" if static_site else f"/docs/{quote(path, safe='/')}"
+    source_href = f"docs/{quote(path, safe='/')}" if static_site else f"/docs/{quote(path, safe='/')}"
     if static_site:
         source_href = posixpath.relpath(source_href, posixpath.dirname(current_output_path) or ".")
     sidebar_links = _document_catalog_html(
