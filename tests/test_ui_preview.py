@@ -114,3 +114,6 @@ def test_nested_pr_preview_contains_dashboard_and_drawing_entry_points(tmp_path:
     assert 'href="drawing.html"' in dashboard
     assert 'href="index.html" aria-label="Planline dashboard"' in drawing
     assert (output / "theme.js").is_file()
+    assert (output / "documentation" / "index.html").is_file()
+    assert (output / "documentation" / "PLANLINE_ARCHITECTURE.md.html").is_file()
+    assert (output / "docs" / "rysunek.png").is_file()
