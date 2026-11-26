@@ -103,5 +103,14 @@ $("#installUpdate").addEventListener("click", async () => {
   }
 });
 
-$("#currentVersion").textContent = "v0.1.1";
+async function loadCurrentVersion() {
+  try {
+    const response = await fetch("/api/health", { cache: "no-store" });
+    if (!response.ok) return;
+    const health = await response.json();
+    if (health.version) $("#currentVersion").textContent = "v" + health.version;
+  } catch (_) {}
+}
+
+loadCurrentVersion();
 if (autoCheck.checked) checkUpdates();
