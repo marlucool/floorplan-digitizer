@@ -90,8 +90,10 @@ def test_static_preview_renders_real_workspace_without_backend_requests() -> Non
 
                     if (site / "dashboard.html").is_file():
                         page.goto(url + "dashboard.html", wait_until="domcontentloaded")
-                        expect(page.locator('a[href="ocr.html"]')).to_be_visible()
-                        expect(page.locator('a[href="settings.html"]')).to_be_visible()
+                        expect(page.locator('.top-links a[href="ocr.html"]')).to_be_visible()
+                        expect(page.locator('.workspace-card.ocr-card[href="ocr.html"]')).to_be_visible()
+                        expect(page.locator('.top-links a[href="settings.html"]')).to_be_visible()
+                        expect(page.locator('.workspace-card.settings-card[href="settings.html"]')).to_be_visible()
 
                     assert not api_requests, f"The static preview attempted backend requests: {api_requests}"
                 finally:
