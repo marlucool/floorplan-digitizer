@@ -10,86 +10,64 @@ The central rule is:
 
 A dimension that is unreadable, unassociated, contradictory, or insufficient to constrain geometry must remain unresolved and be presented for review.
 
-## Current application state
+## Implemented application state (reviewed 2026-11-26)
 
-The current web integration is intentionally a detection-and-review slice:
+Planline is no longer just a detector preview. The current application is a **local-first drawing review and OCR workbench**, with manual geometry authoring and conservative dimension-analysis tools. The implemented features below are distinct from the future goal of automatic, measured CAD reconstruction.
 
-- FastAPI serves the browser UI and exposes `/api/health` and `/api/analyze`.
-- PNG/JPG/WEBP/TIFF and PDF uploads are accepted within the configured limits.
-- Multi-page PDFs support explicit 1-based page selection in the drawing workspace; each selected page is rasterised independently and source page identity is preserved in the review result.
-- The existing YOLO weights detect candidate `wall`, `dimension_line`, and `dimension_value` regions.
-- The UI displays the preview, candidate boxes, class counts, detector scores, a configurable confidence threshold, brightness/contrast preparation, filtering, selected-box highlighting, zoom/fit controls and a scrollable zoomed view.
-- A candidate-review JSON export preserves source pixel dimensions, detector metadata, bounding boxes, scores, optional user-entered dimension-text transcriptions, and optional user-supplied two-point scale calibration under a versioned schema; it excludes source/crop pixels and is not a measurement record.
-- The dimension-value crop panel returns bounded crops from the original raster for manual transcription. User-entered text, a printed/handwritten/unclear style label and verification flags are included in the review JSON; this does not run OCR or associate text with geometry.
-- The application does not automatically persist source drawings or upload them to a server. Users can explicitly save a portable `.planline` project containing the embedded source file, analysis payload and manual review state; the file remains under the user’s control. A DXF export is available for manual walls and rooms only; it is not measured reconstruction from OCR or dimension associations.
-- Raster image dimensions are preflighted from the image header before OpenCV decodes the full image; the pixel limit is enforced again after decode. PDF page dimensions are checked before rasterisation.
-- A manual two-point scale calibration is available after analysis. It records the source-image pixel coordinates, known distance, unit, pixels-per-millimetre factor and source page in the review JSON. It is a user-supplied reference only; it does not verify the reference dimension, correct scan distortion, associate dimensions with walls or create measured geometry.
-- A manual `/api/validate-dimension-chain` endpoint checks explicitly supplied values with decimal arithmetic and verification flags. It does not perform OCR, unit conversion, geometry association or DXF export.
-- The UI can export candidate detections as a versioned JSON review artifact containing source pixel dimensions, model metadata and detector boxes. It excludes the source image and does not represent verified measurements.
+### Drawing ingestion and detection
 
-### Portable project files
+- The FastAPI application serves the dashboard, Drawing workspace, OCR Studio, Settings and the architecture reader. The main API includes health and drawing-analysis endpoints.
+- Raster inputs include PNG, JPG/JPEG, WEBP and TIFF. PDF workflows support explicit 1-based page selection and rasterise the selected page independently while preserving page identity.
+- The current YOLO detector proposes three classes: `wall`, `dimension_line` and `dimension_value`. These are candidate regions, not verified semantic geometry.
+- The Drawing workspace shows the source preview, detector boxes, class counts, detector scores, confidence-threshold filtering, class filtering, selected-box highlighting, zoom/fit controls and a scrollable zoomed view.
+- Brightness and contrast preparation is bounded and non-geometric. It preserves source dimensions and coordinates; it does not deskew, dewarp, crop or correct local scan distortion.
+- Full-frame inference currently uses `imgsz=640`. Overlapping high-resolution tiling is still a benchmark item, not an enabled feature. Small text and thin strokes can be lost when large sheets are resized.
 
-The Drawing workspace supports explicit save/open of versioned `.planline` JSON project files. A project embeds the original source file (up to the existing 25 MB source limit), current analysis payload, manual dimension transcriptions, association selections, scale calibration, user-drawn wall segments and manual room polygons. Saving is user-initiated; there is no background project upload or server-side project storage. Project import validates the format version and source byte count before replacing the current workspace. Keep project files in a trusted local location because they contain the source drawing.
+### Dimension review, OCR and association
 
-### OCR suggestions in Drawing
+- Reviewers can inspect bounded crops from detected dimension-value regions, enter the complete visible text, classify it as printed/handwritten/unclear and mark it verified. Candidate-review JSON exports preserve the source dimensions, model metadata, bounding boxes, scores, text transcriptions, verification state and optional user-supplied scale reference. The export is not a verified measurement record and excludes source/crop pixels.
+- The Drawing workspace can run the optional local PaddleOCR recogniser on selected crops. Base or locally fine-tuned recognition models can be selected where installed. OCR output remains a suggestion with recogniser confidence; it is never verified automatically.
+- A separate conservative dimension-text parser recognises supported explicit units and formats (including metric and common imperial forms). A bare number without a unit is not assumed to be millimetres, and ambiguous separators remain unresolved. Parsing is not proof that the OCR reading is correct.
+- The dimension-association module ranks candidate relationships from dimension-value regions to dimension-line regions and wall gaps using orientation, alignment, projected position and nearby wall-box geometry. A dimension line may be shared by multiple labels in a chained dimension; the same candidate wall gap is not assigned to competing labels. Scores are relative rankings, not probabilities. Every proposed relationship requires reviewer confirmation.
+- The dimension-chain checker uses decimal arithmetic to compare explicitly entered segment values with an overall value and a stated tolerance. It reports missing, unverified and conflicting values. It can propose the remainder for exactly one missing segment only when all known segments and the overall value are verified; that proposal still requires confirmation.
+- A separate wall-dimension comparison checks a user-supplied pixel scale against an explicitly supplied dimension. It reports the difference and tolerance status, but does not rescale, move or validate the wall geometry.
 
-The Drawing workspace can send dimension-candidate crops to the optional local PaddleOCR runtime. The reviewer can choose a base recogniser or an exported fine-tuned model from a local OCR dataset, and choose CPU or a compatible Paddle GPU runtime. OCR output is presented as a suggestion with recogniser confidence; it is never marked verified automatically. The reviewer must explicitly apply the suggestion and check every character against the source crop. The Drawing workspace can interpret explicit architectural dimension strings into millimetres; it never assumes a missing unit or resolves ambiguous thousands/decimal separators. A manually verified dimension crop can be saved directly to a selected OCR dataset with source/writer grouping metadata; only the crop is uploaded, not the full source drawing. OCR does not parse units, correct values, associate dimensions to walls or create geometry.
+### OCR Studio and datasets
 
-### Manual room boundaries and area
+- OCR Studio includes a crop editor, verified-label library, dataset import/export, manifest and checksum validation, source/writer-grouped split creation, dataset-quality reporting and training-job monitoring.
+- Local PaddleOCR PP-OCRv5 fine-tuning jobs can be configured from a matching pretrained checkpoint and PaddleOCR source checkout. Benchmark tooling evaluates a recogniser against a held-out test split and reports exact-string accuracy and character error rate.
+- These features provide a reproducible training/evaluation workflow; they do **not** prove that a recogniser is accurate on real architectural drawings. Training still requires compatible local PaddlePaddle/PaddleOCR assets, representative rights-cleared crops and a genuinely independent held-out set. Do not describe a model as validated merely because a training job completes.
+- The Windows installer provisions the optional OCR runtime and the required pinned training assets in Planline's private Python environment. The core web requirements keep the heavyweight OCR training stack separate.
 
-A reviewer can create a room polygon by clicking at least three corners and explicitly finishing the outline. Self-crossing outlines are rejected. Area is calculated from the polygon using the shoelace formula. Without calibration, only square pixels are reported; with calibration, the app displays a derived square-metre value that is explicitly tied to the user-supplied, unverified two-point reference. Room polygons are user-authored and are not inferred from detector boxes or automatically closed. Selected room corners can be dragged to refine the outline; edits that create a self-crossing or degenerate polygon are reverted.
+### User-authored geometry, projects and exports
 
-### Manual wall geometry
+- Reviewers can draw, select, move either endpoint of, delete, undo and clear manual wall segments. Room polygons can be created and edited; self-crossing or degenerate outlines are rejected. Optional snapping applies only to user-created endpoints and vertices.
+- Wall lengths and room areas are reported in source pixels unless a user supplies a two-point scale reference. Calibrated metres or square metres are derived from that reference; they are not independently verified dimensions and a single global scale cannot correct perspective or local distortion.
+- Portable, versioned `.planline` projects support explicit local save/open of the source file, analysis, review state, manual transcriptions, association selections, scale calibration, wall segments and room polygons. Project saving is user-initiated; there is no background project upload or server-side project store.
+- SVG and DXF export are available for **user-authored** wall segments and room polygons only. Calibrated DXF uses millimetres based on the user-supplied scale; uncalibrated DXF is unitless source-pixel geometry. Detector boxes, OCR text and association suggestions are never silently promoted to CAD entities.
+- Raster dimensions are preflighted before full OpenCV decode and checked again after decode. PDF page dimensions are checked before rasterisation. The multipart request parser may spool uploads to temporary storage before the endpoint-level size check; the application must not be described as memory-only.
 
-The Drawing workspace includes a user-driven wall-segment layer. The reviewer selects Draw wall and clicks a start and end point in source-image coordinates. Segments can be selected, have either endpoint dragged to correct the line, deleted, undone or cleared, and exported as SVG. Selected wall lengths are shown in pixels or derived metres when a user-supplied scale is available. Optional 10-source-pixel snapping joins new manual lines and room corners to existing user-created endpoints and vertices only. These lines are explicitly user-created; detector boxes are never promoted to walls automatically. SVG physical sizing uses the user-supplied scale reference when present and records that it is not verified geometry. DXF export is available for user-authored segments and room polygons only; it uses millimetres only when a user-supplied scale is present, otherwise it is unitless. This is not automatic topology reconstruction or measured CAD inferred from dimensions.
+### Explicitly not implemented
 
-### Manual wall geometry
+The following remain future engineering work: reliable real-scan detector performance; tiled inference; reversible deskew/dewarp; automatic full-sheet OCR; automatic acceptance of text-to-line or line-to-span associations; a global metric constraint solver; dimension-driven wall/opening topology reconstruction; and verified measured DXF export. The existing tools provide reviewable components, not an end-to-end automatic CAD pipeline.
 
-The Drawing workspace includes a user-driven wall-segment layer. The reviewer selects Draw wall and clicks a start and end point in source-image coordinates. Segments can be selected, deleted, undone or cleared, and exported as SVG. These lines are explicitly user-created; detector boxes are never promoted to walls automatically. SVG physical sizing uses the user-supplied scale reference when present and records that it is not verified geometry. DXF export is available for these user-authored segments and room polygons only. Calibrated exports use millimetres based on the user-supplied, unverified reference; uncalibrated exports are unitless source pixels. This is not automatic topology reconstruction or dimension-driven measured CAD.
-
-### Image intensity preparation
-
-The Drawing workspace exposes bounded brightness (-100 to +100) and contrast (0.5× to 2×) adjustments before detection and crop generation. This is a linear intensity transform only: image dimensions and pixel coordinates are unchanged, so existing source-coordinate annotations and two-point calibration remain aligned. The original uploaded file is embedded unchanged in a saved project. These controls do not deskew, dewarp or crop a drawing.
-
-### Manual scale calibration
-
-The Drawing workspace allows a reviewer to click two source-image points and enter their known separation in mm, cm, m, inches or feet. The preview click coordinates are mapped back to the original raster coordinate system before computing pixels per millimetre. Calibration is scoped to the currently analysed source page and is included in the exported review JSON. It is never inferred from OCR or detector boxes. The result is explicitly labelled as a user-supplied reference and must not be treated as validation of any wall, dimension or reconstructed geometry. A single global factor also cannot correct perspective or local scan distortion.
-
-### Detection resolution risk
-
-The current API sends the complete source image to YOLO with `imgsz=640` and exposes a configurable confidence threshold (default `0.25`). On a large scanned sheet, small dimension text and thin annotation features can be reduced to only a few pixels before detection. The bounded 1600-pixel browser preview does not change the inference input; it is only for display.
-
-The 2026 *Buildings* study uses density-adaptive overlapping crops because a single fixed resize can lose small targets in large drawings. Its reported crop sizes and performance are specific to its own dataset and model and must not be copied as Planline defaults without testing.
-
-Planned approach:
-
-- Benchmark full-frame inference against overlapping tile inference on the same held-out source drawings.
-- Preserve each crop's offset and map every detection back to original source-image coordinates.
-- Merge overlapping detections with class-aware NMS, and measure duplicate and missed detections at tile boundaries.
-- Compare several crop sizes and overlap ratios, including crowded dimension bands and sparse plan regions.
-- Keep the original full-resolution scan as the source of truth; never use the resized preview as the measurement coordinate system.
-
-Do not enable tiled inference by assumption alone: the current detector was trained on a small simplified-plan dataset, and higher-resolution crops cannot compensate for a domain mismatch.
-
-The API tests use a fake detector. They do not establish the real model's accuracy or prove that it works on representative scans. An opt-in real-weight smoke test is now available in `tests/test_real_model_smoke.py`; running it with the actual weights and representative old scans remains outstanding.
-
-A Playwright browser smoke test covers image preview, zoom, zoomed overlay alignment, candidate JSON export/schema validation, manual dimension-chain entry and a narrow mobile viewport. Manual visual inspection and PDF-preview verification remain outstanding.
+A real-weight detector smoke test on representative older scans is still outstanding. API tests use a fake detector and therefore do not establish model accuracy. Browser automation covers key drawing, overlay, export and narrow-viewport behaviour; manual visual inspection across real scans and PDF cases remains outstanding.
 
 ## Recommended processing architecture
 
 Keep the stages modular and preserve their intermediate records. Do not combine OCR, association, scale recovery and geometry generation into one opaque function.
 
-### 1. Ingest and preserve source coordinates
+### 1. Ingest and preserve source coordinates — implemented baseline
 
 - Decode the original scan and retain its native width, height, orientation and page identity.
-- For PDFs, make page selection explicit before multi-page support is considered complete.
+- PDF page selection is implemented: the user chooses a 1-based page, and source page identity is retained. Keep this selection explicit when extending PDF workflows.
 - Apply geometric deskew/dewarp as a reversible transform; retain the transform so detected coordinates can be mapped back to the original source.
 - Generate separate preprocessing views for line geometry and text recognition. A single aggressive thresholding pass can destroy either thin strokes or small characters.
 - Keep the original source as the immutable review background.
 
-### 2. Detect drawing primitives
+### 2. Detect drawing primitives — implemented baseline, limited classes
 
-The existing detector's three classes are a useful bootstrap, but are not enough to reconstruct a plan reliably. A later annotation schema should distinguish at least:
+The current detector proposes wall, dimension-line and dimension-value boxes. That is a useful bootstrap, but the detector and current annotation schema are not enough to reconstruct a plan reliably. Future detector coverage should distinguish at least:
 
 - wall strokes/regions and wall junctions;
 - door/window openings where supported by the dataset;
@@ -99,9 +77,9 @@ The existing detector's three classes are a useful bootstrap, but are not enough
 
 Detection outputs should be represented in source-image coordinates and include model/version provenance. Detector confidence must not be presented as OCR confidence or as a calibrated probability.
 
-### 3. Read complete dimension strings
+### 3. Read complete dimension strings — reviewable OCR implemented
 
-Dimension OCR is not digit classification alone. It must preserve full strings and syntax, including decimal separators, units, prefixes/suffixes, tolerances, and common drafting marks. The system should store:
+Dimension OCR is not digit classification alone. Planline can run local PaddleOCR on selected dimension crops and stores reviewer-controlled transcription/verification state. A separate parser handles supported explicit dimension formats; ambiguous or unitless readings remain unresolved. Further OCR work must preserve full strings and syntax, including decimal separators, units, prefixes/suffixes, tolerances, and common drafting marks. The system should retain:
 
 - raw OCR text;
 - normalized candidate value and unit, if parsing is unambiguous;
@@ -112,9 +90,9 @@ Dimension OCR is not digit classification alone. It must preserve full strings a
 
 Printed and handwritten text should be evaluated separately before deciding whether they need separate recognition models. Rotate vertical text using the associated dimension-line orientation, not a blind global rotation guess.
 
-### 4. Associate text with dimension graphics
+### 4. Associate text with dimension graphics — candidate ranking implemented
 
-Treat association as its own inference stage. Candidate evidence includes:
+Association is a separate, reviewable inference stage. Planline currently ranks text-to-dimension-line and dimension-line-to-wall-gap candidates from box geometry. Candidate evidence includes:
 
 - proximity and orientation between text and dimension line;
 - alignment with the dimension-line axis;
@@ -124,9 +102,9 @@ Treat association as its own inference stage. Candidate evidence includes:
 
 Do not attach a number to the nearest wall by distance alone. Store candidate associations and scores, and allow a reviewer to correct them. A text region may be a room label or note rather than a measurement.
 
-### 5. Solve metric geometry as a constraint problem
+### 5. Solve metric geometry as a constraint problem — partial validators implemented
 
-Build a graph of geometric entities and constraints. Each verified dimension constrains a span between identified endpoints or references. Use multiple independent dimensions to detect contradictions and estimate only genuinely shared calibration parameters.
+The current application has a manual dimension-chain arithmetic checker and a review-only comparison between a user-supplied scale and an explicitly supplied wall dimension. A global graph solver that propagates verified dimensions through identified geometric entities is not implemented. The future solver should treat each verified dimension as a constraint on a span between identified endpoints or references, use independent dimensions to detect contradictions, and estimate only genuinely shared calibration parameters.
 
 Important safeguards:
 
@@ -139,13 +117,13 @@ Important safeguards:
 
 A global scale estimate may be useful as a diagnostic when several trusted dimension spans agree. It must not override explicit written dimensions or conceal local scan distortion.
 
-### 6. Reconstruct editable 2D topology
+### 6. Reconstruct editable 2D topology — manual geometry implemented, automatic reconstruction planned
 
-Only after the source strokes and dimension constraints have been reviewed should the system regularise geometry. Recover connected wall segments, junctions, openings and closed boundaries while preserving a link back to source pixels and detection records. Geometric cleanup must not invent a closing wall merely to make a polygon valid.
+Planline currently lets the reviewer draw and edit wall segments and room polygons manually. It does not infer connected wall topology, junctions, openings or closed room boundaries from detections, OCR or dimensions. Future reconstruction must preserve links back to source pixels and detection records. Geometric cleanup must not invent a closing wall merely to make a polygon valid.
 
-### 7. Gate DXF export
+### 7. Gate DXF export — manual-geometry export implemented, measured export planned
 
-DXF export should be a separate, explicit operation that requires a validated project state. A future export should include clear layers (for example walls, openings, dimensions, annotations and review markers), units, and metadata/provenance where possible. Unresolved or contradictory dimensions should block a **measured** export, or be clearly marked as unmeasured if the user explicitly requests a non-metric tracing.
+The current DXF exporter accepts only user-authored wall segments and room polygons. It does not export detector boxes, OCR candidates or automatically reconstructed measured geometry. A future measured export must be a separate, explicit operation gated by a validated project state, with clear layers, units and provenance. Unresolved or contradictory dimensions should block a **measured** export; a non-metric tracing must be explicitly labelled as unmeasured.
 
 ## Research findings that influence the design
 
@@ -227,7 +205,7 @@ Reference implementation: https://github.com/PaddlePaddle/PaddleOCR
 
 ### OCR baseline comparison (research update: 2026-11-25)
 
-The manual crop/transcription panel now provides a source of verified text labels. Use those labels to benchmark recognizers before selecting or integrating an OCR dependency.
+OCR Studio now provides verified full-string crop labels, and the Drawing workspace can run a local PaddleOCR recogniser on selected dimension crops. Use source-/writer-separated held-out labels to compare recognisers; a completed training run is not evidence of accuracy on real floor plans.
 
 | Candidate | Relevant capability | Limitation for Planline | Decision |
 |---|---|---|---|
@@ -254,7 +232,7 @@ Recommended evaluation order:
 5. Keep all machine results **unverified**. Only a human-confirmed complete string may enter the dimension-chain workflow.
 6. Use `python -m planline.ocr_eval` to compare an engine's predictions against verified review exports. It reports exact-string rate and character error rate overall and by text style; it has no OCR-engine dependency.
 
-Do not add either OCR package to the default install yet. The next step is a reproducible benchmark against representative scans, not another training run or an assumption that generic handwriting scores transfer to architectural dimensions.
+Keep heavyweight OCR/training dependencies isolated from the core application environment. The Windows installer provisions the optional local OCR runtime separately. Continue with reproducible benchmarks on representative, held-out architectural scans; do not assume generic handwriting scores transfer to dimension notation.
 
 ### Floor-plan parsing challenges
 
@@ -272,20 +250,29 @@ References:
 
 For sensitive drawings, configure and monitor the server/container temporary directory, apply a request-body limit at the reverse proxy or ASGI boundary, and review logs and browser caching. Do not describe the current implementation as memory-only.
 
-## Dataset strategy — research first, no training yet
+## OCR dataset, training and evaluation status
 
-Do not start another training run until the annotation schema, rights, evaluation split and target failure modes are agreed. The new planline.dataset CLI now provides the first curation step: it exports verified full-string crops from review JSON or imports manually cropped images using a CSV manifest, then validates checksums and builds source/writer-safe splits. It prepares data only; it does not train a recogniser.
+Planline now has a local OCR data workflow; this section replaces the earlier “research first, no training yet” description. The current tools prepare, curate, split, train and evaluate recognition datasets, but dataset tooling is not a substitute for a representative benchmark.
 
-A useful development dataset should contain both:
+Implemented capabilities:
 
-1. **Rights-cleared real scans** for realism and external validity. Record provenance, permission, allowed use, drawing identity, writer identity where relevant, and whether redistribution is allowed.
-2. **Owned synthetic drawings** for exact ground truth and controlled coverage. Generate geometry and annotations parametrically, then render varied drafting styles and scan degradations.
+1. **Verified capture:** Drawing review can save an individually verified full-string dimension crop to a selected local dataset. OCR Studio also supports manual crop creation and exact transcription.
+2. **Dataset curation:** `planline.dataset` exports verified crops from review JSON or imports manually cropped images through a CSV manifest. It records source and optional writer grouping, checks image limits and checksums, and creates grouped train/validation/test splits.
+3. **Quality audit:** `planline.ocr_quality` reports duplicate images, conflicting labels, suspicious transcription formats, character coverage, source/writer representation and split leakage.
+4. **Fine-tuning workflow:** OCR Studio can prepare data and monitor local PaddleOCR PP-OCRv5 mobile/server recognition training jobs using matching pretrained checkpoints and a local PaddleOCR source checkout.
+5. **Held-out evaluation:** The benchmark tooling compares raw recogniser predictions with verified labels and reports exact-string accuracy and character error rate, with breakdowns by text style where available.
 
-Synthetic examples should vary line weights, text size, fonts, handwritten styles (only from appropriately licensed sources), rotation, skew, blur, faded ink, background stains, compression, occlusion, dimension placement, units and dimension-chain layouts. Keep the underlying vector geometry and all annotation associations as exact machine-readable ground truth.
+Important limits:
 
-Split training/validation/test by original drawing and writer, not by cropped digit or text patch. Otherwise nearly identical samples from one source can leak across splits and inflate evaluation.
+- Training requires a compatible local PaddlePaddle environment, the matching PaddleOCR source/configuration and a compatible pretrained checkpoint. The installer provisions these assets in its private environment; the runtime remains separate from the core API dependencies.
+- Training success does not demonstrate engineering accuracy. A useful test set must contain independent real scans and represent printed/handwritten, rotated, faded, skewed, compressed and overlapping dimension strings.
+- Split by original drawing and writer, not by individual crop, so near-duplicate handwriting and drawing styles cannot leak between train, validation and test.
+- Record dataset provenance, consent/rights, allowed use and redistribution status. Keep customer or otherwise sensitive scans out of public training data unless the rights and privacy basis are explicit.
+- Keep machine-generated text unverified. Only a human-confirmed complete string may be used as a trusted input to downstream dimension checks.
 
-## Suggested acceptance tests before model training
+A clean dataset-quality report is only a data-hygiene check. It does not prove that the data is large, balanced or representative enough to train a reliable recogniser.
+
+## Acceptance criteria before relying on reconstructed geometry
 
 1. **Ingest:** correct dimensions/orientation for raster images; clear PDF page handling; reject malformed and oversized inputs.
 2. **Detection:** per-class precision/recall on held-out drawings, with results stratified by scan quality and drafting style.
@@ -298,26 +285,38 @@ Split training/validation/test by original drawing and writer, not by cropped di
 
 ## Immediate engineering backlog
 
-- [x] Connect the browser UI to the existing detector API.
-- [x] Add candidate region review, class filtering and selected-box highlighting.
-- [x] Add a user-adjustable detector confidence threshold; detector scores remain uncalibrated and are not measurement confidence.
-- [x] Document API setup and the current capability boundary.
-- [ ] Run a real-weight smoke test with `yolo_floorplan.pt` and representative old scans.
-- [ ] Compare full-frame YOLO inference with overlapping multi-scale tiles on held-out scans before changing the default detector path.
-- [ ] Audit the legacy digit classifier on held-out scans; do not integrate its current integer output as dimension OCR.
-- [x] Fix and test end-of-row digit segmentation in `dataset_creator.py` before generating any replacement dataset.
-- [x] Add a local OCR crop dataset curator/importer with verified labels, checksum validation and source/writer-grouped splits.
-- [ ] Replace random crop-level validation with drawing-/writer-grouped held-out evaluation before trusting OCR accuracy.
-- [ ] Benchmark at least two OCR baselines on complete dimension strings, including rotated, faded and handwritten samples.
-- [ ] Add text-to-dimension-line and dimension-line-to-span association records with multiple candidates and human review.
-- [ ] Evaluate metric correctness (dimension residuals and placement/topology errors), not only detection mAP or OCR character accuracy.
-- [x] Add a Playwright browser smoke test for zoomed overlay alignment and a 390-pixel mobile viewport.
-- [ ] Manually inspect the interface at desktop/mobile sizes and verify PDF preview behaviour.
-- [ ] Add persistent project state only after defining privacy, retention and recovery requirements.
-- [ ] Introduce a typed intermediate representation for detections, OCR observations, dimension associations and constraints.
-- [ ] Add OCR as a reviewable stage; do not wire it directly to geometry generation.
-- [x] Add a standalone manual dimension-chain arithmetic validator with explicit verification and tolerance states.
-- [x] Add versioned candidate-review JSON export and a JSON Schema contract.
-- [ ] Add dimension-to-line and line-to-span association; the current validator does not perform either task.
-- [ ] Add manual geometry correction and measured DXF export only after validation gates exist.
-- [ ] Revisit training only after rights-cleared data, annotation guidelines and a grouped evaluation split are ready.
+### Completed foundations
+
+- [x] Connect the browser Drawing workspace to the detector API.
+- [x] Add candidate-region review, class filtering, selection, zoom and confidence-threshold control.
+- [x] Add versioned candidate-review JSON export and a schema contract.
+- [x] Add manual dimension transcription with style and verification metadata.
+- [x] Add optional local PaddleOCR recognition suggestions for selected dimension crops.
+- [x] Add explicit-unit dimension parsing that keeps missing-unit and ambiguous values unresolved.
+- [x] Add reviewable text-to-dimension-line and dimension-line-to-wall-gap candidate association.
+- [x] Add a manual decimal dimension-chain checker with explicit verification and tolerance states.
+- [x] Add a review-only wall-dimension comparison; it never changes geometry.
+- [x] Add explicit multi-page PDF page selection and source-page provenance.
+- [x] Add portable `.planline` save/open with local user-controlled storage.
+- [x] Add editable manual wall segments, room polygons, endpoint/corner editing and optional snapping.
+- [x] Add SVG and DXF export for user-authored geometry only, with calibrated/unitless DXF handling.
+- [x] Add an OCR crop curator, manifest validation, source/writer-grouped splits and a dataset-quality audit.
+- [x] Add local PaddleOCR fine-tuning job orchestration and held-out recogniser benchmarking.
+- [x] Add browser smoke coverage for zoomed overlay alignment and a narrow mobile viewport.
+
+### Next engineering priorities
+
+- [ ] Run the real detector weights against representative older scans and record per-class precision/recall.
+- [ ] Compare full-frame YOLO inference with overlapping multi-scale tiles on a held-out scan set before changing defaults.
+- [ ] Audit the legacy digit classifier on held-out scans; do not integrate integer-only output as dimension OCR.
+- [ ] Improve OCR evaluation coverage for faint, rotated, handwritten and overlapping complete dimension strings.
+- [ ] Validate source-/writer-group separation across all OCR import and training paths; keep the test split untouched during model selection.
+- [ ] Evaluate association top-1 accuracy, ambiguity rejection and reviewer correction rate on annotated real plans.
+- [ ] Introduce a typed intermediate representation for detections, OCR observations, associations, constraints and provenance.
+- [ ] Implement a global constraint solver that can identify under-constrained, over-constrained and inconsistent dimension systems without inventing measurements.
+- [ ] Benchmark reversible deskew/dewarp and map transformed detections back to original source coordinates.
+- [ ] Reconstruct wall/opening topology from reviewed source evidence and verified constraints; do not infer closure solely to make polygons valid.
+- [ ] Design a validation gate for dimension-driven measured DXF export, including units, layers, provenance and unresolved-item blocking.
+- [ ] Manually inspect drawing, OCR and architecture pages at desktop/mobile sizes and verify PDF preview behaviour on representative files.
+- [ ] Keep OCR training datasets rights-cleared, source-/writer-separated and outside the application repository by default.
+
