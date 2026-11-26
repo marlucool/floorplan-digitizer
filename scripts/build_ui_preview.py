@@ -132,6 +132,11 @@ def build_preview(output_dir: Path) -> Path:
     if not documents:
         raise RuntimeError("No supported files were found under docs/")
 
+    architecture_source = docs_root / "PLANLINE_ARCHITECTURE.md"
+    if not architecture_source.is_file():
+        raise RuntimeError("Required architecture document is missing: docs/PLANLINE_ARCHITECTURE.md")
+    shutil.copy2(architecture_source, output_dir / "architecture-source.md")
+
     # Keep original files (images, PDFs, source files and Markdown) available as
     # assets and downloads. Rendered pages are generated separately.
     shutil.copytree(docs_root, output_dir / "docs", dirs_exist_ok=True)
