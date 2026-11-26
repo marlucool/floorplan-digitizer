@@ -58,6 +58,7 @@ def render_architecture_page(
       <a class="repo-link" href="{drawing_href}">Drawing</a>
       <a class="repo-link" href="{ocr_href}">OCR Studio</a>
       <a class="repo-link" href="{settings_href}">Settings</a>
+      <a class="repo-link" href="/documentation">Documentation</a>
       <a class="repo-link active" href="{architecture_href}" aria-current="page">Architecture</a>
       <button id="themeToggle" class="toolbar-button theme-toggle" type="button"
               aria-label="Switch to light theme" title="Switch to light theme" aria-pressed="false">
