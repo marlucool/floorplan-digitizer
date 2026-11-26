@@ -18,6 +18,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+
+  ensure-preview-label:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create the preview label if it does not exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          existing="$(gh label list --repo "$GITHUB_REPOSITORY" --limit 1000 --json name --jq '[.[] | select(.name == "preview")] | length')"
+          if [[ "$existing" == "0" ]]; then
+            gh label create preview --repo "$GITHUB_REPOSITORY" --color "0E8A16" --description "Publish a static Planline UI preview for this pull request"
+          fi
   build:
     if: >-
       github.event_name != 'pull_request_target' ||
