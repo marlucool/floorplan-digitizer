@@ -87,6 +87,12 @@ def test_static_preview_renders_real_workspace_without_backend_requests() -> Non
                         expect(page.locator("html")).to_have_attribute("data-theme", "dark")
                         theme_toggle.click()
                         expect(page.locator("html")).to_have_attribute("data-theme", "light")
+                        if page_name == "ocr.html":
+                            expect(page.locator("#apiStatus")).to_have_text("Static OCR preview · backend disabled")
+                            expect(page.locator("#annotationMessage")).to_contain_text("disabled in this static preview")
+                        if page_name == "settings.html":
+                            expect(page.locator("#updateTitle")).to_have_text("Updates disabled in static preview")
+                            expect(page.locator("#currentVersion")).to_have_text("Unavailable in preview")
 
                     if (site / "dashboard.html").is_file():
                         page.goto(url + "dashboard.html", wait_until="domcontentloaded")
@@ -94,6 +100,9 @@ def test_static_preview_renders_real_workspace_without_backend_requests() -> Non
                         expect(page.locator('.workspace-card.ocr-card[href="ocr.html"]')).to_be_visible()
                         expect(page.locator('.top-links a[href="settings.html"]')).to_be_visible()
                         expect(page.locator('.workspace-card.settings-card[href="settings.html"]')).to_be_visible()
+                        expect(page.locator("#healthTitle")).to_have_text("Static preview")
+                        expect(page.locator("#healthDetails")).to_contain_text("Backend services are disabled")
+                        expect(page.locator("#refreshHealth")).to_be_hidden()
 
                     assert not api_requests, f"The static preview attempted backend requests: {api_requests}"
                 finally:
