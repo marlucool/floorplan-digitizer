@@ -37,7 +37,7 @@ Planline is no longer just a detector preview. The current application is a **lo
 - OCR Studio includes a crop editor, verified-label library, dataset import/export, manifest and checksum validation, source/writer-grouped split creation, dataset-quality reporting and training-job monitoring.
 - Local PaddleOCR PP-OCRv5 fine-tuning jobs can be configured from a matching pretrained checkpoint and PaddleOCR source checkout. Benchmark tooling evaluates a recogniser against a held-out test split and reports exact-string accuracy and character error rate.
 - These features provide a reproducible training/evaluation workflow; they do **not** prove that a recogniser is accurate on real architectural drawings. Training still requires compatible local PaddlePaddle/PaddleOCR assets, representative rights-cleared crops and a genuinely independent held-out set. Do not describe a model as validated merely because a training job completes.
-- The Windows installer provisions the optional OCR runtime and the required pinned training assets in Planline's private Python environment. The core web requirements keep the heavyweight OCR training stack separate.
+- The Windows installer provisions PaddlePaddle and the pinned PaddleOCR recognition runtime in Planline's private Python environment. OCR Studio downloads the pinned PaddleOCR source checkout and matching pretrained training checkpoint on demand when training assets are prepared or a training job is started; these larger assets are not bundled in the installer. The core web requirements keep the heavyweight training stack separate.
 
 ### User-authored geometry, projects and exports
 
