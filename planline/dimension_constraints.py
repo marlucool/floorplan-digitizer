@@ -1,7 +1,7 @@
 """Conservative comparison between a user-drawn wall and a verified dimension."""
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import Decimal, ROUND_HALF_UP, localcontext
 from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
@@ -22,15 +22,25 @@ class WallDimensionCheckRequest(BaseModel):
 
 
 def _format(value: Decimal) -> str:
-    rounded = value.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
-    return format(rounded.normalize(), "f")
+    # The validated input ranges permit results wider than Decimal's default
+    # 28-digit context (especially percentage differences for tiny dimensions).
+    # Keep enough precision to round every supported result to 0.001 safely.
+    with localcontext() as context:
+        context.prec = 60
+        rounded = value.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+        return format(rounded.normalize(), "f")
 
 
 def compare_wall_dimension(request: WallDimensionCheckRequest) -> dict[str, Any]:
-    measured_mm = request.wall_length_px / request.pixels_per_mm
-    delta_mm = measured_mm - request.dimension_mm
-    difference_percent = abs(delta_mm) / request.dimension_mm * Decimal("100")
-    status = "within_tolerance" if difference_percent <= request.tolerance_percent else "mismatch"
+    # Division and percentage calculation can also exceed the default Decimal
+    # precision even when every individual request field is valid.
+    with localcontext() as context:
+        context.prec = 60
+        measured_mm = request.wall_length_px / request.pixels_per_mm
+        delta_mm = measured_mm - request.dimension_mm
+        difference_percent = abs(delta_mm) / request.dimension_mm * Decimal("100")
+        status = "within_tolerance" if difference_percent <= request.tolerance_percent else "mismatch"
+
     return {
         "status": status,
         "measured_length_mm": _format(measured_mm),
