@@ -84,7 +84,7 @@ jobs:
             tmp="$(mktemp -d)"
             mkdir -p "$tmp/scripts"
             cp scripts/build_ui_preview.py "$tmp/scripts/"
-            git archive --format=tar FETCH_HEAD web | tar -xf - -C "$tmp"
+            git archive --format=tar FETCH_HEAD web docs | tar -xf - -C "$tmp"
 
             # The preview harness is trusted build infrastructure, not PR code.
             # Older PR branches may predate these static-only assets, so supply
@@ -100,9 +100,12 @@ jobs:
             python "$tmp/scripts/build_ui_preview.py" --output "$destination"
             test -s "$destination/index.html"
             test -s "$destination/app.js"
+            test -s "$destination/ocr.html"
+            test -s "$destination/settings.html"
             test -s "$destination/preview.js"
-            node --check "$destination/app.js"
-            node --check "$destination/preview.js"
+            for script in "$destination"/*.js; do
+              node --check "$script"
+            done
             rm -rf "$tmp"
             count=$((count + 1))
           done < <(jq -c '.[]' <<<"$prs")
@@ -111,8 +114,11 @@ jobs:
 
       - name: Check main preview JavaScript syntax
         run: |
-          node --check web/app.js
-          node --check web/preview.js
+          for script in web/app.js web/preview.js web/ocr-studio.js web/settings.js web/dashboard.js; do
+            if [[ -f "$script" ]]; then
+              node --check "$script"
+            fi
+          done
 
       - name: Install preview test dependencies
         run: python -m pip install pytest
@@ -165,6 +171,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
+      pull-requests: write
     steps:
       - name: Add or update the PR preview link
         uses: actions/github-script@v7

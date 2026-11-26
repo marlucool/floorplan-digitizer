@@ -74,6 +74,25 @@ def test_static_preview_renders_real_workspace_without_backend_requests() -> Non
                         "() => { const image = document.querySelector('#previewImage'); return image && image.complete && image.naturalWidth === 1200; }",
                         timeout=10000,
                     )
+                    for page_name in ("ocr.html", "settings.html", "dashboard.html"):
+                        workspace = site / page_name
+                        if not workspace.is_file():
+                            continue
+                        page.goto(url + page_name, wait_until="domcontentloaded")
+                        expect(page.locator('aside[role="status"]')).to_contain_text("DESKTOP UI PREVIEW")
+                        expect(page.locator("h1").first).to_be_visible()
+                        theme_toggle = page.locator("#themeToggle")
+                        expect(theme_toggle).to_be_visible()
+                        theme_toggle.click()
+                        expect(page.locator("html")).to_have_attribute("data-theme", "dark")
+                        theme_toggle.click()
+                        expect(page.locator("html")).to_have_attribute("data-theme", "light")
+
+                    if (site / "dashboard.html").is_file():
+                        page.goto(url + "dashboard.html", wait_until="domcontentloaded")
+                        expect(page.locator('a[href="ocr.html"]')).to_be_visible()
+                        expect(page.locator('a[href="settings.html"]')).to_be_visible()
+
                     assert not api_requests, f"The static preview attempted backend requests: {api_requests}"
                 finally:
                     browser.close()
