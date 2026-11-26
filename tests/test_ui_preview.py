@@ -26,3 +26,13 @@ def test_preview_build_rewrites_assets_and_disables_backend_pages(tmp_path: Path
     assert 'src="app.js" defer></script>' in html
     assert 'href="/api/' not in html
     assert 'href="#preview-disabled"' in html
+
+
+def test_preview_build_supports_pr_subdirectory_urls(tmp_path: Path) -> None:
+    output = build_preview(tmp_path / "_site" / "pr-preview" / "123")
+
+    assert (output / "index.html").is_file()
+    html = (output / "index.html").read_text(encoding="utf-8")
+    assert 'href="styles.css"' in html
+    assert 'src="app.js" defer></script>' in html
+    assert (output / "demo-floorplan.svg").is_file()
