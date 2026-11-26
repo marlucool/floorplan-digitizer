@@ -264,8 +264,15 @@ def start_training_job(
     split_path = dataset_dir / "splits.json"
     if not split_path.is_file():
         raise ValueError("Build source/writer-grouped train/validation/test splits before training.")
-    split_data = json.loads(split_path.read_text(encoding="utf-8"))
-    assignments = split_data.get("assignments", {})
+    try:
+        split_data = json.loads(split_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("The split plan is unreadable. Rebuild the dataset splits before training.") from exc
+    if not isinstance(split_data, dict):
+        raise ValueError("The split plan must contain a JSON object. Rebuild the dataset splits before training.")
+    assignments = split_data.get("assignments")
+    if not isinstance(assignments, dict):
+        raise ValueError("The split plan assignments must be a JSON object. Rebuild the dataset splits before training.")
     if not any(value == "test" for value in assignments.values()):
         raise ValueError("The split plan has no held-out test samples. Rebuild splits with at least three independent groups.")
     training_data = run_dir / "train_data"
