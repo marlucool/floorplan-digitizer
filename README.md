@@ -3,6 +3,8 @@
 Planline is a local-first project for turning scanned or hand-drawn 2D floor plans into **editable, dimensionally constrained CAD geometry**.
 
 > **Desktop UI preview:** [Open the current drawing workspace](https://marlucool.github.io/floorplan-digitizer/). This static preview uses illustrative sample data; OCR, model inference, uploads and backend operations are disabled. The repository owner must enable **Settings → Pages → Build and deployment → GitHub Actions** once before the site can publish.
+>
+> **Pull request previews:** the `preview` label publishes that PR's version of the same drawing workspace at `https://marlucool.github.io/floorplan-digitizer/pr-preview/<PR-number>/`. The link is posted in the PR conversation and refreshes whenever new commits are pushed. Removing the label or closing the PR removes its preview. The main website and all currently labelled PR previews are rebuilt together on every push to `main`.
 
 The important problem is not tracing pixels. Survey drawings can be skewed, faded, low-resolution, or drawn approximately rather than to scale. Planline is being developed to read written dimensions, relate them to the correct parts of the drawing, detect contradictions, and keep uncertain results in a human review workflow.
 
