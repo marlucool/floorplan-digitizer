@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f2ec">
   <title>Planline — Settings</title>
-  <link rel="stylesheet" href="/styles.css">
+<script>
+  try { document.documentElement.dataset.theme = localStorage.getItem("planline-theme") || "dark"; }
+  catch (_) { document.documentElement.dataset.theme = "dark"; }
+</script>
+    <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/settings.css">
   <script src="/settings.js" defer></script>
 </head>
