@@ -626,6 +626,8 @@ html[data-theme="dark"] .architecture-prose code{background:#252d26}
 
 
 /* Documentation library: multi-format file index and reader. */
+.documentation-page,.architecture-page{--surface:#fff;--hover:#f2f5ef}
+html[data-theme="dark"] .documentation-page,html[data-theme="dark"] .architecture-page{--surface:#202620;--hover:#29352a}
 .documentation-hub,.documentation-layout{width:min(1480px,100%);margin:0 auto;padding:34px clamp(18px,4.5vw,64px) 60px}
 .documentation-hero{max-width:900px;margin:0 0 26px}
 .documentation-hero h1{margin:0;font:700 clamp(34px,4.2vw,48px)/1.05 Manrope,sans-serif;letter-spacing:-2.5px;color:var(--ink)}
@@ -735,3 +737,5 @@ html[data-theme="dark"] .architecture-prose code{background:#252d26}
   .documentation-file-list .documentation-file-name small{font-size:8px}
   .documentation-group{padding:12px}
 }
+
+.documentation-search input:focus-visible{outline:2px solid var(--green)!important;outline-offset:2px}
