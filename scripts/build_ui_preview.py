@@ -11,15 +11,15 @@ WEB = ROOT / "web"
 
 # Each page is copied only when that workspace exists in the source revision.
 PAGES = {
-    "index.html": ("app.js", "styles.css"),
-    "dashboard.html": ("dashboard.js", "dashboard.css", "styles.css"),
+    "drawing.html": ("app.js", "styles.css"),
+    "index.html": ("dashboard.js", "dashboard.css", "styles.css"),
     "ocr.html": ("ocr-studio.js", "ocr-studio.css", "styles.css"),
     "settings.html": ("settings.js", "settings.css", "styles.css"),
 }
 SHARED_ASSETS = ("preview.js", "demo-floorplan.svg")
 ROUTES = {
-    "/": "index.html",
-    "/dashboard": "dashboard.html",
+    "/": "drawing.html",
+    "/dashboard": "index.html",
     "/ocr": "ocr.html",
     "/settings": "settings.html",
     "/architecture": "architecture.md",
@@ -54,16 +54,22 @@ def build_preview(output_dir: Path) -> Path:
 
     copied_assets: set[str] = set()
     page_count = 0
-    for page, assets in PAGES.items():
-        source = WEB / page
+    source_pages = {
+        "drawing.html": "index.html",
+        "index.html": "dashboard.html",
+        "ocr.html": "ocr.html",
+        "settings.html": "settings.html",
+    }
+    for output_name, assets in PAGES.items():
+        source = WEB / source_pages[output_name]
         if not source.is_file():
             continue
-        prepare_page(source, output_dir / page)
+        prepare_page(source, output_dir / output_name)
         page_count += 1
         copied_assets.update(assets)
 
-    if "index.html" not in {path.name for path in output_dir.glob("*.html")}:
-        raise RuntimeError("The drawing workspace web/index.html is required to build a preview.")
+    if "index.html" not in {path.name for path in output_dir.glob("*.html")} or "drawing.html" not in {path.name for path in output_dir.glob("*.html")}:
+        raise RuntimeError("The dashboard and drawing workspace are both required to build a preview.")
 
     for asset in sorted(copied_assets | set(SHARED_ASSETS)):
         source = WEB / asset
