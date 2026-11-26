@@ -367,18 +367,6 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert dxf_submitted["segments"][0]["id"] == "manual-wall-002"
             assert dxf_submitted["rooms"][0]["id"] == "manual-room-001"
 
-            page.locator("#selectWallTool").click()
-            page.locator("#previewImage").click(position={"x": 185, "y": 225})
-            page.locator("#wallDimensionSelect").select_option("det-004")
-            assert page.locator("#wallDimensionSelect").input_value() == "det-004"
-            assert page.locator("#checkWallDimension").is_enabled()
-            page.locator("#checkWallDimension").click()
-            page.wait_for_function("document.querySelector('#wallDimensionResult').dataset.status === 'within_tolerance'")
-            assert "Within the selected tolerance" in page.locator("#wallDimensionResult").inner_text()
-            assert wall_check_request["dimension_mm"] == "2685"
-            assert wall_check_request["pixels_per_mm"] > 0
-            assert abs(wall_check_request["wall_length_px"] - 230.217) < 1
-            assert wall_check_request["tolerance_percent"] == 1
             page.locator("#detectionSearch").fill("dimension_value")
             assert page.locator(".detection-row:visible").count() == 1
             page.locator("#detectionSearch").fill("does-not-exist")
@@ -412,6 +400,19 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert "2685 mm" in page.locator(".dimension-interpretation").inner_text()
             page.locator(".dimension-text-verified-input").check()
             page.wait_for_function("Array.from(document.querySelector('#wallDimensionSelect').options).some(option => option.value === 'det-004')")
+
+            page.locator("#selectWallTool").click()
+            page.locator("#previewImage").click(position={"x": 185, "y": 225})
+            page.locator("#wallDimensionSelect").select_option("det-004")
+            assert page.locator("#wallDimensionSelect").input_value() == "det-004"
+            assert page.locator("#checkWallDimension").is_enabled()
+            page.locator("#checkWallDimension").click()
+            page.wait_for_function("document.querySelector('#wallDimensionResult').dataset.status === 'within_tolerance'")
+            assert "Within the selected tolerance" in page.locator("#wallDimensionResult").inner_text()
+            assert wall_check_request["dimension_mm"] == "2685"
+            assert wall_check_request["pixels_per_mm"] > 0
+            assert abs(wall_check_request["wall_length_px"] - 230.217) < 1
+            assert wall_check_request["tolerance_percent"] == 1
             page.locator("#drawingDatasetSelect").select_option("handwritten-dimensions")
             page.locator("#drawingSourceId").fill("plan-01")
             page.locator("#drawingWriterId").fill("writer-a")
