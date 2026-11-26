@@ -2,13 +2,13 @@
 
 Planline is a local-first project for turning scanned or hand-drawn 2D floor plans into **editable, dimensionally constrained CAD geometry**.
 
-> **Desktop UI preview:** [Open the current drawing workspace](https://marlucool.github.io/floorplan-digitizer/). This static preview uses illustrative sample data; OCR, model inference, uploads and backend operations are disabled. The repository owner must enable **Settings → Pages → Build and deployment → GitHub Actions** once before the site can publish.
+> **Desktop UI preview:** [Open the current Planline workspace](https://marlucool.github.io/floorplan-digitizer/). This multi-page static preview includes the dashboard, drawing workspace, OCR Studio and settings. It uses illustrative sample data; OCR, model inference, uploads and backend operations are disabled. The repository owner must enable **Settings → Pages → Build and deployment → GitHub Actions** once before the site can publish.
 >
-> **Pull request previews:** the `preview` label publishes that PR's version of the same drawing workspace at `https://marlucool.github.io/floorplan-digitizer/pr-preview/<PR-number>/`. The link is posted in the PR conversation and refreshes whenever new commits are pushed. Removing the label or closing the PR removes its preview. The main website and all currently labelled PR previews are rebuilt together on every push to `main`.
+> **Pull request previews:** the `preview` label publishes that PR's version of the multi-page Planline workspace at `https://marlucool.github.io/floorplan-digitizer/pr-preview/<PR-number>/`. The link is posted in the PR conversation and refreshes whenever new commits are pushed. Removing the label or closing the PR removes its preview. The main website and all currently labelled PR previews are rebuilt together on every push to `main`.
 
 The important problem is not tracing pixels. Survey drawings can be skewed, faded, low-resolution, or drawn approximately rather than to scale. Planline is being developed to read written dimensions, relate them to the correct parts of the drawing, detect contradictions, and keep uncertain results in a human review workflow.
 
-> **Current status: drawing review plus OCR Studio workbench.** The local app now includes a crop editor, verified-label library, source/writer-safe dataset splits, background PP-OCRv5 fine-tuning jobs and held-out benchmark reporting. The desktop app opens the drawing workspace first; OCR Studio is available from the global navigation at `/ocr`, and application settings and GitHub release updates are available at `/settings`. The drawing-analysis workflow ranks geometric candidates linking dimension-value regions to dimension lines and wall spans, with explicit human confirmation. The Windows installer provisions PaddlePaddle and PaddleOCR in Planline's private Python runtime; local recognition remains optional and every suggestion remains unverified until reviewed. Manual two-point scale calibration and user-authored wall/room geometry are available, including SVG and DXF export. Automatic dimension-driven measured reconstruction and verified CAD export are not implemented.
+> **Current status: drawing review plus OCR Studio workbench.** The local app now includes a crop editor, verified-label library, source/writer-safe dataset splits, background PP-OCRv5 fine-tuning jobs and held-out benchmark reporting. The desktop app opens the workspace dashboard first. Drawing, OCR Studio and application settings are available from the global navigation at `/`, `/ocr` and `/settings`. The drawing-analysis workflow ranks geometric candidates linking dimension-value regions to dimension lines and wall spans, with explicit human confirmation. The Windows installer provisions PaddlePaddle and PaddleOCR in Planline's private Python runtime; local recognition remains optional and every suggestion remains unverified until reviewed. Manual two-point scale calibration and user-authored wall/room geometry are available, including SVG and DXF export. Automatic dimension-driven measured reconstruction and verified CAD export are not implemented.
 
 ![Example survey drawing](docs/rysunek.png)
 
@@ -16,7 +16,7 @@ The important problem is not tracing pixels. Survey drawings can be skewed, fade
 
 | Area | Current capability |
 | --- | --- |
-| Web app | Browser UI served by the local FastAPI application |
+| Web app | Browser UI served by the local FastAPI application, with a workspace dashboard at `/dashboard` |
 | Input | PNG, JPG, WEBP, TIFF and PDF uploads up to 25 MB |
 | PDF handling | Select and analyse any page in a multi-page PDF without re-uploading the source |
 | Scale calibration | Manual two-point reference in mm, cm, m, inches or feet; exported with provenance and explicitly not treated as geometry validation |
