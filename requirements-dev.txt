@@ -9,4 +9,5 @@ python-multipart>=0.0.9,<1.0
 # Starlette TestClient now prefers httpx2; the legacy httpx adapter is deprecated.
 httpx2>=2.0,<3.0
 pytest>=8.0,<10.0
+Markdown>=3.7,<4.0
 jsonschema>=4.20,<5.0
