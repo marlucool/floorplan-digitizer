@@ -34,6 +34,8 @@ jobs:
         run: |
           node --check web/app.js
           node --check web/ocr-studio.js
+          node --check web/settings.js
+          node --check web/dashboard.js
 
   browser-ui:
     runs-on: ubuntu-latest
