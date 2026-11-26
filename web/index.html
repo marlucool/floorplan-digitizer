@@ -93,6 +93,17 @@
           </div>
           <p class="geometry-export-note">DXF contains only the walls and room outlines you draw. A user-supplied scale is exported as millimetres; without calibration, coordinates are unitless source pixels.</p>
           <output id="wallLength" aria-live="polite">Select a wall to view its length.</output>
+          <section class="wall-dimension-check" aria-label="Compare a selected wall with a verified dimension">
+            <strong>Check a wall against a written dimension</strong>
+            <p>Choose a dimension you have interpreted and verified. This compares it with the selected manual wall using your scale reference; it never changes the wall.</p>
+            <label for="wallDimensionSelect">Verified linear dimension<select id="wallDimensionSelect" disabled><option value="">Interpret and verify a dimension first…</option></select></label>
+            <div class="wall-dimension-check-controls">
+              <label for="wallDimensionTolerance">Tolerance (%)<input id="wallDimensionTolerance" type="number" min="0" max="10" step="0.1" value="1.0"></label>
+              <button id="checkWallDimension" class="toolbar-button" type="button" disabled>Compare selected wall</button>
+            </div>
+            <output id="wallDimensionResult" aria-live="polite">Select a wall, verify an explicit dimension and apply a scale reference to compare them.</output>
+          </section>
+
           <output id="geometryStatus" aria-live="polite">Analyse a drawing to start manually tracing wall segments.</output>
           <div class="room-heading"><strong>Manual room boundaries</strong><span id="roomCount">0 rooms</span></div>
           <p>Click each corner, then finish the outline. Area is only converted to square metres when you apply a scale reference.</p>

@@ -236,3 +236,14 @@ html[data-theme="dark"] .ocr-assist-controls{background:#202620;border-color:var
 .interpret-dimension-button{margin:8px 0 4px}
 .dimension-interpretation{display:block;padding:8px 10px;border-left:2px solid var(--accent);background:var(--panel);font-size:11px;line-height:1.55;color:var(--ink);margin-bottom:8px}
 .dimension-interpretation[data-status="ambiguous"],.dimension-interpretation[data-status="unit_missing"]{border-left-color:var(--warning,#b88736)}
+
+.wall-dimension-check{margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
+.wall-dimension-check>strong{font-size:12px}
+.wall-dimension-check>p{font-size:11px;line-height:1.5;color:var(--muted);margin:7px 0}
+.wall-dimension-check>label,.wall-dimension-check-controls label{display:grid;gap:5px;font-size:11px;color:var(--muted)}
+.wall-dimension-check select,.wall-dimension-check input{width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit}
+.wall-dimension-check-controls{display:flex;gap:10px;align-items:end;margin-top:9px}
+.wall-dimension-check-controls label{max-width:100px}
+.wall-dimension-check-controls button{flex:1;min-height:36px}
+#wallDimensionResult{display:block;margin-top:10px;font-size:11px;line-height:1.55;color:var(--ink)}
+#wallDimensionResult[data-status="mismatch"]{color:var(--warning,#b88736)}

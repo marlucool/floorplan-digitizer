@@ -438,6 +438,95 @@ function pointToSegmentDistance(point, start, end) {
   return Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy));
 }
 
+function refreshWallDimensionOptions() {
+  const select = $("#wallDimensionSelect");
+  if (!select) return;
+  const previous = select.value;
+  select.replaceChildren();
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Choose a verified dimension…";
+  select.append(placeholder);
+  document.querySelectorAll(".dimension-text-item").forEach((row) => {
+    const verified = row.querySelector(".dimension-text-verified-input")?.checked;
+    const valueMm = row.dataset.parsedValueMm;
+    if (!verified || !valueMm || row.dataset.dimensionType !== "linear") return;
+    const option = document.createElement("option");
+    option.value = row.dataset.detectionId || "";
+    option.dataset.valueMm = valueMm;
+    const raw = row.querySelector(".dimension-text-value")?.value.trim() || "Dimension";
+    option.textContent = raw + " → " + valueMm + " mm";
+    select.append(option);
+  });
+  select.disabled = select.options.length <= 1;
+  if ([...select.options].some((option) => option.value === previous)) select.value = previous;
+  updateWallDimensionCheckControls();
+}
+
+function updateWallDimensionCheckControls() {
+  const select = $("#wallDimensionSelect");
+  const selectedWall = state.geometry?.segments?.find((segment) => segment.id === state.geometry.selectedId);
+  const hasCalibration = Number(state.calibration.applied?.pixels_per_mm) > 0;
+  const hasDimension = Boolean(select?.selectedOptions?.[0]?.dataset.valueMm);
+  const toleranceText = $("#wallDimensionTolerance").value.trim();
+  const tolerance = Number(toleranceText);
+  const validTolerance = toleranceText !== "" && Number.isFinite(tolerance) && tolerance >= 0 && tolerance <= 10;
+  $("#checkWallDimension").disabled = !selectedWall || !hasDimension || !hasCalibration || !validTolerance;
+  if (!hasCalibration) {
+    $("#wallDimensionResult").textContent = "Apply a two-point scale reference before comparing metric dimensions.";
+  } else if (!selectedWall) {
+    $("#wallDimensionResult").textContent = "Select a manual wall segment on the drawing.";
+  } else if (!hasDimension) {
+    $("#wallDimensionResult").textContent = "Interpret a dimension with an explicit unit, verify it, then choose it above.";
+  }
+}
+
+async function compareSelectedWallToDimension() {
+  const selectedWall = state.geometry.segments.find((segment) => segment.id === state.geometry.selectedId);
+  const option = $("#wallDimensionSelect").selectedOptions[0];
+  const dimensionMm = option?.dataset.valueMm;
+  const pixelsPerMm = state.calibration.applied?.pixels_per_mm;
+  const tolerance = Number($("#wallDimensionTolerance").value);
+  if (!selectedWall || !dimensionMm || !(pixelsPerMm > 0)) {
+    updateWallDimensionCheckControls();
+    return;
+  }
+  const wallLengthPx = Math.hypot(
+    selectedWall.end_px.x - selectedWall.start_px.x,
+    selectedWall.end_px.y - selectedWall.start_px.y
+  );
+  const button = $("#checkWallDimension");
+  button.disabled = true;
+  button.textContent = "Comparing…";
+  try {
+    const response = await fetch("/api/validate-wall-dimension", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        wall_length_px: wallLengthPx,
+        pixels_per_mm: pixelsPerMm,
+        dimension_mm: dimensionMm,
+        tolerance_percent: tolerance
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.detail || "Wall comparison failed.");
+    const summary = "Wall " + selectedWall.id + ": " + result.measured_length_mm +
+      " mm vs " + result.dimension_value_mm + " mm. Difference " +
+      result.delta_mm + " mm (" + result.difference_percent + "%). ";
+    $("#wallDimensionResult").textContent = result.status === "within_tolerance"
+      ? summary + "Within the selected tolerance. Confirm the association against the drawing; geometry was not changed."
+      : summary + "Outside tolerance. Check the scale reference and dimension-to-wall association; geometry was not changed.";
+    $("#wallDimensionResult").dataset.status = result.status;
+  } catch (error) {
+    $("#wallDimensionResult").textContent = "Comparison failed: " + (error.message || "Local API unavailable.");
+    $("#wallDimensionResult").dataset.status = "error";
+  } finally {
+    button.textContent = "Compare selected wall";
+    updateWallDimensionCheckControls();
+  }
+}
+
 function renderGeometryControls() {
   const geometry = state.geometry;
   const wallCount = geometry?.segments?.length || 0;
@@ -485,6 +574,7 @@ function renderGeometryControls() {
   } else {
     $("#wallLength").textContent = "Select a wall to view its length.";
   }
+  refreshWallDimensionOptions();
   const selectedRoom = geometry.rooms.find((room) => room.id === geometry.selectedRoomId);
   if (selectedRoom) {
     const areaPx = polygonAreaPx2(selectedRoom.vertices_px);
@@ -838,6 +928,9 @@ $("#deleteWall").addEventListener("click", deleteSelectedManualWall);
 $("#clearWalls").addEventListener("click", clearManualWalls);
 $("#exportGeometry").addEventListener("click", exportManualGeometrySvg);
 $("#exportDxf").addEventListener("click", exportManualGeometryDxf);
+$("#wallDimensionSelect").addEventListener("change", updateWallDimensionCheckControls);
+$("#wallDimensionTolerance").addEventListener("input", updateWallDimensionCheckControls);
+$("#checkWallDimension").addEventListener("click", compareSelectedWallToDimension);
 
 $("#previewImage").addEventListener("click", handleDrawingClick);
 function beginWallEndpointDrag(event) {
@@ -1081,6 +1174,10 @@ function renderDimensionTextReview(regions) {
     textInput.addEventListener("input", () => {
       interpretButton.disabled = !textInput.value.trim();
       interpretation.textContent = "";
+      delete row.dataset.parsedValueMm;
+      delete row.dataset.dimensionType;
+      verifiedInput.checked = false;
+      refreshWallDimensionOptions();
       updateDatasetCaptureButtons();
     });
     interpretButton.addEventListener("click", () => interpretDimensionForRow(textInput, interpretation, interpretButton));
@@ -1215,12 +1312,16 @@ function renderDimensionTextReview(regions) {
     saveCropButton.disabled = !region.crop_data_url;
     saveCropButton.addEventListener("click", () => saveDimensionCropToDataset(region, row, saveCropButton));
     textInput.addEventListener("input", updateDatasetCaptureButtons);
-    verifiedInput.addEventListener("change", updateDatasetCaptureButtons);
+    verifiedInput.addEventListener("change", () => {
+      refreshWallDimensionOptions();
+      updateDatasetCaptureButtons();
+    });
 
     fields.append(meta, textLabel, interpretButton, interpretation, styleLabel, verifiedLabel, associationPanel, saveCropButton);
     row.append(fields);
     container.append(row);
   });
+  refreshWallDimensionOptions();
   updateOcrControls();
 }
 
@@ -1266,6 +1367,15 @@ async function interpretDimensionForRow(input, output, button) {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.detail || "Dimension interpretation failed.");
+    const row = input.closest(".dimension-text-item");
+    if (result.status === "parsed" && result.dimension_type === "linear" && row) {
+      row.dataset.parsedValueMm = result.value_mm;
+      row.dataset.dimensionType = result.dimension_type;
+    } else if (row) {
+      delete row.dataset.parsedValueMm;
+      delete row.dataset.dimensionType;
+    }
+    refreshWallDimensionOptions();
     if (result.status === "parsed") {
       output.textContent = "Interpretation: " + result.value_mm + " mm (" + result.dimension_type +
         ", source unit " + result.unit + "). Check this against the original drawing; it is not verified.";
