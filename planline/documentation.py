@@ -428,6 +428,16 @@ def render_document_page(
         static_site=static_site,
         current_output_path=current_output_path,
     )
+    source_link_attributes = (
+        "download"
+        if kind in {"source", "download"}
+        else 'target="_blank" rel="noreferrer"'
+    )
+    source_link_label = (
+        "Download original source ↓"
+        if kind in {"source", "download"}
+        else "Open original file ↗"
+    )
 
     body = f"""
   <main class="documentation-layout">
@@ -442,7 +452,7 @@ def render_document_page(
         <p class="eyebrow">{html.escape(str(document["group"]).upper())} / {html.escape(str(document["suffix"]).upper())}</p>
         <h1>{html.escape(title)}</h1>
         <p class="documentation-path">{html.escape(path)} · {html.escape(str(document["size_label"]))}</p>
-        <a class="documentation-source-link" href="{html.escape(source_href, quote=True)}" target="_blank" rel="noreferrer">Open original file ↗</a>
+        <a class="documentation-source-link" href="{html.escape(source_href, quote=True)}" {source_link_attributes}>{source_link_label}</a>
       </div>
       <div class="documentation-prose">{body_content}</div>
       <footer class="documentation-footer"><span>PLANLINE · DOCUMENTATION</span><span><a href="{documentation_href}">Back to documentation</a></span></footer>
