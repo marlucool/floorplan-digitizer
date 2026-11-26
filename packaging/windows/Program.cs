@@ -1180,6 +1180,13 @@ internal sealed class SetupForm : Form
             appDirectory
         );
 
+        await SetStatusAsync("Checking Python package consistency…");
+        await RunProcessAsync(
+            python,
+            new[] { "-m", "pip", "check" },
+            appDirectory
+        );
+
         await SetStatusAsync("Verifying the PaddleOCR runtime…");
         string verification = await RunProcessAsync(
             python,
