@@ -412,7 +412,7 @@ def render_document_page(
         else:
             body_content = '<p>This file cannot be displayed as UTF-8 text. Use the download link below.</p>'
     else:
-        raw_href = f"docs/{path}" if static_site else f"/docs/{quote(path, safe='/')}"
+        raw_href = f"docs/{quote(path, safe='/')}" if static_site else f"/docs/{quote(path, safe='/')}"
         if static_site:
             raw_href = posixpath.relpath(raw_href, posixpath.dirname(current_output_path) or ".")
         body_content = (
