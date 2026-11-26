@@ -105,5 +105,21 @@ $("#installUpdate").addEventListener("click", async () => {
   }
 });
 
-$("#currentVersion").textContent = "v0.1.1";
-if (autoCheck.checked) checkUpdates();
+async function loadCurrentVersion() {
+  try {
+    const response = await fetch("/api/health", { cache: "no-store" });
+    if (!response.ok) return;
+    const health = await response.json();
+    if (health.version) $("#currentVersion").textContent = "v" + health.version;
+  } catch (_) {}
+}
+
+if (window.PLANLINE_PREVIEW === true) {
+  $("#currentVersion").textContent = "Unavailable in preview";
+  setUpdateState("neutral", "Updates disabled in static preview", "Release checks and installation are available in the local desktop application.");
+  $("#checkUpdates").disabled = true;
+  $("#installUpdate").hidden = true;
+} else {
+  loadCurrentVersion();
+  if (autoCheck.checked) checkUpdates();
+}
