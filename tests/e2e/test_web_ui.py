@@ -376,10 +376,11 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.locator('.detection-row[data-detection-id="det-004"]').click()
             assert page.locator("#selectedDetection").is_visible()
             assert "det-004" in page.locator("#selectedDetection").inner_text().lower()
-            page.locator("#themeToggle").click()
             assert page.locator("html").get_attribute("data-theme") == "dark"
             page.locator("#themeToggle").click()
             assert page.locator("html").get_attribute("data-theme") == "light"
+            page.locator("#themeToggle").click()
+            assert page.locator("html").get_attribute("data-theme") == "dark"
             alignment = page.evaluate(
                 "() => { const image = document.querySelector('#previewImage').getBoundingClientRect(); const canvas = document.querySelector('#overlay').getBoundingClientRect(); return { left: Math.abs(image.left - canvas.left), top: Math.abs(image.top - canvas.top), width: Math.abs(image.width - canvas.width), height: Math.abs(image.height - canvas.height) }; }"
             )
