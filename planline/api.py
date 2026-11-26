@@ -339,7 +339,7 @@ def documentation_file(doc_path: str) -> HTMLResponse:
 
     page = render_document_page(
         document,
-        source_path.read_bytes(),
+        source_path.read_bytes() if document["kind"] in {"markdown", "source"} else b"",
         documents,
         static_site=False,
         current_output_path=f"documentation/{doc_path}",
