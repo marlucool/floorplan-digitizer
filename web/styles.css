@@ -709,7 +709,6 @@ html[data-theme="dark"] .architecture-prose code{background:#252d26}
 .documentation-prose :is(h1,h2,h3,h4,h5,h6)[id],.architecture-prose :is(h1,h2,h3,h4,h5,h6)[id]{
   scroll-margin-block-start:var(--docs-anchor-offset, 120px);
 }
-html{scroll-padding-top:var(--docs-anchor-offset, 120px)}
 @media(prefers-reduced-motion:no-preference){html:has(body.documentation-page),html:has(body.architecture-page){scroll-behavior:smooth}}
 @media(max-width:1020px){
   .documentation-layout{grid-template-columns:245px minmax(0,1fr);gap:20px}
