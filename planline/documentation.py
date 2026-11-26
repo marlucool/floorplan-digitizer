@@ -132,7 +132,11 @@ def _rewrite_markdown_links(
         if static_site:
             link = posixpath.relpath(destination, posixpath.dirname(current_output_path) or ".")
         else:
-            link = f"/documentation/{quote(target, safe='/')} " .rstrip() if _kind(target) == "markdown" else f"/docs/{quote(target, safe='/')}"
+            link = (
+                f"/documentation/{quote(target, safe='/')}"
+                if _kind(target) == "markdown"
+                else f"/docs/{quote(target, safe='/')}"
+            )
         rewritten = urlunsplit(("", "", link, parts.query, parts.fragment))
         return f'{attribute}="{html.escape(rewritten, quote=True)}"'
 
