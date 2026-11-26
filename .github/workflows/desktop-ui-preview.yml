@@ -87,17 +87,38 @@ jobs:
             git archive --format=tar FETCH_HEAD web docs | tar -xf - -C "$tmp"
 
             # The preview harness is trusted build infrastructure, not PR code.
-            # Older PR branches may predate these static-only assets, so supply
-            # the main-branch versions when they are absent from the PR snapshot.
-            for asset in preview.js demo-floorplan.svg; do
+            # This trusted builder is still from main and expects the previous
+            # stylesheet filenames. Supply inert compatibility files; PR pages
+            # load only their consolidated styles.css.
+            for asset in preview.js demo-floorplan.svg dashboard.css ocr-studio.css settings.css; do
               if [[ ! -s "$tmp/web/$asset" ]]; then
-                echo "PR #$number is missing web/$asset; using the trusted main-branch preview asset."
+                echo "PR #$number is missing web/$asset; using the trusted main-branch compatibility asset."
                 cp "web/$asset" "$tmp/web/$asset"
               fi
             done
 
             destination="$GITHUB_WORKSPACE/_site/pr-preview/$number"
             python "$tmp/scripts/build_ui_preview.py" --output "$destination"
+
+            # The default-branch builder predates the dashboard-first layout.
+            # Normalize its legacy output with trusted workflow code, not PR code.
+            if [[ -s "$destination/dashboard.html" && ! -s "$destination/drawing.html" ]]; then
+              mv "$destination/index.html" "$destination/drawing.html"
+              mv "$destination/dashboard.html" "$destination/index.html"
+              cp "$tmp/web/theme.js" "$destination/theme.js"
+              python - "$destination" <<'PY'
+          from pathlib import Path
+          import sys
+
+          site = Path(sys.argv[1])
+          for page in site.glob("*.html"):
+              html = page.read_text(encoding="utf-8")
+              html = html.replace('href="drawing.html"', 'href="index.html"')
+              html = html.replace('href="dashboard.html"', 'href="index.html"')
+              html = html.replace('href="drawing"', 'href="drawing.html"')
+              page.write_text(html, encoding="utf-8")
+          PY
+            fi
             test -s "$destination/index.html"
             test -s "$destination/drawing.html"
             test -s "$destination/theme.js"
