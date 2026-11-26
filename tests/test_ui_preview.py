@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 from scripts.build_ui_preview import PAGE_SOURCES, build_preview
+from planline.documentation import discover_documents
 
 
 def test_preview_contains_every_workspace_and_uses_one_stylesheet(tmp_path: Path) -> None:
@@ -13,7 +14,7 @@ def test_preview_contains_every_workspace_and_uses_one_stylesheet(tmp_path: Path
         assert (output / page).is_file(), f"Missing preview page: {page}"
     for asset in ("app.js", "dashboard.js", "ocr-studio.js", "settings.js", "theme.js",
                   "styles.css", "preview.js", "demo-floorplan.svg", "architecture.html",
-                  "architecture-source.md", ".nojekyll"):
+                  "architecture-source.md", "documentation/index.html", ".nojekyll"):
         assert (output / asset).is_file(), f"Missing preview asset: {asset}"
 
     assert not (output / "dashboard.css").exists()
@@ -34,13 +35,40 @@ def test_preview_contains_every_workspace_and_uses_one_stylesheet(tmp_path: Path
     assert (output / "architecture.md" / "index.html").is_file()
     architecture = (output / "architecture.html").read_text(encoding="utf-8")
     legacy_architecture = (output / "architecture.md" / "index.html").read_text(encoding="utf-8")
-    assert '<article class="architecture-prose">' in architecture
-    assert '<nav class="architecture-toc"' in architecture
+    assert '<article class="documentation-article">' in architecture
+    assert '<nav class="documentation-toc"' in architecture
     assert 'href="styles.css"' in architecture
     assert 'src="theme.js" defer' in architecture
     assert 'href="../styles.css"' in legacy_architecture
     assert 'src="../theme.js" defer' in legacy_architecture
     assert "Planline architecture and implementation roadmap" in architecture
+
+    documents = discover_documents(Path(__file__).resolve().parents[1] / "docs")
+    assert len(documents) > 5
+    assert (output / "documentation" / "ARCHITECTURE.md.html").is_file()
+    assert (output / "documentation" / "OCR_DATASET_QUALITY.md.html").is_file()
+    assert (output / "documentation" / "PLANLINE_ARCHITECTURE.md.html").is_file()
+    assert (output / "documentation" / "archive" / "planline-webui-prototype" / "backend" / "app.py.html").is_file()
+    assert (output / "docs" / "rysunek.png").is_file()
+
+    hub = (output / "documentation" / "index.html").read_text(encoding="utf-8")
+    assert "Guides and technical references" in hub
+    assert "Images and examples" in hub
+    assert "Archived references" in hub
+    assert 'href="ARCHITECTURE.md.html"' in hub
+    assert 'href="rysunek.png.html"' in hub
+
+    architecture_notes = (output / "documentation" / "ARCHITECTURE.md.html").read_text(encoding="utf-8")
+    assert 'href="PLANLINE_ARCHITECTURE.md.html"' in architecture_notes
+
+    for page in (output / "documentation").rglob("*.html"):
+        page_html = page.read_text(encoding="utf-8")
+        for link in re.findall(r'(?:href|src)="([^"]+)"', page_html):
+            if link.startswith(("http://", "https://", "data:", "#", "mailto:")):
+                continue
+            local = link.split("?", 1)[0].split("#", 1)[0]
+            if Path(local).suffix:
+                assert (page.parent / local).resolve().is_file(), f"{page.relative_to(output)} references missing {local}"
 
 
 def test_preview_navigation_opens_dashboard_and_keeps_pages_separate(tmp_path: Path) -> None:
@@ -55,7 +83,10 @@ def test_preview_navigation_opens_dashboard_and_keeps_pages_separate(tmp_path: P
     assert 'href="drawing.html"' in dashboard
     assert 'href="ocr.html"' in dashboard
     assert 'href="settings.html"' in dashboard
-    assert 'href="architecture.html"' in dashboard
+    assert 'href="documentation/index.html"' in dashboard
+    assert 'href="documentation/index.html"' in drawing
+    assert 'href="documentation/index.html"' in ocr
+    assert 'href="documentation/index.html"' in settings
 
     for page, app_script in ((drawing, "app.js"), (ocr, "ocr-studio.js"), (settings, "settings.js")):
         assert 'href="index.html"' in page
@@ -83,3 +114,6 @@ def test_nested_pr_preview_contains_dashboard_and_drawing_entry_points(tmp_path:
     assert 'href="drawing.html"' in dashboard
     assert 'href="index.html" aria-label="Planline dashboard"' in drawing
     assert (output / "theme.js").is_file()
+    assert (output / "documentation" / "index.html").is_file()
+    assert (output / "documentation" / "PLANLINE_ARCHITECTURE.md.html").is_file()
+    assert (output / "docs" / "rysunek.png").is_file()
