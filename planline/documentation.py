@@ -343,10 +343,26 @@ def render_documentation_index(
     )
 
 
-def _render_toc(toc: str) -> str:
-    if not toc:
+def _render_toc(rendered_html: str) -> str:
+    """Build a sidebar TOC from the heading IDs generated in rendered HTML."""
+    heading_pattern = re.compile(
+        r'<h([2-4])\\b[^>]*\\bid="([^"]+)"[^>]*>(.*?)</h[2-4]>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    entries = []
+    for match in heading_pattern.finditer(rendered_html):
+        level, anchor_id, inner_html = match.groups()
+        label = re.sub(r"<[^>]+>", "", inner_html)
+        label = re.sub(r"\\s+", " ", html.unescape(label)).strip()
+        if not label:
+            continue
+        entries.append(
+            f'<li class="documentation-toc-level-{level}">'
+            f'<a href="#{html.escape(anchor_id, quote=True)}">{html.escape(label)}</a></li>'
+        )
+    if not entries:
         return '<p class="documentation-muted">No section links available.</p>'
-    return toc
+    return '<ul class="documentation-toc-list">' + "".join(entries) + "</ul>"
 
 
 def render_document_page(
@@ -376,24 +392,8 @@ def render_document_page(
             extension_configs={"toc": {"toc_depth": "2-4"}},
         )
         markdown_source = content.decode("utf-8-sig")
-        # Python-Markdown exposes md.toc only when its marker is present in the
-        # document. Add a temporary marker to the rendered copy, never to the
-        # maintained source file, so every guide gets a sidebar contents list.
-        if not re.search(r"(?m)^\[TOC\]\s*$", markdown_source):
-            title_match = re.search(r"(?m)^# .+?$", markdown_source)
-            if title_match:
-                insert_at = title_match.end()
-                markdown_source = (
-                    markdown_source[:insert_at]
-                    + "\n\n[TOC]\n\n"
-                    + markdown_source[insert_at:]
-                )
-            else:
-                markdown_source = "[TOC]\n\n" + markdown_source
         rendered = parser.convert(markdown_source)
-        toc_html = _render_toc(parser.toc)
-        if parser.toc:
-            rendered = rendered.replace(parser.toc, "", 1)
+        toc_html = _render_toc(rendered)
         rendered = _rewrite_markdown_links(
             rendered,
             current_path=path,
