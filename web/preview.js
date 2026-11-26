@@ -1,9 +1,8 @@
-/* Static desktop-UI preview. This file is only included by the GitHub Pages build. */
+/* Static desktop-UI preview. Included only by the GitHub Pages build. */
 window.PLANLINE_PREVIEW = true;
 
 (() => {
   const nativeFetch = window.fetch.bind(window);
-
   const demoDetections = [
     { id: "demo-001", class_name: "wall", confidence: 0.98, bbox: { x1: 120, y1: 115, x2: 1080, y2: 129, width: 960, height: 14 }, centre: { x: 600, y: 122 } },
     { id: "demo-002", class_name: "wall", confidence: 0.97, bbox: { x1: 120, y1: 115, x2: 134, y2: 735, width: 14, height: 620 }, centre: { x: 127, y: 425 } },
@@ -18,7 +17,7 @@ window.PLANLINE_PREVIEW = true;
     { id: "demo-011", class_name: "dimension_value", confidence: 0.92, bbox: { x1: 26, y1: 390, x2: 112, y2: 435, width: 86, height: 45 }, centre: { x: 69, y: 412.5 } }
   ];
 
-  function jsonResponse(payload, status = 200) {
+  function jsonResponse(payload, status = 503) {
     return new Response(JSON.stringify(payload), {
       status,
       headers: { "Content-Type": "application/json", "X-Planline-Preview": "static-demo" }
@@ -48,26 +47,30 @@ window.PLANLINE_PREVIEW = true;
           "The sample confidence values and boxes are illustrative, not model output."
         ],
         export_ready: false
-      });
+      }, 200);
     }
 
     return jsonResponse({
       detail: "Backend features are disabled in the public desktop UI preview. No files or drawings are sent to a server."
-    }, 503);
+    });
   };
 
   window.addEventListener("DOMContentLoaded", async () => {
     const banner = document.createElement("aside");
     banner.setAttribute("role", "status");
     banner.style.cssText = "position:sticky;top:0;z-index:10000;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;padding:10px 16px;background:#263d2b;color:#fff;font:600 12px/1.4 'DM Sans',sans-serif;letter-spacing:.02em;text-align:center";
-    banner.innerHTML = '<span>DESKTOP UI PREVIEW</span><span style="opacity:.65">·</span><span>Sample data only — no OCR, models, uploads or backend processing</span>';
+    banner.innerHTML = '<span>DESKTOP UI PREVIEW</span><span style="opacity:.65">·</span><span>Sample data only — no uploads, OCR, training or backend processing</span>';
     document.body.prepend(banner);
 
-    document.querySelectorAll('a[href="#preview-disabled"]').forEach((link) => {
-      link.hidden = true;
-      link.setAttribute("aria-disabled", "true");
-      link.removeAttribute("href");
-    });
+    const drawingPage = Boolean(document.querySelector("#fileInput"));
+    if (!drawingPage) {
+      document.querySelectorAll("input, select, textarea, button").forEach((control) => {
+        if (control.id === "themeToggle" || control.id === "refreshHealth" ||
+            control.classList.contains("view-nav-button")) return;
+        control.disabled = true;
+      });
+      return;
+    }
 
     ["#fileInput", "#exportReview", "#saveProject", "#exportDxf", "#checkChain", "#runOcrButton"].forEach((selector) => {
       const control = document.querySelector(selector);
