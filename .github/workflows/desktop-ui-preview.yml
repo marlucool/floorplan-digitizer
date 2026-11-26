@@ -99,6 +99,8 @@ jobs:
             destination="$GITHUB_WORKSPACE/_site/pr-preview/$number"
             python "$tmp/scripts/build_ui_preview.py" --output "$destination"
             test -s "$destination/index.html"
+            test -s "$destination/drawing.html"
+            test -s "$destination/theme.js"
             test -s "$destination/app.js"
             test -s "$destination/ocr.html"
             test -s "$destination/settings.html"
@@ -114,7 +116,7 @@ jobs:
 
       - name: Check main preview JavaScript syntax
         run: |
-          for script in web/app.js web/preview.js web/ocr-studio.js web/settings.js web/dashboard.js; do
+          for script in web/app.js web/preview.js web/theme.js web/ocr-studio.js web/settings.js web/dashboard.js; do
             if [[ -f "$script" ]]; then
               node --check "$script"
             fi
