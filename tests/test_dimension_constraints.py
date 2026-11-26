@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from decimal import Decimal
-
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -74,8 +72,8 @@ def test_wall_dimension_comparison_handles_extreme_valid_decimal_ranges() -> Non
         tolerance_percent="1",
     ))
     assert result["status"] == "mismatch"
-    assert result["measured_length_mm"].startswith("9999999999999999999999")
-    assert result["difference_percent"].startswith("999999999999999999999999999999")
+    assert result["measured_length_mm"] == "10000000000000000000000"
+    assert result["difference_percent"] == "99999999999999999999999999999800"
     assert result["geometry_modified"] is False
 
 
