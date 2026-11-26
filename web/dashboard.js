@@ -22,6 +22,15 @@ async function refreshHealth() {
   const card = $("#healthCard");
   const dot = $("#healthDot");
   const label = $("#healthLabel");
+  if (window.PLANLINE_PREVIEW === true) {
+    $("#healthTitle").textContent = "Static preview";
+    $("#healthDetails").textContent = "Backend services are disabled in this preview. Run Planline locally for live application health.";
+    card.dataset.state = "preview";
+    dot.style.background = "#8b8b7d";
+    label.textContent = "Static UI preview";
+    $("#refreshHealth").hidden = true;
+    return;
+  }
   $("#healthTitle").textContent = "Connecting to local API";
   $("#healthDetails").textContent = "Checking application readiness…";
   try {
