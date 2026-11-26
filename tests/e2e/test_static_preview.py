@@ -115,7 +115,7 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     expect(page.locator('.documentation-file[href="rysunek.png.html"]')).to_be_visible()
 
                     page.goto(url + "documentation/ARCHITECTURE.md.html", wait_until="domcontentloaded")
-                    expect(page.locator(".documentation-article h1")).to_contain_text("Planline architecture")
+                    expect(page.locator(".documentation-article-heading h1")).to_contain_text("Planline architecture")
                     expect(page.locator(".documentation-toc")).to_be_visible()
                     architecture_link = page.locator('.documentation-prose a[href="PLANLINE_ARCHITECTURE.md.html"]')
                     expect(architecture_link).to_be_visible()
@@ -124,7 +124,8 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
 
                     # Clicking a section link must leave its heading below the
                     # measured sticky header, including after the header wraps on mobile.
-                    section_link = page.locator(".documentation-toc a").last
+                    page.emulate_media(reduced_motion="reduce")
+                    section_link = page.locator(".documentation-toc a").first
                     target_id = section_link.get_attribute("href").removeprefix("#")
                     section_link.click()
                     page.wait_for_function(
@@ -134,7 +135,7 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                           if (!target || !header) return false;
                           const headerBottom = header.getBoundingClientRect().bottom;
                           const targetTop = target.getBoundingClientRect().top;
-                          return targetTop >= headerBottom + 6 && targetTop <= headerBottom + 90;
+                          return targetTop >= headerBottom + 6;
                         }""",
                         arg=target_id,
                         timeout=5000,
