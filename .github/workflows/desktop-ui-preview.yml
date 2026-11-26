@@ -39,6 +39,10 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'preview') ||
       (github.event.action == 'unlabeled' && github.event.label.name == 'preview')
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      pages: read
     steps:
       - name: Check out trusted default-branch build tooling
         uses: actions/checkout@v4
