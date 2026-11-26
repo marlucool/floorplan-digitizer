@@ -499,6 +499,11 @@ def dashboard_page() -> FileResponse:
     """Serve the Planline workspace dashboard."""
     return FileResponse(WEB_DIR / "dashboard.html")
 
+@app.get("/drawing", response_class=FileResponse)
+def drawing_page() -> FileResponse:
+    """Serve the drawing and geometry workspace."""
+    return FileResponse(WEB_DIR / "index.html")
+
 
 @app.get("/settings", response_class=FileResponse)
 def settings_page() -> FileResponse:
