@@ -384,8 +384,8 @@ def render_document_page(
             if title_match:
                 insert_at = title_match.end()
                 markdown_source = (
+                    markdown_source[:insert_at]
                     + "\n\n[TOC]\n\n"
-                    + "\\n\\n[TOC]\\n\\n"
                     + markdown_source[insert_at:]
                 )
             else:
