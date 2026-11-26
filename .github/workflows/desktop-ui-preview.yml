@@ -86,6 +86,16 @@ jobs:
             cp scripts/build_ui_preview.py "$tmp/scripts/"
             git archive --format=tar FETCH_HEAD web | tar -xf - -C "$tmp"
 
+            # The preview harness is trusted build infrastructure, not PR code.
+            # Older PR branches may predate these static-only assets, so supply
+            # the main-branch versions when they are absent from the PR snapshot.
+            for asset in preview.js demo-floorplan.svg; do
+              if [[ ! -s "$tmp/web/$asset" ]]; then
+                echo "PR #$number is missing web/$asset; using the trusted main-branch preview asset."
+                cp "web/$asset" "$tmp/web/$asset"
+              fi
+            done
+
             destination="$GITHUB_WORKSPACE/_site/pr-preview/$number"
             python "$tmp/scripts/build_ui_preview.py" --output "$destination"
             test -s "$destination/index.html"
