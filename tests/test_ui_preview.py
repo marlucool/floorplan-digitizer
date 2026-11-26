@@ -15,13 +15,21 @@ def test_preview_contains_all_available_workspaces_and_static_assets(tmp_path: P
     assert (output / "demo-floorplan.svg").is_file()
     assert (output / ".nojekyll").is_file()
 
-    for page in PAGES:
+    for page, assets in PAGES.items():
         source = Path("web") / page
         if source.is_file():
             assert (output / page).is_file(), f"Missing preview page: {page}"
+            for asset in assets:
+                assert (output / asset).is_file(), f"Missing asset for {page}: {asset}"
 
     assert (output / "ocr.html").is_file()
     assert (output / "settings.html").is_file()
+    if (Path("web") / "dashboard.html").is_file():
+        assert (output / "dashboard.html").is_file()
+        assert (output / "dashboard.js").is_file()
+        assert (output / "dashboard.css").is_file()
+    if (Path("docs") / "PLANLINE_ARCHITECTURE.md").is_file():
+        assert (output / "architecture.md").is_file()
     assert not (output / "api").exists()
 
 
