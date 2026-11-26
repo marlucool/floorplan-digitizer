@@ -2,9 +2,11 @@
 
 Planline is a local-first project for turning scanned or hand-drawn 2D floor plans into **editable, dimensionally constrained CAD geometry**.
 
-> **Desktop UI preview:** [Open the current Planline workspace](https://marlucool.github.io/floorplan-digitizer/). This multi-page static preview includes the dashboard, drawing workspace, OCR Studio and settings. It uses illustrative sample data; OCR, model inference, uploads and backend operations are disabled. The repository owner must enable **Settings → Pages → Build and deployment → GitHub Actions** once before the site can publish.
+> **Desktop UI preview:** [Open the current Planline workspace](https://marlucool.github.io/floorplan-digitizer/). This multi-page static preview includes the dashboard, drawing workspace, OCR Studio, settings and the documentation library. It uses illustrative sample data; OCR, model inference, uploads and backend operations are disabled. The repository owner must enable **Settings → Pages → Build and deployment → GitHub Actions** once before the site can publish.
 >
 > **Pull request previews:** the `preview` label publishes that PR's version of the multi-page Planline workspace at `https://marlucool.github.io/floorplan-digitizer/pr-preview/<PR-number>/`. The link is posted in the PR conversation and refreshes whenever new commits are pushed. Removing the label or closing the PR removes its preview. The main website and all currently labelled PR previews are rebuilt together on every push to `main`.
+
+> **Documentation:** [Browse the full documentation library](https://marlucool.github.io/floorplan-digitizer/documentation/), including architecture notes, OCR dataset guidance, examples and archived source references. The same library is available locally from the Dashboard and workspace navigation.
 
 The important problem is not tracing pixels. Survey drawings can be skewed, faded, low-resolution, or drawn approximately rather than to scale. Planline is being developed to read written dimensions, relate them to the correct parts of the drawing, detect contradictions, and keep uncertain results in a human review workflow.
 
