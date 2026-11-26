@@ -62,11 +62,11 @@ def main() -> int:
     try:
         webview.create_window(
             "Planline — Floor-plan and OCR Studio",
-            f"http://127.0.0.1:{port}/dashboard",
+            f"http://127.0.0.1:{port}/",
             width=1500,
             height=980,
             min_size=(1024, 700),
-            background_color="#fbfaf6",
+            background_color="#171b18",
             js_api=DesktopBridge(),
         )
         webview.start(debug=False)
