@@ -375,7 +375,25 @@ def render_document_page(
             extensions=["fenced_code", "tables", "toc", "sane_lists"],
             extension_configs={"toc": {"toc_depth": "2-4"}},
         )
-        rendered = parser.convert(content.decode("utf-8-sig"))
+        markdown_source = content.decode("utf-8-sig")
+        # Python-Markdown exposes md.toc only when its marker is present in the
+        # document. Add a temporary marker to the rendered copy, never to the
+        # maintained source file, so every guide gets a sidebar contents list.
+        if not re.search(r"(?m)^\\[TOC\\]\\s*$", markdown_source):
+            title_match = re.search(r"(?m)^# .+?$", markdown_source)
+            if title_match:
+                insert_at = title_match.end()
+                markdown_source = (
+                    markdown_source[:insert_at]
+                    + "\\n\\n[TOC]\\n\\n"
+                    + markdown_source[insert_at:]
+                )
+            else:
+                markdown_source = "[TOC]\\n\\n" + markdown_source
+        rendered = parser.convert(markdown_source)
+        toc_html = _render_toc(parser.toc)
+        if parser.toc:
+            rendered = rendered.replace(parser.toc, "", 1)
         rendered = _rewrite_markdown_links(
             rendered,
             current_path=path,
@@ -384,7 +402,6 @@ def render_document_page(
             current_output_path=current_output_path,
         )
         body_content = rendered
-        toc_html = _render_toc(parser.toc)
     elif kind == "image":
         mime = mimetypes.guess_type(path)[0] or "application/octet-stream"
         raw_href = f"docs/{quote(path, safe='/')}" if static_site else f"/docs/{quote(path, safe='/')}"
