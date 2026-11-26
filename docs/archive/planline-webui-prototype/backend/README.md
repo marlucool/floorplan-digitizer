@@ -36,4 +36,4 @@ Open [http://127.0.0.1:8000](http://127.0.0.1:8000). The API serves the frontend
 
 The API does **not** run OCR, wall detection, dimension association or reconstruction yet. It does not fabricate confidence scores, candidate dimensions or geometry. The browser's sample DXF is a separate illustrative example; it is not the output for an uploaded scan.
 
-The next integration point is a local analysis adapter that returns dimension candidates with source regions and provenance, followed by constraint checks and verified 2D geometry. See [the architecture plan](../docs/ARCHITECTURE.md).
+The next integration point is a local analysis adapter that returns dimension candidates with source regions and provenance, followed by constraint checks and verified 2D geometry. See [the architecture plan](../../../ARCHITECTURE.md).
