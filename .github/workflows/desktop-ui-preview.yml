@@ -84,7 +84,7 @@ jobs:
             tmp="$(mktemp -d)"
             mkdir -p "$tmp/scripts"
             cp scripts/build_ui_preview.py "$tmp/scripts/"
-            git archive --format=tar FETCH_HEAD web | tar -xf - -C "$tmp"
+            git archive --format=tar FETCH_HEAD web docs | tar -xf - -C "$tmp"
 
             # The preview harness is trusted build infrastructure, not PR code.
             # Older PR branches may predate these static-only assets, so supply
@@ -100,6 +100,8 @@ jobs:
             python "$tmp/scripts/build_ui_preview.py" --output "$destination"
             test -s "$destination/index.html"
             test -s "$destination/app.js"
+            test -s "$destination/ocr.html"
+            test -s "$destination/settings.html"
             test -s "$destination/preview.js"
             node --check "$destination/app.js"
             node --check "$destination/preview.js"
