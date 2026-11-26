@@ -1,6 +1,10 @@
+from pathlib import Path
+
+import pytest
 from fastapi.testclient import TestClient
 
 from planline.api import app
+from planline.documentation import safe_document_path
 
 
 def test_application_root_and_dashboard_route_open_dashboard() -> None:
@@ -84,6 +88,9 @@ def test_documentation_renders_archived_source_as_readable_code() -> None:
     assert "from fastapi" in response.text
 
 
-def test_documentation_rejects_paths_outside_docs_directory() -> None:
-    response = TestClient(app).get("/documentation/../README.md")
-    assert response.status_code == 404
+def test_documentation_path_resolver_rejects_paths_outside_docs_directory() -> None:
+    docs_root = Path(__file__).resolve().parents[1] / "docs"
+    with pytest.raises(FileNotFoundError):
+        safe_document_path(docs_root, "../README.md")
+    with pytest.raises(FileNotFoundError):
+        safe_document_path(docs_root, "..\\README.md")
