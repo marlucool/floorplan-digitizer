@@ -468,7 +468,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert exported["calibration"]["status"] == "user_supplied_reference_not_geometry_validation"
             assert exported["detections"][0]["bbox"]["x1"] == 100
             assert exported["manual_dimension_text_review"][0]["detection_id"] == "det-004"
-            assert exported["manual_dimension_text_review"][0]["raw_text"] == "4200"
+            assert exported["manual_dimension_text_review"][0]["raw_text"] == "2685 mm"
             assert exported["manual_dimension_text_review"][0]["text_style"] == "handwritten"
             assert exported["manual_dimension_text_review"][0]["verified"] is True
             assert exported["manual_dimension_text_review"][0]["association"]["dimension_line_id"] == "det-002"
