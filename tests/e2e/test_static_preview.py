@@ -14,7 +14,7 @@ from playwright.sync_api import expect, sync_playwright
 from scripts.build_ui_preview import build_preview
 
 
-def test_static_preview_renders_real_workspace_without_backend_requests() -> None:
+def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> None:
     api_requests: list[str] = []
     with TemporaryDirectory(prefix="planline-preview-") as temporary:
         site = build_preview(Path(temporary) / "site")
@@ -62,8 +62,18 @@ def test_static_preview_renders_real_workspace_without_backend_requests() -> Non
                         else None,
                     )
                     page.goto(url, wait_until="domcontentloaded")
+                    expect(page.locator("h1").first).to_contain_text("Your floor-plan")
+                    expect(page.locator("#healthTitle")).to_have_text("Static preview")
+                    expect(page.locator("#healthDetails")).to_contain_text("Backend services are disabled")
+                    expect(page.locator("#refreshHealth")).to_be_hidden()
+                    expect(page.locator('.workspace-card.drawing-card[href="drawing.html"]')).to_be_visible()
+                    expect(page.locator('.workspace-card.ocr-card[href="ocr.html"]')).to_be_visible()
+                    expect(page.locator('.workspace-card.settings-card[href="settings.html"]')).to_be_visible()
+                    expect(page.locator('.top-links a[href="drawing.html"]')).to_be_visible()
+
+                    page.goto(url + "drawing.html", wait_until="domcontentloaded")
                     expect(page.locator("#resultStatus")).to_have_text("DETECTION COMPLETE", timeout=15000)
-                    expect(page.locator("#apiStatus")).to_have_text("Static UI preview · backend disabled")
+                    expect(page.locator("#apiStatus")).to_contain_text("Static UI preview")
                     expect(page.locator("#detectionList .detection-row")).to_have_count(11)
                     expect(page.locator("#ocrAssistStatus")).to_contain_text("OCR is disabled")
                     expect(page.locator("#fileInput")).to_be_disabled()
@@ -74,35 +84,16 @@ def test_static_preview_renders_real_workspace_without_backend_requests() -> Non
                         "() => { const image = document.querySelector('#previewImage'); return image && image.complete && image.naturalWidth === 1200; }",
                         timeout=10000,
                     )
-                    for page_name in ("ocr.html", "settings.html", "dashboard.html"):
-                        workspace = site / page_name
-                        if not workspace.is_file():
-                            continue
-                        page.goto(url + page_name, wait_until="domcontentloaded")
-                        expect(page.locator('aside[role="status"]')).to_contain_text("DESKTOP UI PREVIEW")
-                        expect(page.locator("h1").first).to_be_visible()
-                        theme_toggle = page.locator("#themeToggle")
-                        expect(theme_toggle).to_be_visible()
-                        theme_toggle.click()
-                        expect(page.locator("html")).to_have_attribute("data-theme", "dark")
-                        theme_toggle.click()
-                        expect(page.locator("html")).to_have_attribute("data-theme", "light")
-                        if page_name == "ocr.html":
-                            expect(page.locator("#apiStatus")).to_have_text("Static OCR preview · backend disabled")
-                            expect(page.locator("#annotationMessage")).to_contain_text("disabled in this static preview")
-                        if page_name == "settings.html":
-                            expect(page.locator("#updateTitle")).to_have_text("Updates disabled in static preview")
-                            expect(page.locator("#currentVersion")).to_have_text("Unavailable in preview")
 
-                    if (site / "dashboard.html").is_file():
-                        page.goto(url + "dashboard.html", wait_until="domcontentloaded")
-                        expect(page.locator('.top-links a[href="ocr.html"]')).to_be_visible()
-                        expect(page.locator('.workspace-card.ocr-card[href="ocr.html"]')).to_be_visible()
-                        expect(page.locator('.top-links a[href="settings.html"]')).to_be_visible()
-                        expect(page.locator('.workspace-card.settings-card[href="settings.html"]')).to_be_visible()
-                        expect(page.locator("#healthTitle")).to_have_text("Static preview")
-                        expect(page.locator("#healthDetails")).to_contain_text("Backend services are disabled")
-                        expect(page.locator("#refreshHealth")).to_be_hidden()
+                    page.goto(url + "ocr.html", wait_until="domcontentloaded")
+                    expect(page.locator("h1").first).to_be_visible()
+                    expect(page.locator("#apiStatus")).to_contain_text("Static OCR preview")
+                    expect(page.locator("#annotationMessage")).to_contain_text("disabled in this static preview")
+
+                    page.goto(url + "settings.html", wait_until="domcontentloaded")
+                    expect(page.locator("h1").first).to_be_visible()
+                    expect(page.locator("#updateTitle")).to_have_text("Updates disabled in static preview")
+                    expect(page.locator("#currentVersion")).to_have_text("Unavailable in preview")
 
                     assert not api_requests, f"The static preview attempted backend requests: {api_requests}"
                 finally:

@@ -1,4 +1,4 @@
-"""Build a backend-free, multi-page static copy of the Planline desktop UI."""
+"""Build a backend-free, dashboard-first static copy of the Planline UI."""
 from __future__ import annotations
 
 import argparse
@@ -9,44 +9,81 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 WEB = ROOT / "web"
 
-# Each page is copied only when that workspace exists in the source revision.
-PAGES = {
-    "index.html": ("app.js", "styles.css"),
-    "dashboard.html": ("dashboard.js", "dashboard.css", "styles.css"),
-    "ocr.html": ("ocr-studio.js", "ocr-studio.css", "styles.css"),
-    "settings.html": ("settings.js", "settings.css", "styles.css"),
+# The public site and every PR preview enter through index.html (the dashboard).
+# The full drawing editor remains available as a separate workspace page.
+PAGE_SOURCES = {
+    "index.html": "dashboard.html",
+    "drawing.html": "index.html",
+    "ocr.html": "ocr.html",
+    "settings.html": "settings.html",
 }
-SHARED_ASSETS = ("preview.js", "demo-floorplan.svg")
 ROUTES = {
-    "/": "index.html",
-    "/dashboard": "dashboard.html",
+    "/dashboard": "index.html",
+    "/drawing": "drawing.html",
     "/ocr": "ocr.html",
     "/settings": "settings.html",
     "/architecture": "architecture.md",
 }
+SHARED_ASSETS = ("preview.js", "demo-floorplan.svg")
+
+
+def _normalise_brand(html: str) -> str:
+    """Make the wordmark and Dashboard nav item return to the site homepage."""
+    html = re.sub(
+        r'(<a\s+class="brand"[^>]*\bhref=")[^"]*(")',
+        r'\1/dashboard\2',
+        html,
+        count=1,
+    )
+    return re.sub(
+        r'(<a\s+class="repo-link(?: active)?"[^>]*\bhref=")[^"]*(">Dashboard</a>)',
+        r'\1/dashboard\2',
+        html,
+        count=1,
+    )
 
 
 def rewrite_routes(html: str) -> str:
-    """Rewrite server-root routes to files relative to the preview directory."""
+    """Rewrite application routes and root-relative assets for a static site."""
+    html = _normalise_brand(html)
+    # A bare root link means Drawing in page content; the wordmark was already
+    # normalised to /dashboard above.
+    html = html.replace('href="/"', 'href="/drawing"')
     for route, target in sorted(ROUTES.items(), key=lambda item: len(item[0]), reverse=True):
         html = html.replace(f'href="{route}"', f'href="{target}"')
-    html = re.sub(r'(href|src)="/([^"]+)"', lambda match: f'{match.group(1)}="{match.group(2)}"', html)
+    html = re.sub(
+        r'(href|src)="/([^"]+)"',
+        lambda match: f'{match.group(1)}="{match.group(2)}"',
+        html,
+    )
     return html
 
 
-def prepare_page(source: Path, destination: Path) -> None:
+def prepare_page(source: Path, destination: Path) -> set[str]:
+    """Rewrite one page and return its local stylesheet/script dependencies."""
     html = rewrite_routes(source.read_text(encoding="utf-8"))
-    script = re.search(r'<script src="([^"]+\.js)" defer></script>', html)
+    script = re.search(r'<script\s+src="([^"]+\.js)"\s+defer></script>', html)
     if not script:
         raise RuntimeError(f"Could not find the deferred application script in {source.name}.")
+
     preview_tag = '<script src="preview.js" defer></script>\n  '
-    if "src=\"preview.js\"" not in html:
+    if 'src="preview.js"' not in html:
         html = html[:script.start()] + preview_tag + html[script.start():]
     destination.write_text(html, encoding="utf-8")
 
+    dependencies: set[str] = set()
+    for raw_path in re.findall(r'(?:href|src)="([^"]+)"', html):
+        if raw_path.startswith(("http://", "https://", "data:", "#")):
+            continue
+        path = raw_path.split("?", 1)[0].split("#", 1)[0]
+        if path.endswith((".css", ".js", ".svg", ".png", ".webp", ".woff", ".woff2")):
+            dependencies.add(path.lstrip("/"))
+    dependencies.update(SHARED_ASSETS)
+    return dependencies
+
 
 def build_preview(output_dir: Path) -> Path:
-    """Build all available workspaces as a static site suitable for nested PR URLs."""
+    """Build all workspaces into a root-dashboard site, including nested PR previews."""
     output_dir = Path(output_dir)
     if output_dir.exists():
         shutil.rmtree(output_dir)
@@ -54,30 +91,37 @@ def build_preview(output_dir: Path) -> Path:
 
     copied_assets: set[str] = set()
     page_count = 0
-    for page, assets in PAGES.items():
-        source = WEB / page
+    for output_name, source_name in PAGE_SOURCES.items():
+        source = WEB / source_name
         if not source.is_file():
+            if output_name in {"index.html", "drawing.html"}:
+                raise RuntimeError(f"Required workspace page is missing: web/{source_name}")
             continue
-        prepare_page(source, output_dir / page)
+        copied_assets.update(prepare_page(source, output_dir / output_name))
         page_count += 1
-        copied_assets.update(assets)
 
-    if "index.html" not in {path.name for path in output_dir.glob("*.html")}:
-        raise RuntimeError("The drawing workspace web/index.html is required to build a preview.")
+    expected_pages = {"index.html", "drawing.html"}
+    missing_pages = [name for name in expected_pages if not (output_dir / name).is_file()]
+    if missing_pages:
+        raise RuntimeError(f"Preview is missing required page(s): {', '.join(sorted(missing_pages))}")
 
-    for asset in sorted(copied_assets | set(SHARED_ASSETS)):
+    for asset in sorted(copied_assets):
         source = WEB / asset
+        target = output_dir / asset
         if source.is_file():
-            shutil.copy2(source, output_dir / asset)
-        elif asset in copied_assets:
-            raise RuntimeError(f"Required UI asset is missing: web/{asset}")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+        elif asset in SHARED_ASSETS:
+            raise RuntimeError(f"Required static preview asset is missing: web/{asset}")
+        else:
+            raise RuntimeError(f"Page references a missing UI asset: web/{asset}")
 
     docs = ROOT / "docs" / "PLANLINE_ARCHITECTURE.md"
     if docs.is_file():
         shutil.copy2(docs, output_dir / "architecture.md")
 
     (output_dir / ".nojekyll").write_text("", encoding="utf-8")
-    print(f"Included {page_count} workspace page(s).")
+    print(f"Included {page_count} workspace page(s); index.html is the dashboard.")
     return output_dir
 
 
