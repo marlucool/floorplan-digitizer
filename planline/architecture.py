@@ -46,6 +46,22 @@ def render_architecture_page(
     }})();
   </script>
   <script src="{asset_prefix}theme.js" defer></script>
+  <script>
+    (() => {{
+      const root = document.documentElement;
+      const syncOffset = () => {{
+        const header = document.querySelector(".topbar");
+        if (!header) return;
+        root.style.setProperty("--docs-anchor-offset", Math.ceil(header.getBoundingClientRect().height + 16) + "px");
+      }};
+      document.addEventListener("DOMContentLoaded", () => {{
+        syncOffset();
+        const header = document.querySelector(".topbar");
+        if (header && "ResizeObserver" in window) new ResizeObserver(syncOffset).observe(header);
+      }}, {{ once: true }});
+      window.addEventListener("resize", syncOffset, {{ passive: true }});
+    }})();
+  </script>
 </head>
 <body class="architecture-page">
   <header class="topbar">
@@ -58,6 +74,7 @@ def render_architecture_page(
       <a class="repo-link" href="{drawing_href}">Drawing</a>
       <a class="repo-link" href="{ocr_href}">OCR Studio</a>
       <a class="repo-link" href="{settings_href}">Settings</a>
+      <a class="repo-link" href="/documentation">Documentation</a>
       <a class="repo-link active" href="{architecture_href}" aria-current="page">Architecture</a>
       <button id="themeToggle" class="toolbar-button theme-toggle" type="button"
               aria-label="Switch to light theme" title="Switch to light theme" aria-pressed="false">
