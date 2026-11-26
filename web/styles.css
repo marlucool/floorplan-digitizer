@@ -557,3 +557,69 @@ html[data-theme="dark"] .theme-toggle{background:#252d26;border-color:var(--line
   .top-links .repo-link:first-of-type{display:inline-flex}
   .theme-toggle{flex:0 0 36px}
 }
+
+
+/* Responsive technical reference / architecture reader. */
+.architecture-shell{
+  width:min(1480px,100%);margin:0 auto;padding:42px clamp(18px,4.5vw,64px) 64px;
+  display:grid;grid-template-columns:250px minmax(0,880px);gap:clamp(28px,5vw,72px);align-items:start
+}
+.architecture-sidebar{
+  position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;
+  padding:18px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface,#202620)
+}
+.architecture-sidebar .eyebrow{margin:0 0 14px}
+.architecture-toc{font-size:12px;line-height:1.5}
+.architecture-toc ul{list-style:none;margin:0;padding:0 0 0 12px}
+.architecture-toc>ul{padding-left:0}
+.architecture-toc li{margin:6px 0}
+.architecture-toc a{color:var(--muted);text-decoration:none}
+.architecture-toc a:hover,.architecture-toc a:focus-visible{color:var(--green);text-decoration:underline}
+.architecture-toc-empty{color:var(--muted);font-size:11px}
+.architecture-source-link{display:block;margin-top:18px;padding-top:14px;border-top:1px solid var(--line);color:var(--green);font:10px 'DM Mono',monospace;text-decoration:none}
+.architecture-main{max-width:none;min-width:0;margin:0;padding:0}
+.architecture-page-heading{padding:0 0 22px;margin:0 0 30px;border-bottom:1px solid var(--line)}
+.architecture-page-heading .eyebrow{margin-bottom:10px}
+.architecture-lede{max-width:760px;margin:0;color:var(--muted);font-size:15px;line-height:1.75}
+.architecture-prose{min-width:0;font-size:14px;line-height:1.78;color:var(--ink);overflow-wrap:anywhere}
+.architecture-prose h1,.architecture-prose h2,.architecture-prose h3,.architecture-prose h4{
+  color:var(--ink);font-family:Manrope,'DM Sans',sans-serif;line-height:1.25;letter-spacing:-.035em
+}
+.architecture-prose h1{margin:0 0 26px;font-size:clamp(30px,4vw,46px);letter-spacing:-.055em}
+.architecture-prose h2{margin:48px 0 16px;padding-top:22px;border-top:1px solid var(--line);font-size:clamp(22px,2.5vw,29px)}
+.architecture-prose h3{margin:30px 0 10px;font-size:19px;letter-spacing:-.025em}
+.architecture-prose h4{margin:22px 0 8px;font-size:15px}
+.architecture-prose p{margin:12px 0;color:var(--muted)}
+.architecture-prose strong{color:var(--ink)}
+.architecture-prose a{color:var(--green);text-decoration-thickness:1px;text-underline-offset:3px}
+.architecture-prose ul,.architecture-prose ol{padding-left:24px;color:var(--muted)}
+.architecture-prose li{padding-left:4px;margin:6px 0}
+.architecture-prose blockquote{margin:20px 0;padding:12px 18px;border-left:3px solid var(--green);background:var(--surface,#202620);border-radius:0 8px 8px 0}
+.architecture-prose blockquote p{margin:4px 0}
+.architecture-prose hr{border:0;border-top:1px solid var(--line);margin:30px 0}
+.architecture-prose table{display:block;width:100%;max-width:100%;overflow-x:auto;border-collapse:collapse;border:1px solid var(--line);font-size:12px}
+.architecture-prose th,.architecture-prose td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;min-width:110px}
+.architecture-prose th{background:var(--surface,#202620);color:var(--ink);font-weight:700}
+.architecture-prose tr:last-child td{border-bottom:0}
+.architecture-prose code{padding:2px 5px;border-radius:4px;background:var(--surface,#202620);font:12px 'DM Mono',monospace;color:var(--ink)}
+.architecture-prose pre{max-width:100%;overflow:auto;padding:16px;border:1px solid var(--line);border-radius:9px;background:#111713;color:#e4eadf;line-height:1.65}
+.architecture-prose pre code{padding:0;background:transparent;color:inherit}
+.architecture-footer{margin-top:54px;padding-top:16px;gap:16px;line-height:1.6;flex-wrap:wrap}
+.architecture-footer a{color:var(--green);text-decoration:none}
+html[data-theme="dark"] .architecture-sidebar,html[data-theme="dark"] .architecture-prose blockquote,html[data-theme="dark"] .architecture-prose th{background:#202620}
+html[data-theme="dark"] .architecture-prose code{background:#252d26}
+@media(max-width:900px){
+  .architecture-shell{grid-template-columns:1fr;gap:24px;padding-top:26px}
+  .architecture-sidebar{position:static;max-height:250px}
+  .architecture-toc>ul{columns:2;column-gap:22px}
+}
+@media(max-width:600px){
+  .architecture-shell{padding:22px 15px 44px;gap:18px}
+  .architecture-sidebar{max-height:220px;padding:14px}
+  .architecture-toc>ul{columns:1}
+  .architecture-prose{font-size:13px}
+  .architecture-prose h2{margin-top:36px}
+  .architecture-page-heading{margin-bottom:22px}
+  .architecture-footer{display:block}
+  .architecture-footer span{display:block;margin:6px 0}
+}
