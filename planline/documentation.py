@@ -11,6 +11,7 @@ from typing import Any
 from urllib.parse import quote, unquote, urlsplit, urlunsplit
 
 import markdown
+from markdown.extensions.toc import slugify, unique
 
 SUPPORTED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}
 SUPPORTED_CODE_SUFFIXES = {
@@ -343,26 +344,51 @@ def render_documentation_index(
     )
 
 
-def _render_toc(rendered_html: str) -> str:
-    """Build a sidebar TOC from the heading IDs generated in rendered HTML."""
+def _add_heading_ids_and_render_toc(rendered_html: str) -> tuple[str, str]:
+    """Ensure stable heading anchors, then build the sidebar TOC from those IDs."""
     heading_pattern = re.compile(
-        r'<h([2-4])\b[^>]*\bid="([^"]+)"[^>]*>(.*?)</h[2-4]>',
+        r'<h([1-6])([^>]*)>(.*?)</h[1-6]>',
         re.IGNORECASE | re.DOTALL,
     )
-    entries = []
-    for match in heading_pattern.finditer(rendered_html):
-        level, anchor_id, inner_html = match.groups()
-        label = re.sub(r"<[^>]+>", "", inner_html)
+    used_ids: set[str] = set()
+    entries: list[str] = []
+
+    def add_heading(match: re.Match[str]) -> str:
+        level_text, attributes, inner_html = match.groups()
+        level = int(level_text)
+        label = re.sub(r"<[^>]+>", " ", inner_html)
         label = re.sub(r"\s+", " ", html.unescape(label)).strip()
-        if not label:
-            continue
-        entries.append(
-            f'<li class="documentation-toc-level-{level}">'
-            f'<a href="#{html.escape(anchor_id, quote=True)}">{html.escape(label)}</a></li>'
-        )
-    if not entries:
-        return '<p class="documentation-muted">No section links available.</p>'
-    return '<ul class="documentation-toc-list">' + "".join(entries) + "</ul>"
+
+        existing = re.search(r'\bid="([^"]+)"', attributes, re.IGNORECASE)
+        if existing:
+            anchor_id = unique(existing.group(1), used_ids)
+            if anchor_id != existing.group(1):
+                attributes = re.sub(
+                    r'\bid="[^"]+"',
+                    f'id="{html.escape(anchor_id, quote=True)}"',
+                    attributes,
+                    count=1,
+                    flags=re.IGNORECASE,
+                )
+        else:
+            base_id = slugify(label, "-") or f"section-{level}"
+            anchor_id = unique(base_id, used_ids)
+            attributes = attributes.rstrip() + f' id="{html.escape(anchor_id, quote=True)}"'
+
+        if 2 <= level <= 4 and label:
+            entries.append(
+                f'<li class="documentation-toc-level-{level}">'
+                f'<a href="#{html.escape(anchor_id, quote=True)}">{html.escape(label)}</a></li>'
+            )
+        return f"<h{level_text}{attributes}>{inner_html}</h{level_text}>"
+
+    rendered = heading_pattern.sub(add_heading, rendered_html)
+    toc = (
+        '<ul class="documentation-toc-list">' + "".join(entries) + "</ul>"
+        if entries
+        else '<p class="documentation-muted">No section links available.</p>'
+    )
+    return rendered, toc
 
 
 def render_document_page(
@@ -393,7 +419,7 @@ def render_document_page(
         )
         markdown_source = content.decode("utf-8-sig")
         rendered = parser.convert(markdown_source)
-        toc_html = _render_toc(rendered)
+        rendered, toc_html = _add_heading_ids_and_render_toc(rendered)
         rendered = _rewrite_markdown_links(
             rendered,
             current_path=path,
