@@ -252,3 +252,139 @@ def test_ocr_jobs_reject_unsupported_python_before_starting(monkeypatch, tmp_pat
     assert "CPython 3.9" in training.json()["detail"]
     assert benchmark.status_code == 422
     assert "CPython 3.9" in benchmark.json()["detail"]
+
+
+
+def test_ocr_training_defaults_to_cpu_unless_gpu_is_explicitly_selected() -> None:
+    assert ocr_studio_api.StartTrainingRequest(
+        paddleocr_dir="paddleocr",
+        pretrained_model="model.pdparams",
+    ).use_gpu is False
+
+
+def test_gpu_training_is_rejected_when_paddle_cuda_is_unavailable(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(ocr_studio_api, "_require_supported_paddle_python", lambda: None)
+    monkeypatch.setattr(ocr_studio_api, "_paddle_gpu_available", lambda: False)
+    app = FastAPI()
+    app.include_router(ocr_studio_api.router)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/ocr/datasets/example/train",
+        json={
+            "paddleocr_dir": str(tmp_path / "PaddleOCR"),
+            "pretrained_model": str(tmp_path / "model.pdparams"),
+            "use_gpu": True,
+        },
+    )
+
+    assert response.status_code == 422
+    assert "PaddlePaddle GPU support is not available" in response.json()["detail"]
+
+
+def test_gpu_benchmark_and_recognition_are_rejected_without_cuda(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(ocr_studio_api, "_require_supported_paddle_python", lambda: None)
+    monkeypatch.setattr(ocr_studio_api, "_paddle_gpu_available", lambda: False)
+    app = FastAPI()
+    app.include_router(ocr_studio_api.router)
+    client = TestClient(app)
+
+    benchmark = client.post(
+        "/api/ocr/datasets/example/benchmark",
+        json={"device": "gpu:0"},
+    )
+    recognition = client.post(
+        "/api/ocr/recognize-review",
+        data={"review_json": "{}", "device": "gpu:0"},
+        files={"file": ("drawing.png", _png(), "image/png")},
+    )
+
+    assert benchmark.status_code == 422
+    assert recognition.status_code == 422
+    assert "PaddlePaddle GPU support is not available" in benchmark.json()["detail"]
+    assert "PaddlePaddle GPU support is not available" in recognition.json()["detail"]
+
+
+def test_ocr_status_reports_paddle_cuda_availability(monkeypatch) -> None:
+    monkeypatch.setattr(ocr_studio_api, "_paddle_gpu_available", lambda: False)
+    result = ocr_studio_api.ocr_studio_status()
+
+    assert result["paddle_cuda_available"] is False
+
+
+
+def test_training_asset_status_and_prepare_routes(monkeypatch, tmp_path: Path) -> None:
+    status = {
+        "ready": False,
+        "model_variant": "mobile",
+        "source_version": "v3.3.1",
+        "paddleocr_dir": "",
+        "config_path": "",
+        "pretrained_model": "",
+        "missing": ["source", "weights"],
+    }
+    prepared = {
+        "ready": True,
+        "model_variant": "mobile",
+        "source_version": "v3.3.1",
+        "paddleocr_dir": str(tmp_path / "PaddleOCR"),
+        "config_path": str(tmp_path / "config.yml"),
+        "pretrained_model": str(tmp_path / "model.pdparams"),
+        "missing": [],
+    }
+    monkeypatch.setattr(ocr_studio_api, "training_assets_status", lambda variant: status)
+    monkeypatch.setattr(ocr_studio_api, "ensure_training_assets", lambda variant: prepared)
+    app = FastAPI()
+    app.include_router(ocr_studio_api.router)
+    client = TestClient(app)
+
+    current = client.get("/api/ocr/training-assets?model_variant=mobile")
+    ready = client.post(
+        "/api/ocr/training-assets/prepare",
+        json={"model_variant": "mobile"},
+    )
+
+    assert current.status_code == 200
+    assert current.json()["ready"] is False
+    assert ready.status_code == 200
+    assert ready.json()["ready"] is True
+    assert ready.json()["pretrained_model"] == prepared["pretrained_model"]
+
+
+def test_training_route_automatically_provisions_missing_asset_paths(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(ocr_studio_api, "_require_supported_paddle_python", lambda: None)
+    monkeypatch.setattr(ocr_studio_api, "_paddle_gpu_available", lambda: False)
+    monkeypatch.setattr(ocr_studio_api, "_dataset_dir", lambda dataset_id: tmp_path)
+    prepared = {
+        "paddleocr_dir": str(tmp_path / "PaddleOCR"),
+        "pretrained_model": str(tmp_path / "model.pdparams"),
+    }
+    monkeypatch.setattr(ocr_studio_api, "ensure_training_assets", lambda variant: prepared)
+    captured: dict[str, object] = {}
+
+    def fake_start_training(dataset_dir, paddleocr_dir, pretrained_model, **kwargs):
+        captured.update({
+            "dataset_dir": dataset_dir,
+            "paddleocr_dir": paddleocr_dir,
+            "pretrained_model": pretrained_model,
+            **kwargs,
+        })
+        return {"job_id": "training-job"}
+
+    monkeypatch.setattr(ocr_studio_api, "start_training_job", fake_start_training)
+    app = FastAPI()
+    app.include_router(ocr_studio_api.router)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/ocr/datasets/example/train",
+        json={"epochs": 2, "batch_size": 4},
+    )
+
+    assert response.status_code == 202
+    assert response.json()["job_id"] == "training-job"
+    assert captured["paddleocr_dir"] == Path(prepared["paddleocr_dir"])
+    assert captured["pretrained_model"] == Path(prepared["pretrained_model"])
+    assert captured["model_variant"] == "mobile"

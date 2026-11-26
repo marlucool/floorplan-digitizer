@@ -16,7 +16,8 @@
     datasets: [], datasetId: null, dataset: null, queue: [], queueIndex: 0,
     image: null, imageFile: null, cropBlob: null, cropRect: null,
     pointerStart: null, editingId: null, activeJobId: null, pollTimer: null,
-    lastTrainedModel: null, busy: false, paddleReady: false, ocrReady: false, pythonCompatible: false
+    lastTrainedModel: null, busy: false, paddleReady: false, ocrReady: false,
+    pythonCompatible: false, paddleGpuAvailable: false, trainingAssets: null
   };
 
   const terminalStatuses = new Set(["completed", "completed_no_export", "failed", "cancelled"]);
@@ -61,7 +62,9 @@
     const splitReady = Boolean(summary?.splits_present && splitCounts.train > 0 && splitCounts.validation > 0 && splitCounts.test > 0);
     const hasJob = Boolean(state.activeJobId);
     $("#auditDatasetButton").disabled = state.busy || !state.dataset;
-    $("#trainButton").disabled = state.busy || hasJob || !splitReady || !state.paddleReady || summary?.valid === false;
+    const assetsReady = Boolean(state.trainingAssets?.ready);
+    $("#trainButton").disabled = state.busy || hasJob || !splitReady || !state.paddleReady || !assetsReady || summary?.valid === false;
+    $("#prepareTrainingAssetsButton").disabled = state.busy || assetsReady;
     $("#benchmarkBaseButton").disabled = state.busy || hasJob || !splitReady || !state.ocrReady || summary?.valid === false;
     const selectedModel = $("#trainedModelSelect")?.value || state.lastTrainedModel;
     $("#benchmarkTrainedButton").disabled = state.busy || hasJob || !splitReady || !state.ocrReady || !selectedModel;
@@ -69,10 +72,30 @@
     const readiness = $("#trainingReadiness");
     if (!state.pythonCompatible) readiness.textContent = "Compatible Python runtime required";
     else if (!state.paddleReady) readiness.textContent = "PaddlePaddle runtime not installed";
+    else if (!assetsReady) readiness.textContent = "Prepare official training files";
     else if (!summary || !summary.samples) readiness.textContent = "Add verified crops to begin";
     else if (summary.independent_groups < 3) readiness.textContent = `${summary.samples} crops · need 3 independent groups`;
     else if (!splitReady) readiness.textContent = `${summary.samples} crops · build splits before training`;
     else readiness.textContent = `${summary.samples} crops · split plan ready`;
+  }
+
+  async function loadTrainingAssets() {
+    const variant = $("#modelVariant").value;
+    try {
+      const assets = await api(`/api/ocr/training-assets?model_variant=${encodeURIComponent(variant)}`);
+      state.trainingAssets = assets;
+      $("#paddleSourcePath").value = assets.paddleocr_dir || "";
+      $("#pretrainedPath").value = assets.pretrained_model || "";
+      $("#prepareTrainingAssetsButton").disabled = state.busy || assets.ready;
+      $("#trainingAssetsStatus").textContent = assets.ready
+        ? `Official PaddleOCR ${assets.source_version} source and ${variant} checkpoint are ready locally.`
+        : "Training files are not downloaded yet. Prepare them once; subsequent training runs reuse the local files.";
+    } catch (error) {
+      state.trainingAssets = null;
+      $("#prepareTrainingAssetsButton").disabled = state.busy;
+      $("#trainingAssetsStatus").textContent = error.message;
+    }
+    refreshTrainingButtons();
   }
 
   async function loadDatasets(preferredId) {
@@ -81,6 +104,12 @@
       state.pythonCompatible = Boolean(status.python_compatible_for_paddle);
       state.paddleReady = Boolean(status.training_runtime_ready ?? (state.pythonCompatible && status.paddle_installed));
       state.ocrReady = Boolean(status.inference_runtime_ready ?? (state.pythonCompatible && status.paddle_installed && status.paddleocr_installed));
+      state.paddleGpuAvailable = Boolean(status.paddle_cuda_available);
+      $("#useGpu").checked = state.paddleGpuAvailable;
+      $("#useGpu").disabled = !state.paddleGpuAvailable;
+      $("#gpuAvailabilityNote").textContent = state.paddleGpuAvailable
+        ? "PaddlePaddle CUDA runtime detected. GPU training and benchmarking are available."
+        : "This installation has a CPU-only PaddlePaddle runtime. Training and benchmarking will use CPU.";
       $("#apiStatus").textContent = state.ocrReady
         ? "Local OCR engine ready"
         : !state.pythonCompatible
@@ -91,7 +120,14 @@
         : state.ocrReady
           ? status.training_note
           : status.training_note + " Dataset annotation and verified crop storage remain available without the OCR engine.";
-    } catch (_) { $("#apiStatus").textContent = "Local OCR workbench"; }
+    } catch (_) {
+      state.paddleGpuAvailable = false;
+      $("#useGpu").checked = false;
+      $("#useGpu").disabled = true;
+      $("#gpuAvailabilityNote").textContent = "Could not verify Paddle GPU support. CPU mode is selected.";
+      $("#apiStatus").textContent = "Local OCR workbench";
+    }
+    await loadTrainingAssets();
     const payload = await api("/api/ocr/datasets");
     state.datasets = payload.datasets || [];
     if (!state.datasets.length) {
@@ -531,6 +567,35 @@
     if (!state.activeJobId) return;
     try { await api(`/api/ocr/jobs/${encodeURIComponent(state.activeJobId)}/cancel`, { method: "POST" }); message("Cancellation requested. The current process is being stopped."); }
     catch (error) { message(error.message, "error"); }
+  });
+
+  $("#prepareTrainingAssetsButton").addEventListener("click", async () => {
+    setBusy(true);
+    $("#trainingAssetsStatus").textContent = "Downloading the pinned PaddleOCR source and matching pretrained checkpoint. The first setup can take a few minutes.";
+    try {
+      const assets = await api("/api/ocr/training-assets/prepare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model_variant: $("#modelVariant").value })
+      });
+      state.trainingAssets = assets;
+      $("#paddleSourcePath").value = assets.paddleocr_dir;
+      $("#pretrainedPath").value = assets.pretrained_model;
+      $("#trainingAssetsStatus").textContent = `Ready: PaddleOCR ${assets.source_version} and ${assets.model_variant} pretrained weights are stored locally.`;
+      message("Official training files are ready. You can now start fine-tuning.", "success");
+    } catch (error) {
+      state.trainingAssets = null;
+      $("#trainingAssetsStatus").textContent = error.message;
+      message(error.message, "error");
+    } finally {
+      setBusy(false);
+      refreshTrainingButtons();
+    }
+  });
+
+  $("#modelVariant").addEventListener("change", () => {
+    state.trainingAssets = null;
+    loadTrainingAssets();
   });
 
   $("#trainButton").addEventListener("click", async () => {

@@ -7,6 +7,7 @@ import os
 import sys
 import re
 import threading
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,7 @@ from .dataset import (
     update_crop_sample,
 )
 from .ocr_training import cancel_job, get_job, start_benchmark_job, start_training_job
+from .ocr_training_assets import ensure_training_assets, training_assets_status
 from .ocr_quality import audit_dataset
 
 _OCR_INFERENCE_LOCK = threading.Lock()
@@ -66,13 +68,17 @@ class CreateSplitsRequest(BaseModel):
     force: bool = False
 
 
+class TrainingAssetsRequest(BaseModel):
+    model_variant: str = "mobile"
+
+
 class StartTrainingRequest(BaseModel):
-    paddleocr_dir: str = Field(min_length=1, max_length=2048)
-    pretrained_model: str = Field(min_length=1, max_length=2048)
+    paddleocr_dir: str | None = Field(default=None, min_length=1, max_length=2048)
+    pretrained_model: str | None = Field(default=None, min_length=1, max_length=2048)
     model_variant: str = "mobile"
     epochs: int = Field(default=30, ge=1, le=500)
     batch_size: int = Field(default=8, ge=1, le=32)
-    use_gpu: bool = True
+    use_gpu: bool = False
 
 
 class StartBenchmarkRequest(BaseModel):
@@ -184,6 +190,19 @@ def paddle_python_supported(version_info: tuple[int, ...] | Any = sys.version_in
     return (major, minor) >= (3, 9) and (major, minor) <= (3, 13)
 
 
+def _paddle_gpu_available() -> bool:
+    """Return true only when the installed Paddle build can see a CUDA device."""
+    try:
+        import paddle
+
+        return bool(
+            paddle.device.is_compiled_with_cuda()
+            and paddle.device.cuda.device_count() > 0
+        )
+    except Exception:
+        return False
+
+
 def _require_supported_paddle_python() -> None:
     """Reject OCR jobs before spawning a process on an unsupported interpreter."""
     if not paddle_python_supported():
@@ -200,7 +219,7 @@ def _require_supported_paddle_python() -> None:
 
 @router.get("/status")
 def ocr_studio_status() -> dict[str, Any]:
-    """Check optional OCR dependencies and Python compatibility without importing GPU libraries."""
+    """Report OCR dependencies and whether the installed Paddle build can use a GPU."""
     try:
         paddleocr_installed = importlib.util.find_spec("paddleocr") is not None
     except (ImportError, ValueError):
@@ -212,6 +231,7 @@ def ocr_studio_status() -> dict[str, Any]:
 
     version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     python_compatible = paddle_python_supported()
+    paddle_cuda_available = _paddle_gpu_available() if paddle_installed and python_compatible else False
     if not python_compatible:
         training_note = (
             f"Planline is running Python {version}. PaddlePaddle's current published wheels "
@@ -221,18 +241,20 @@ def ocr_studio_status() -> dict[str, Any]:
     elif not paddle_installed:
         training_note = (
             "This Python version is compatible, but PaddlePaddle is not installed. "
-            "Training also requires a local PaddleOCR source checkout and a matching .pdparams checkpoint."
+            "Run the Planline installer again to provision the PaddlePaddle and PaddleOCR runtime."
         )
     elif not paddleocr_installed:
         training_note = (
             "PaddlePaddle is installed, but the PaddleOCR inference package is missing. "
-            "Training still requires a local PaddleOCR source checkout and a matching .pdparams checkpoint."
+            "Run the Planline installer again to install the PaddleOCR inference package."
         )
     else:
         training_note = (
-            "PaddlePaddle and PaddleOCR are available. Fine-tuning still requires a local PaddleOCR source checkout "
-            "and a matching .pdparams checkpoint."
+            "PaddlePaddle and PaddleOCR are available. OCR Studio can automatically prepare the pinned "
+            "PaddleOCR source checkout and matching pretrained checkpoint before fine-tuning."
         )
+    if paddle_installed and not paddle_cuda_available:
+        training_note += " The installed PaddlePaddle runtime is CPU-only; GPU training and recognition are disabled."
     return {
         "status": "ok",
         "python_version": version,
@@ -240,12 +262,32 @@ def ocr_studio_status() -> dict[str, Any]:
         "python_compatible_for_paddle": python_compatible,
         "paddleocr_installed": paddleocr_installed,
         "paddle_installed": paddle_installed,
+        "paddle_cuda_available": paddle_cuda_available,
         "training_supported": python_compatible,
         "training_runtime_ready": python_compatible and paddle_installed,
         "inference_runtime_ready": python_compatible and paddle_installed and paddleocr_installed,
         "dataset_root": str(OCR_DATASET_ROOT),
         "training_note": training_note,
     }
+
+
+@router.get("/training-assets")
+def get_training_assets(model_variant: str = "mobile") -> dict[str, Any]:
+    try:
+        return training_assets_status(model_variant)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/training-assets/prepare")
+def prepare_training_assets(request: TrainingAssetsRequest) -> dict[str, Any]:
+    try:
+        return ensure_training_assets(request.model_variant)
+    except (OSError, ValueError, zipfile.BadZipFile) as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not prepare official PaddleOCR training assets: {exc}",
+        ) from exc
 
 
 @router.get("/models")
@@ -283,6 +325,8 @@ def recognize_review_crops(
     """Run optional PaddleOCR recognition on the dimension crops in a review export."""
     if device not in {"cpu", "gpu:0"}:
         raise HTTPException(status_code=422, detail="device must be cpu or gpu:0.")
+    if device == "gpu:0" and not _paddle_gpu_available():
+        raise HTTPException(status_code=422, detail="PaddlePaddle GPU support is not available in this installation; choose CPU.")
     if len(review_json.encode("utf-8")) > 2 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Review JSON limit is 2 MB.")
     if file.size is not None and file.size > MAX_CROP_BYTES:
@@ -510,12 +554,27 @@ def audit_ocr_dataset(dataset_id: str) -> dict[str, Any]:
 @router.post("/datasets/{dataset_id}/train", status_code=202)
 def start_ocr_training(dataset_id: str, request: StartTrainingRequest) -> dict[str, Any]:
     _require_supported_paddle_python()
+    if request.use_gpu and not _paddle_gpu_available():
+        raise HTTPException(status_code=422, detail="PaddlePaddle GPU support is not available in this installation; uncheck Use NVIDIA GPU.")
+    if bool(request.paddleocr_dir) != bool(request.pretrained_model):
+        raise HTTPException(status_code=422, detail="Provide both training asset paths or leave both empty for automatic setup.")
+    try:
+        if request.paddleocr_dir and request.pretrained_model:
+            paddleocr_dir = Path(request.paddleocr_dir)
+            pretrained_model = Path(request.pretrained_model)
+        else:
+            assets = ensure_training_assets(request.model_variant)
+            paddleocr_dir = Path(assets["paddleocr_dir"])
+            pretrained_model = Path(assets["pretrained_model"])
+    except (OSError, ValueError, zipfile.BadZipFile) as exc:
+        raise HTTPException(status_code=502, detail=f"Could not prepare official PaddleOCR training assets: {exc}") from exc
+
     dataset_dir = _dataset_dir(dataset_id)
     try:
         return start_training_job(
             dataset_dir,
-            Path(request.paddleocr_dir),
-            Path(request.pretrained_model),
+            paddleocr_dir,
+            pretrained_model,
             model_variant=request.model_variant,
             epochs=request.epochs,
             batch_size=request.batch_size,
@@ -528,6 +587,8 @@ def start_ocr_training(dataset_id: str, request: StartTrainingRequest) -> dict[s
 @router.post("/datasets/{dataset_id}/benchmark", status_code=202)
 def start_ocr_benchmark(dataset_id: str, request: StartBenchmarkRequest) -> dict[str, Any]:
     _require_supported_paddle_python()
+    if request.device.startswith("gpu") and not _paddle_gpu_available():
+        raise HTTPException(status_code=422, detail="PaddlePaddle GPU support is not available in this installation; choose CPU.")
     dataset_dir = _dataset_dir(dataset_id)
     try:
         model_dir = Path(request.model_dir) if request.model_dir else None

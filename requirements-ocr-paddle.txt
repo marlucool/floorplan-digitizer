@@ -1,4 +1,4 @@
-# Optional OCR runtime only; not part of the default Planline install.
-# Install a matching PaddlePaddle CPU or GPU wheel first:
-# https://www.paddleocr.ai/latest/en/version3.x/installation.html
+# PaddlePaddle itself is installed by the Windows installer with a matching CPU/GPU wheel.
+# This file installs the pinned PaddleOCR API and its Python dependencies.
+# Manual installation guidance: https://www.paddleocr.ai/latest/en/version3.x/installation.html
 paddleocr==3.3.1
