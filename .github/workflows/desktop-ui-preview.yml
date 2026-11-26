@@ -103,6 +103,8 @@ jobs:
             test -s "$destination/app.js"
             test -s "$destination/ocr.html"
             test -s "$destination/settings.html"
+            test -s "$destination/architecture.html"
+            test -s "$destination/architecture.md/index.html"
             test -s "$destination/preview.js"
             for script in "$destination"/*.js; do
               node --check "$script"
