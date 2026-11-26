@@ -11,15 +11,16 @@ WEB = ROOT / "web"
 
 # Each page is copied only when that workspace exists in the source revision.
 PAGES = {
-    "drawing.html": ("app.js", "styles.css"),
-    "index.html": ("dashboard.js", "dashboard.css", "styles.css"),
-    "ocr.html": ("ocr-studio.js", "ocr-studio.css", "styles.css"),
-    "settings.html": ("settings.js", "settings.css", "styles.css"),
+    "drawing.html": ("app.js", "styles.css", "theme.js"),
+    "index.html": ("dashboard.js", "styles.css", "theme.js"),
+    "ocr.html": ("ocr-studio.js", "styles.css", "theme.js"),
+    "settings.html": ("settings.js", "styles.css", "theme.js"),
 }
 SHARED_ASSETS = ("preview.js", "demo-floorplan.svg")
 ROUTES = {
-    "/": "drawing.html",
+    "/": "index.html",
     "/dashboard": "index.html",
+    "/drawing": "drawing.html",
     "/ocr": "ocr.html",
     "/settings": "settings.html",
     "/architecture": "architecture.md",
