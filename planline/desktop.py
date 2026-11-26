@@ -62,7 +62,7 @@ def main() -> int:
     try:
         webview.create_window(
             "Planline — Floor-plan and OCR Studio",
-            f"http://127.0.0.1:{port}/",
+            f"http://127.0.0.1:{port}/dashboard",
             width=1500,
             height=980,
             min_size=(1024, 700),

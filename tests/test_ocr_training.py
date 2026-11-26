@@ -103,6 +103,32 @@ def test_quiet_training_process_is_cancelled_without_waiting_for_output(tmp_path
 
 
 
+@pytest.mark.parametrize(
+    "split_payload",
+    ["[]", '{"assignments": []}', '{"assignments": null}'],
+)
+def test_start_training_rejects_malformed_split_metadata(
+    tmp_path: Path, split_payload: str
+) -> None:
+    from planline.ocr_training import MODEL_CONFIGS, start_training_job
+
+    dataset = tmp_path / "dataset"
+    dataset.mkdir()
+    (dataset / "splits.json").write_text(split_payload, encoding="utf-8")
+
+    source = tmp_path / "PaddleOCR"
+    (source / "tools").mkdir(parents=True)
+    (source / "tools" / "train.py").write_text("# training entrypoint", encoding="utf-8")
+    config = source / MODEL_CONFIGS["mobile"]
+    config.parent.mkdir(parents=True)
+    config.write_text("Global: {}", encoding="utf-8")
+    checkpoint = tmp_path / "mobile.pdparams"
+    checkpoint.write_bytes(b"checkpoint")
+
+    with pytest.raises(ValueError, match="split plan|Split plan"):
+        start_training_job(dataset, source, checkpoint)
+
+
 def test_exported_inference_model_requires_nonempty_parameter_file(tmp_path: Path) -> None:
     from planline.ocr_training import _has_exported_inference_weights
 
