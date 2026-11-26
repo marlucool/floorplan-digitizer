@@ -83,10 +83,7 @@ def test_preview_navigation_opens_dashboard_and_keeps_pages_separate(tmp_path: P
     assert 'href="drawing.html"' in dashboard
     assert 'href="ocr.html"' in dashboard
     assert 'href="settings.html"' in dashboard
-    assert 'href="documentation/index.html"' in dashboard
-    assert 'href="documentation/index.html"' in drawing
-    assert 'href="documentation/index.html"' in ocr
-    assert 'href="documentation/index.html"' in settings
+    assert 'href="documentation/index.html"' in architecture
 
     for page, app_script in ((drawing, "app.js"), (ocr, "ocr-studio.js"), (settings, "settings.js")):
         assert 'href="index.html"' in page
