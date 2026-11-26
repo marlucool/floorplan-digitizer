@@ -379,17 +379,17 @@ def render_document_page(
         # Python-Markdown exposes md.toc only when its marker is present in the
         # document. Add a temporary marker to the rendered copy, never to the
         # maintained source file, so every guide gets a sidebar contents list.
-        if not re.search(r"(?m)^\\[TOC\\]\\s*$", markdown_source):
+        if not re.search(r"(?m)^\[TOC\]\s*$", markdown_source):
             title_match = re.search(r"(?m)^# .+?$", markdown_source)
             if title_match:
                 insert_at = title_match.end()
                 markdown_source = (
-                    markdown_source[:insert_at]
+                    + "\n\n[TOC]\n\n"
                     + "\\n\\n[TOC]\\n\\n"
                     + markdown_source[insert_at:]
                 )
             else:
-                markdown_source = "[TOC]\\n\\n" + markdown_source
+                markdown_source = "[TOC]\n\n" + markdown_source
         rendered = parser.convert(markdown_source)
         toc_html = _render_toc(parser.toc)
         if parser.toc:
