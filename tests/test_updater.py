@@ -8,7 +8,7 @@ import pytest
 from planline import updater
 
 
-def release(version: str = "0.1.2") -> dict:
+def release(version: str = "0.1.3") -> dict:
     base = "https://github.com/marlucool/floorplan-digitizer/releases/download/planline-v" + version
     return {
         "tag_name": "planline-v" + version,
@@ -36,7 +36,7 @@ def test_release_check_detects_newer_verified_installer(monkeypatch: pytest.Monk
     result = updater.fetch_latest_release()
     assert result["status"] == "update_available"
     assert result["current_version"] == updater.__version__
-    assert result["latest_version"] == "0.1.2"
+    assert result["latest_version"] == "0.1.3"
     assert result["install_available"] is True
     assert result["release_notes"] == "Update notes"
 
