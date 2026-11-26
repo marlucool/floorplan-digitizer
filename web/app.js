@@ -1413,10 +1413,11 @@ async function loadOcrCapabilities() {
     ]);
     if (!statusResponse.ok || !modelsResponse.ok || !datasetsResponse.ok) throw new Error("OCR status endpoint unavailable.");
     const status = await statusResponse.json();
-    const gpuOption = $("#ocrDeviceSelect").querySelector('option[value="gpu:0"]');
+    const ocrDeviceSelect = $("#ocrDeviceSelect");
+    const gpuOption = ocrDeviceSelect?.querySelector('option[value="gpu:0"]');
     if (gpuOption) gpuOption.disabled = !Boolean(status.paddle_cuda_available);
-    if (!status.paddle_cuda_available && $("#ocrDeviceSelect").value === "gpu:0") {
-      $("#ocrDeviceSelect").value = "cpu";
+    if (ocrDeviceSelect && !status.paddle_cuda_available && ocrDeviceSelect.value === "gpu:0") {
+      ocrDeviceSelect.value = "cpu";
     }
     const modelPayload = await modelsResponse.json();
     const datasetPayload = await datasetsResponse.json();
