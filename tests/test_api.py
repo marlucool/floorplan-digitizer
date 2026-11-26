@@ -386,7 +386,10 @@ def test_health_does_not_load_models() -> None:
 
 def test_web_ui_assets_and_architecture_notes_are_served() -> None:
     client = TestClient(api.app)
-    page = client.get("/")
+    home = client.get("/")
+    assert home.status_code == 200
+    assert "Planline — Dashboard" in home.text
+    page = client.get("/drawing")
     assert page.status_code == 200
     assert 'id="classFilter"' in page.text
     assert 'id="overlayToggle"' in page.text
@@ -453,8 +456,8 @@ def test_settings_page_and_global_workspace_navigation_are_available() -> None:
     settings = client.get("/settings")
     assert settings.status_code == 200
     assert "Updates" in settings.text
-    assert 'href="/">Drawing workspace</a>' in settings.text
-    drawing = client.get("/")
+    assert 'href="/drawing">Drawing workspace</a>' in settings.text
+    drawing = client.get("/drawing")
     assert 'href="/settings">Settings</a>' in drawing.text
     ocr = client.get("/ocr")
     assert 'href="/settings">Settings</a>' in ocr.text
