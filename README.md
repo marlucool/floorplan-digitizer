@@ -2,6 +2,8 @@
 
 Planline is a local-first project for turning scanned or hand-drawn 2D floor plans into **editable, dimensionally constrained CAD geometry**.
 
+> **Desktop UI preview:** [Open the current drawing workspace](https://marlucool.github.io/floorplan-digitizer/). This is a static browser preview of the desktop UI with illustrative sample data; OCR, model inference, uploads and backend operations are disabled.
+
 The important problem is not tracing pixels. Survey drawings can be skewed, faded, low-resolution, or drawn approximately rather than to scale. Planline is being developed to read written dimensions, relate them to the correct parts of the drawing, detect contradictions, and keep uncertain results in a human review workflow.
 
 > **Current status: drawing review plus OCR Studio workbench.** The local app now includes a crop editor, verified-label library, source/writer-safe dataset splits, background PP-OCRv5 fine-tuning jobs and held-out benchmark reporting. The desktop app opens the drawing workspace first; OCR Studio is available from the global navigation at `/ocr`, and application settings and GitHub release updates are available at `/settings`. The drawing-analysis workflow ranks geometric candidates linking dimension-value regions to dimension lines and wall spans, with explicit human confirmation. Local PaddleOCR can provide optional, unverified suggestions in Drawing. Manual two-point scale calibration and user-authored wall/room geometry are available, including SVG and DXF export. Automatic dimension-driven measured reconstruction and verified CAD export are not implemented.
