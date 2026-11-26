@@ -12,7 +12,8 @@ def test_preview_contains_every_workspace_and_uses_one_stylesheet(tmp_path: Path
     for page in ("index.html", "drawing.html", "ocr.html", "settings.html"):
         assert (output / page).is_file(), f"Missing preview page: {page}"
     for asset in ("app.js", "dashboard.js", "ocr-studio.js", "settings.js", "theme.js",
-                  "styles.css", "preview.js", "demo-floorplan.svg", ".nojekyll"):
+                  "styles.css", "preview.js", "demo-floorplan.svg", "architecture.html",
+                  "architecture-source.md", ".nojekyll"):
         assert (output / asset).is_file(), f"Missing preview asset: {asset}"
 
     assert not (output / "dashboard.css").exists()
@@ -29,7 +30,17 @@ def test_preview_contains_every_workspace_and_uses_one_stylesheet(tmp_path: Path
             if local.endswith((".css", ".js", ".svg", ".png", ".webp", ".woff", ".woff2")):
                 assert (output / local).is_file(), f"{page.name} references missing asset {local}"
 
-    assert (output / "architecture.md").is_file()
+    assert (output / "architecture.md").is_dir()
+    assert (output / "architecture.md" / "index.html").is_file()
+    architecture = (output / "architecture.html").read_text(encoding="utf-8")
+    legacy_architecture = (output / "architecture.md" / "index.html").read_text(encoding="utf-8")
+    assert '<article class="architecture-prose">' in architecture
+    assert '<nav class="architecture-toc"' in architecture
+    assert 'href="styles.css"' in architecture
+    assert 'src="theme.js" defer' in architecture
+    assert 'href="../styles.css"' in legacy_architecture
+    assert 'src="../theme.js" defer' in legacy_architecture
+    assert "Planline architecture and implementation roadmap" in architecture
 
 
 def test_preview_navigation_opens_dashboard_and_keeps_pages_separate(tmp_path: Path) -> None:
@@ -44,6 +55,7 @@ def test_preview_navigation_opens_dashboard_and_keeps_pages_separate(tmp_path: P
     assert 'href="drawing.html"' in dashboard
     assert 'href="ocr.html"' in dashboard
     assert 'href="settings.html"' in dashboard
+    assert 'href="architecture.html"' in dashboard
 
     for page, app_script in ((drawing, "app.js"), (ocr, "ocr-studio.js"), (settings, "settings.js")):
         assert 'href="index.html"' in page
