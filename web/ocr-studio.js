@@ -64,7 +64,7 @@
     $("#auditDatasetButton").disabled = state.busy || !state.dataset;
     const assetsReady = Boolean(state.trainingAssets?.ready);
     $("#trainButton").disabled = state.busy || hasJob || !splitReady || !state.paddleReady || !assetsReady || summary?.valid === false;
-    $("#prepareTrainingAssetsButton").disabled = state.busy || assetsReady;
+    $("#prepareTrainingAssetsButton").disabled = state.busy || assetsReady || !state.paddleReady;
     $("#benchmarkBaseButton").disabled = state.busy || hasJob || !splitReady || !state.ocrReady || summary?.valid === false;
     const selectedModel = $("#trainedModelSelect")?.value || state.lastTrainedModel;
     $("#benchmarkTrainedButton").disabled = state.busy || hasJob || !splitReady || !state.ocrReady || !selectedModel;
@@ -86,7 +86,7 @@
       state.trainingAssets = assets;
       $("#paddleSourcePath").value = assets.paddleocr_dir || "";
       $("#pretrainedPath").value = assets.pretrained_model || "";
-      $("#prepareTrainingAssetsButton").disabled = state.busy || assets.ready;
+      $("#prepareTrainingAssetsButton").disabled = state.busy || assets.ready || !state.paddleReady;
       $("#trainingAssetsStatus").textContent = assets.ready
         ? `Official PaddleOCR ${assets.source_version} source and ${variant} checkpoint are ready locally.`
         : "Training files are not downloaded yet. Prepare them once; subsequent training runs reuse the local files.";
@@ -107,9 +107,11 @@
       state.paddleGpuAvailable = Boolean(status.paddle_cuda_available);
       $("#useGpu").checked = state.paddleGpuAvailable;
       $("#useGpu").disabled = !state.paddleGpuAvailable;
-      $("#gpuAvailabilityNote").textContent = state.paddleGpuAvailable
-        ? "PaddlePaddle CUDA runtime detected. GPU training and benchmarking are available."
-        : "This installation has a CPU-only PaddlePaddle runtime. Training and benchmarking will use CPU.";
+      $("#gpuAvailabilityNote").textContent = !state.paddleReady
+        ? "PaddlePaddle is not installed. Rerun the Planline installer before preparing training files."
+        : state.paddleGpuAvailable
+          ? "PaddlePaddle CUDA runtime detected. GPU training and benchmarking are available."
+          : "This installation has a CPU-only PaddlePaddle runtime. Training and benchmarking will use CPU.";
       $("#apiStatus").textContent = state.ocrReady
         ? "Local OCR engine ready"
         : !state.pythonCompatible
