@@ -24,6 +24,12 @@ def release(version: str = "0.1.2") -> dict:
     }
 
 
+def test_application_version_matches_windows_installer_version() -> None:
+    root = Path(__file__).resolve().parents[1]
+    project = (root / "packaging" / "windows" / "Planline.Setup.csproj").read_text(encoding="utf-8")
+    assert f"<Version>{updater.__version__}</Version>" in project
+
+
 def test_release_check_detects_newer_verified_installer(monkeypatch: pytest.MonkeyPatch) -> None:
     payload = json.dumps(release()).encode("utf-8")
     monkeypatch.setattr(updater, "_read_url", lambda _url, **_kwargs: payload)
