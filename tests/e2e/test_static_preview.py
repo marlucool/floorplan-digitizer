@@ -107,7 +107,8 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     expect(page.locator("#currentVersion")).to_have_text("Unavailable in preview")
 
                     # The docs index contains several document formats and the archive.
-                    page.goto(url + "documentation/", wait_until="domcontentloaded")
+                    page.locator('.top-links a[href="documentation/index.html"]').click()
+                    expect(page).to_have_url(url + "documentation/index.html")
                     expect(page.locator("h1").first).to_have_text("Documentation.")
                     assert page.locator(".documentation-file").count() > 10
                     expect(page.locator('.documentation-file[href="PLANLINE_ARCHITECTURE.md.html"]')).to_be_visible()
@@ -121,11 +122,9 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     architecture_link.click()
                     expect(page).to_have_url(url + "documentation/PLANLINE_ARCHITECTURE.md.html")
 
-                    # Disable smooth motion in the smoke test so the anchor
-                    # position is measured after the browser completes the jump.
-                    page.emulate_media(reduced_motion="reduce")
                     # Clicking a section link must leave its heading below the
                     # measured sticky header, including after the header wraps on mobile.
+                    page.emulate_media(reduced_motion="reduce")
                     section_link = page.locator(".documentation-toc a").first
                     target_id = section_link.get_attribute("href").removeprefix("#")
                     section_link.click()
