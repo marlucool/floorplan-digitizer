@@ -494,6 +494,12 @@ def index() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
 
 
+@app.get("/dashboard", response_class=FileResponse)
+def dashboard_page() -> FileResponse:
+    """Serve the Planline workspace dashboard."""
+    return FileResponse(WEB_DIR / "dashboard.html")
+
+
 @app.get("/settings", response_class=FileResponse)
 def settings_page() -> FileResponse:
     """Serve application settings and the in-app release updater."""
