@@ -30,7 +30,7 @@ def rewrite_routes(html: str) -> str:
     """Rewrite server-root routes to files relative to the preview directory."""
     for route, target in sorted(ROUTES.items(), key=lambda item: len(item[0]), reverse=True):
         html = html.replace(f'href="{route}"', f'href="{target}"')
-    html = re.sub(r'(?:href|src)="(/[^"]+)"', lambda match: f'{match.group(1).split("=")[0]}="{match.group(1)[1:-1]}"', html)
+    html = re.sub(r'(href|src)="/([^"]+)"', lambda match: f'{match.group(1)}="{match.group(2)}"', html)
     return html
 
 
