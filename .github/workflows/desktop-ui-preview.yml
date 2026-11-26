@@ -167,6 +167,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
+      pull-requests: write
     steps:
       - name: Add or update the PR preview link
         uses: actions/github-script@v7
