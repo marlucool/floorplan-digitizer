@@ -491,13 +491,19 @@ async def analyze_drawing(
 
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(WEB_DIR / "index.html")
+    """Open the dashboard as the single application entry point."""
+    return FileResponse(WEB_DIR / "dashboard.html")
 
 
 @app.get("/dashboard", response_class=FileResponse)
 def dashboard_page() -> FileResponse:
     """Serve the Planline workspace dashboard."""
     return FileResponse(WEB_DIR / "dashboard.html")
+
+@app.get("/drawing", response_class=FileResponse)
+def drawing_page() -> FileResponse:
+    """Serve the drawing and geometry workspace."""
+    return FileResponse(WEB_DIR / "index.html")
 
 
 @app.get("/settings", response_class=FileResponse)
