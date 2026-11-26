@@ -28,9 +28,15 @@ SHARED_ASSETS = ("preview.js", "demo-floorplan.svg")
 
 
 def _normalise_brand(html: str) -> str:
-    """Make the Planline wordmark return to the dashboard from every page."""
-    return re.sub(
+    """Make the wordmark and Dashboard nav item return to the site homepage."""
+    html = re.sub(
         r'(<a\s+class="brand"[^>]*\bhref=")[^"]*(")',
+        r'\1/dashboard\2',
+        html,
+        count=1,
+    )
+    return re.sub(
+        r'(<a\s+class="repo-link(?: active)?"[^>]*\bhref=")[^"]*(">Dashboard</a>)',
         r'\1/dashboard\2',
         html,
         count=1,
@@ -66,7 +72,7 @@ def prepare_page(source: Path, destination: Path) -> set[str]:
     destination.write_text(html, encoding="utf-8")
 
     dependencies: set[str] = set()
-    for _, raw_path in re.findall(r'(?:href|src)="([^"]+)"', html):
+    for raw_path in re.findall(r'(?:href|src)="([^"]+)"', html):
         if raw_path.startswith(("http://", "https://", "data:", "#")):
             continue
         path = raw_path.split("?", 1)[0].split("#", 1)[0]
