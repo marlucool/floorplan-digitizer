@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import posixpath
 import re
 import shutil
 import sys
@@ -11,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from planline.architecture import render_architecture_page
+from planline.documentation import discover_documents, render_documentation_index, render_document_page
 
 WEB = ROOT / "web"
 
@@ -29,6 +30,7 @@ ROUTES = {
     "/ocr": "ocr.html",
     "/settings": "settings.html",
     "/architecture": "architecture.html",
+    "/documentation": "documentation/index.html",
 }
 SHARED_ASSETS = ("preview.js", "demo-floorplan.svg")
 
@@ -122,43 +124,91 @@ def build_preview(output_dir: Path) -> Path:
         else:
             raise RuntimeError(f"Page references a missing UI asset: web/{asset}")
 
-    docs = ROOT / "docs" / "PLANLINE_ARCHITECTURE.md"
-    if not docs.is_file():
-        raise RuntimeError("Required architecture notes are missing: docs/PLANLINE_ARCHITECTURE.md")
+    docs_root = ROOT / "docs"
+    if not docs_root.is_dir():
+        raise RuntimeError("Required documentation directory is missing: docs/")
 
-    source = docs.read_text(encoding="utf-8")
-    (output_dir / "architecture-source.md").write_text(source, encoding="utf-8")
+    documents = discover_documents(docs_root)
+    if not documents:
+        raise RuntimeError("No supported files were found under docs/")
 
-    # The human-readable viewer is the primary page. Keep the historical
-    # /architecture.md URL working as a directory index as well; static hosts
-    # redirect that path to architecture.md/ and serve this index.html.
-    (output_dir / "architecture.html").write_text(
-        render_architecture_page(
-            source,
-            asset_prefix="",
-            home_href="index.html",
-            drawing_href="drawing.html",
-            ocr_href="ocr.html",
-            settings_href="settings.html",
-            architecture_href="architecture.html",
-            source_href="architecture-source.md",
+    architecture_source = docs_root / "PLANLINE_ARCHITECTURE.md"
+    if not architecture_source.is_file():
+        raise RuntimeError("Required architecture document is missing: docs/PLANLINE_ARCHITECTURE.md")
+    shutil.copy2(architecture_source, output_dir / "architecture-source.md")
+
+    # Keep original files (images, PDFs, source files and Markdown) available as
+    # assets and downloads. Rendered pages are generated separately.
+    shutil.copytree(docs_root, output_dir / "docs", dirs_exist_ok=True)
+
+    documentation_index_path = "documentation/index.html"
+    documentation_index = output_dir / documentation_index_path
+    documentation_index.parent.mkdir(parents=True, exist_ok=True)
+
+    def relative_to_site_root(current_output_path: str, target: str) -> str:
+        relative = posixpath.relpath(target, posixpath.dirname(current_output_path) or ".")
+        return relative
+
+    def render_doc_page(document: dict, current_output_path: str) -> str:
+        source_path = docs_root / document["path"]
+        prefix = relative_to_site_root(current_output_path, ".")
+        if prefix == ".":
+            prefix = ""
+        else:
+            prefix = prefix.rstrip("/") + "/"
+        return render_document_page(
+            document,
+            source_path.read_bytes() if document["kind"] in {"markdown", "source"} else b"",
+            documents,
+            static_site=True,
+            current_output_path=current_output_path,
+            asset_prefix=prefix,
+            home_href=relative_to_site_root(current_output_path, "index.html"),
+            drawing_href=relative_to_site_root(current_output_path, "drawing.html"),
+            ocr_href=relative_to_site_root(current_output_path, "ocr.html"),
+            settings_href=relative_to_site_root(current_output_path, "settings.html"),
+            documentation_href=relative_to_site_root(current_output_path, documentation_index_path),
+        )
+
+    documentation_index.write_text(
+        render_documentation_index(
+            documents,
+            static_site=True,
+            current_output_path=documentation_index_path,
+            asset_prefix="../",
+            home_href="../index.html",
+            drawing_href="../drawing.html",
+            ocr_href="../ocr.html",
+            settings_href="../settings.html",
+            documentation_href="index.html",
         ),
+        encoding="utf-8",
+    )
+
+    for document in documents:
+        page_path = f"documentation/{document['path']}.html"
+        destination = output_dir / page_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(render_doc_page(document, page_path), encoding="utf-8")
+
+    # Preserve both existing architecture entry points while making the new
+    # documentation hub the primary place to discover every docs/ file.
+    architecture_doc = next(
+        (item for item in documents if item["path"] == "PLANLINE_ARCHITECTURE.md"),
+        None,
+    )
+    if architecture_doc is None:
+        raise RuntimeError("Required architecture document is missing: docs/PLANLINE_ARCHITECTURE.md")
+
+    (output_dir / "architecture.html").write_text(
+        render_doc_page(architecture_doc, "architecture.html"),
         encoding="utf-8",
     )
 
     legacy_viewer = output_dir / "architecture.md"
     legacy_viewer.mkdir()
     (legacy_viewer / "index.html").write_text(
-        render_architecture_page(
-            source,
-            asset_prefix="../",
-            home_href="../index.html",
-            drawing_href="../drawing.html",
-            ocr_href="../ocr.html",
-            settings_href="../settings.html",
-            architecture_href="../architecture.html",
-            source_href="../architecture-source.md",
-        ),
+        render_doc_page(architecture_doc, "architecture.md/index.html"),
         encoding="utf-8",
     )
 
