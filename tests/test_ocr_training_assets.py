@@ -35,6 +35,8 @@ def test_ensure_training_assets_downloads_pinned_source_and_variant_weights(
     downloads: list[str] = []
 
     def fake_download(url: str, destination: Path, *, max_bytes: int) -> str:
+        if destination.is_file() and ocr_training_assets._MIN_ASSET_BYTES <= destination.stat().st_size <= max_bytes:
+            return "cached-sha256"
         downloads.append(url)
         destination.parent.mkdir(parents=True, exist_ok=True)
         if url.endswith(".zip"):
@@ -50,6 +52,10 @@ def test_ensure_training_assets_downloads_pinned_source_and_variant_weights(
                 archive.writestr(
                     f"PaddleOCR-{ocr_training_assets.PADDLEOCR_VERSION}/../escape.txt",
                     "must not escape",
+                )
+                archive.writestr(
+                    f"PaddleOCR-{ocr_training_assets.PADDLEOCR_VERSION}/README.md",
+                    "x" * ocr_training_assets._MIN_ASSET_BYTES,
                 )
         else:
             destination.write_bytes(b"w" * ocr_training_assets._MIN_ASSET_BYTES)
