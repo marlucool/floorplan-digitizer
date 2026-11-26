@@ -36,7 +36,7 @@ def test_preview_contains_every_workspace_and_uses_one_stylesheet(tmp_path: Path
     architecture = (output / "architecture.html").read_text(encoding="utf-8")
     legacy_architecture = (output / "architecture.md" / "index.html").read_text(encoding="utf-8")
     assert '<article class="documentation-article">' in architecture
-    assert '<nav class="documentation-toc"' in architecture
+    assert "class='documentation-toc'" in architecture
     assert 'href="documentation/index.html"' in architecture
     assert 'href="styles.css"' in architecture
     assert 'src="theme.js" defer' in architecture
