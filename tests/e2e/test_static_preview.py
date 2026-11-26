@@ -114,7 +114,7 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     expect(page.locator('.documentation-file[href="rysunek.png.html"]')).to_be_visible()
 
                     page.goto(url + "documentation/ARCHITECTURE.md.html", wait_until="domcontentloaded")
-                    expect(page.locator(".documentation-article h1")).to_contain_text("Planline architecture")
+                    expect(page.locator(".documentation-article-heading h1")).to_contain_text("Planline architecture")
                     expect(page.locator(".documentation-toc")).to_be_visible()
                     architecture_link = page.locator('.documentation-prose a[href="PLANLINE_ARCHITECTURE.md.html"]')
                     expect(architecture_link).to_be_visible()
