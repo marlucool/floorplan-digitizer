@@ -103,8 +103,9 @@ jobs:
             test -s "$destination/ocr.html"
             test -s "$destination/settings.html"
             test -s "$destination/preview.js"
-            node --check "$destination/app.js"
-            node --check "$destination/preview.js"
+            for script in "$destination"/*.js; do
+              node --check "$script"
+            done
             rm -rf "$tmp"
             count=$((count + 1))
           done < <(jq -c '.[]' <<<"$prs")
@@ -113,8 +114,11 @@ jobs:
 
       - name: Check main preview JavaScript syntax
         run: |
-          node --check web/app.js
-          node --check web/preview.js
+          for script in web/app.js web/preview.js web/ocr-studio.js web/settings.js web/dashboard.js; do
+            if [[ -f "$script" ]]; then
+              node --check "$script"
+            fi
+          done
 
       - name: Install preview test dependencies
         run: python -m pip install pytest
