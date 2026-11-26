@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Planline floor-plan icon">
+  <rect x="1" y="1" width="62" height="62" rx="15" fill="#334b37"/>
+  <path d="M16 14.5h32v35H16z" fill="none" stroke="#f7f6ef" stroke-width="3.2" stroke-linejoin="round"/>
+  <path d="M31.5 14.5v15.8H48M16 36.8h15.5v12.7" fill="none" stroke="#f7f6ef" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M31.5 30.3a7.6 7.6 0 0 1 7.6 7.6" fill="none" stroke="#a8cf9b" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="31.5" cy="30.3" r="3.1" fill="#a8cf9b"/>
+  <path d="M42.5 10.5h7" stroke="#e5b66d" stroke-width="3" stroke-linecap="round"/>
+</svg>
