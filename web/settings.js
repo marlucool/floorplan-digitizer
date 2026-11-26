@@ -11,9 +11,9 @@ function setTheme(theme) {
   themeButton.setAttribute("aria-pressed", String(dark));
   try { localStorage.setItem("planline-theme", theme); } catch (_) {}
 }
-let theme = "light";
-try { theme = localStorage.getItem("planline-theme") || "light"; } catch (_) {}
-setTheme(theme === "dark" ? "dark" : "light");
+let theme = "dark";
+try { theme = localStorage.getItem("planline-theme") || "dark"; } catch (_) {}
+setTheme(theme === "light" ? "light" : "dark");
 themeButton.addEventListener("click", () => {
   setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
 });
