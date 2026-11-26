@@ -158,7 +158,7 @@ def build_preview(output_dir: Path) -> Path:
             prefix = prefix.rstrip("/") + "/"
         return render_document_page(
             document,
-            source_path.read_bytes(),
+            source_path.read_bytes() if document["kind"] in {"markdown", "source"} else b"",
             documents,
             static_site=True,
             current_output_path=current_output_path,
