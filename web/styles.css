@@ -485,3 +485,75 @@ html[data-theme="dark"] .workspace-card,
 html[data-theme="dark"] .dashboard-info,
 html[data-theme="dark"] .settings-card,
 html[data-theme="dark"] .studio-card { color: var(--ink); }
+
+
+/* Consistent application shell and navigation across every workspace. */
+.topbar{
+  position:sticky;
+  top:0;
+  z-index:50;
+  min-height:62px;
+  backdrop-filter:saturate(140%) blur(14px);
+}
+.top-links{gap:5px;min-width:0}
+.top-links .repo-link{
+  display:inline-flex;
+  align-items:center;
+  min-height:34px;
+  padding:7px 10px;
+  border:1px solid transparent;
+  border-radius:7px;
+  color:var(--muted);
+  font-size:11px;
+  font-weight:600;
+  transition:background .15s,border-color .15s,color .15s;
+}
+.top-links .repo-link:hover{
+  background:var(--surface);
+  border-color:var(--line);
+  color:var(--ink);
+}
+.top-links .repo-link.active,
+.top-links .repo-link[aria-current="page"]{
+  background:var(--surface);
+  border-color:var(--line);
+  color:var(--ink);
+}
+.theme-toggle{
+  flex:0 0 36px;
+  width:36px;
+  height:36px;
+  display:grid;
+  place-items:center;
+  margin-left:5px;
+  padding:7px;
+  border-radius:8px;
+  color:var(--ink);
+}
+.theme-toggle svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+html[data-theme="dark"] .topbar{background:rgb(32 38 32 / 94%);border-color:var(--line)}
+html[data-theme="dark"] .top-links .repo-link:hover,
+html[data-theme="dark"] .top-links .repo-link.active,
+html[data-theme="dark"] .top-links .repo-link[aria-current="page"]{background:#29332b;border-color:#435441;color:#e8eee4}
+html[data-theme="dark"] .theme-toggle{background:#252d26;border-color:var(--line);color:var(--ink)}
+@media(max-width:1080px){
+  .topbar{height:auto;min-height:62px;flex-wrap:wrap;padding-top:9px;padding-bottom:9px;gap:8px 18px}
+  .top-meta{margin-left:auto}
+  .top-links{order:3;width:100%;margin:0;flex-wrap:wrap;justify-content:flex-start}
+}
+@media(max-width:640px){
+  .topbar{padding:9px 14px}
+  .top-meta{display:none}
+  .top-links{
+    order:3;
+    width:100%;
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    overscroll-behavior-x:contain;
+    scrollbar-width:thin;
+    padding:2px 0 5px;
+  }
+  .top-links .repo-link{flex:0 0 auto;display:inline-flex;font-size:11px}
+  .top-links .repo-link:first-of-type{display:inline-flex}
+  .theme-toggle{flex:0 0 36px}
+}
