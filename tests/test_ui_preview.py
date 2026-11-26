@@ -48,7 +48,7 @@ def test_preview_navigation_opens_dashboard_and_keeps_pages_separate(tmp_path: P
     for page, app_script in ((drawing, "app.js"), (ocr, "ocr-studio.js"), (settings, "settings.js")):
         assert 'href="index.html"' in page
         assert 'href="drawing.html"' in page
-        assert 'src="styles.css"' in page
+        assert 'href="styles.css"' in page
         assert 'src="theme.js" defer></script>' in page
         assert 'src="preview.js" defer></script>' in page
         assert f'src="{app_script}" defer></script>' in page
