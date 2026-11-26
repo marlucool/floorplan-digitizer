@@ -3,23 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f4f2ec">
+  <meta name="theme-color" content="#171b18">
   <title>Planline — Settings</title>
 <script>
-  try { document.documentElement.dataset.theme = localStorage.getItem("planline-theme") || "dark"; }
-  catch (_) { document.documentElement.dataset.theme = "dark"; }
+  try {
+    document.documentElement.dataset.theme = localStorage.getItem("planline-theme-v2") === "light" ? "light" : "dark";
+  } catch (_) {
+    document.documentElement.dataset.theme = "dark";
+  }
 </script>
     <link rel="stylesheet" href="/styles.css">
-  <link rel="stylesheet" href="/settings.css">
+  <script src="/theme.js" defer></script>
   <script src="/settings.js" defer></script>
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/dashboard" aria-label="Planline dashboard"><span class="brand-mark">P</span><span>planline<span class="brand-dot">.</span></span></a>
+    <a class="brand" href="/" aria-label="Planline dashboard"><span class="brand-mark">P</span><span>planline<span class="brand-dot">.</span></span></a>
     <div class="top-meta"><span class="local-dot"></span><span>Local desktop app</span><span class="divider">/</span> Settings</div>
     <div class="top-links"><a class="repo-link" href="/dashboard">Dashboard</a>
       <button id="themeToggle" class="toolbar-button theme-toggle" type="button" aria-label="Switch to dark theme" title="Switch to dark theme" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.2 15.1A8.5 8.5 0 0 1 8.9 3.8 8.7 8.7 0 1 0 20.2 15.1Z"/></svg></button>
-      <a class="repo-link" href="/">Drawing workspace</a>
+      <a class="repo-link" href="/drawing">Drawing workspace</a>
       <a class="repo-link" href="/ocr">OCR Studio</a>
       <a class="repo-link active" href="/settings" aria-current="page">Settings</a>
     </div>
@@ -70,7 +73,7 @@
     <section class="settings-card">
       <div class="settings-card-heading"><div><p class="eyebrow">NAVIGATION</p><h2>Workspaces</h2></div></div>
       <div class="workspace-links">
-        <a href="/"><strong>Drawing workspace</strong><span>Import plans, inspect detections and review dimension associations ↗</span></a>
+        <a href="/drawing"><strong>Drawing workspace</strong><span>Import plans, inspect detections and review dimension associations ↗</span></a>
         <a href="/ocr"><strong>OCR Studio</strong><span>Build a verified crop dataset, annotate dimensions and fine-tune later ↗</span></a>
       </div>
     </section>
