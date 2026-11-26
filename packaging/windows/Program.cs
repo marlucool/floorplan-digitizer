@@ -356,6 +356,9 @@ internal sealed class SetupForm : Form
         "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
     private const string TorchCudaIndex = "https://download.pytorch.org/whl/cu126";
     private const string TorchCpuIndex = "https://download.pytorch.org/whl/cpu";
+    private const string PaddleVersion = "3.3.0";
+    private const string PaddleGpuIndex = "https://www.paddlepaddle.org.cn/packages/stable/cu126/";
+    private const string PaddleCpuIndex = "https://www.paddlepaddle.org.cn/packages/stable/cpu/";
 
     private static readonly HttpClient Http = new(new HttpClientHandler
     {
@@ -729,6 +732,7 @@ internal sealed class SetupForm : Form
         string installDirectory = "";
         bool useGpu = _gpuOption.Checked;
         bool cpuFallback = false;
+        string ocrAccelerator = "not-installed";
 
         try
         {
@@ -909,14 +913,23 @@ internal sealed class SetupForm : Form
                 appDirectory
             );
 
+            // Provision OCR in the same private Python environment as Planline.
+            // Paddle's current stable Windows GPU wheels require compute capability
+            // greater than 7.5; unsupported GPUs (including SM 7.5) use CPU safely.
+            ocrAccelerator = await InstallPaddleOcrAsync(
+                python,
+                appDirectory,
+                requestGpu: useGpu && !cpuFallback
+            );
+
             await SetStatusAsync("Checking the installed application…");
             await RunProcessAsync(
                 python,
                 new[]
                 {
                     "-c",
-                    "import cv2, fastapi, torch, webview, ultralytics; " +
-                    "print('Planline dependencies ready; torch=' + torch.__version__)",
+                    "import cv2, fastapi, paddle, paddleocr, torch, webview, ultralytics; " +
+                    "print('Planline dependencies ready; torch=' + torch.__version__ + '; paddle=' + paddle.__version__)",
                 },
                 appDirectory
             );
@@ -941,6 +954,7 @@ internal sealed class SetupForm : Form
                 data_directory = dataDirectory,
                 python_version = PythonVersion,
                 accelerator = cpuFallback ? "cpu-fallback" : (useGpu ? "cuda-12.6" : "cpu"),
+                ocr_accelerator = ocrAccelerator,
             };
             File.WriteAllText(marker, JsonSerializer.Serialize(markerData, new JsonSerializerOptions { WriteIndented = true }));
 
@@ -974,10 +988,10 @@ internal sealed class SetupForm : Form
             _status.Text = "Installation complete.";
 
             string result = cpuFallback
-                ? "Planline is installed. CUDA could not be started on this system, so the CPU runtime was installed instead."
+                ? $"Planline is installed. PyTorch CUDA could not be started, so detector inference uses CPU. PaddleOCR runtime: {ocrAccelerator}."
                 : useGpu
-                    ? "Planline is installed with NVIDIA CUDA acceleration."
-                    : "Planline is installed with the CPU runtime.";
+                    ? $"Planline is installed with NVIDIA PyTorch acceleration. PaddleOCR runtime: {ocrAccelerator}."
+                    : $"Planline is installed with the CPU PyTorch runtime. PaddleOCR runtime: {ocrAccelerator}.";
 
             if (_autoInstall)
             {
@@ -1046,6 +1060,148 @@ internal sealed class SetupForm : Form
             // rather than silently reused during an application update.
             return false;
         }
+    }
+
+    private async Task<string> InstallPaddleOcrAsync(
+        string python,
+        string appDirectory,
+        bool requestGpu
+    )
+    {
+        bool usePaddleGpu = false;
+
+        if (requestGpu)
+        {
+            try
+            {
+                await SetStatusAsync("Checking PaddlePaddle GPU compatibility…");
+                string capabilityOutput = await RunProcessAsync(
+                    python,
+                    new[]
+                    {
+                        "-c",
+                        "import torch; c=torch.cuda.get_device_capability(0); print('PADDLE_CC=' + str(c[0] * 10 + c[1]))",
+                    },
+                    appDirectory
+                );
+                string? capabilityLine = capabilityOutput
+                    .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                    .FirstOrDefault(line => line.Trim().StartsWith("PADDLE_CC=", StringComparison.Ordinal));
+                int capability = 0;
+                if (capabilityLine is not null)
+                    int.TryParse(capabilityLine.Trim()["PADDLE_CC=".Length..], out capability);
+
+                // Paddle's published Windows GPU packages document support above
+                // SM 7.5. Do not install a GPU wheel on an unsupported device.
+                if (capability > 75 && capability < 120)
+                {
+                    await SetStatusAsync("Installing PaddlePaddle GPU runtime (CUDA 12.6)…");
+                    try
+                    {
+                        await RunProcessAsync(
+                            python,
+                            new[]
+                            {
+                                "-m", "pip", "install",
+                                "--disable-pip-version-check",
+                                "--extra-index-url", PaddleGpuIndex,
+                                $"paddlepaddle-gpu=={PaddleVersion}",
+                            },
+                            appDirectory
+                        );
+                        string gpuCheck = await RunProcessAsync(
+                            python,
+                            new[]
+                            {
+                                "-c",
+                                "import paddle; print('PADDLE_CUDA=' + str(paddle.device.is_compiled_with_cuda())); " +
+                                "print('PADDLE_GPU_COUNT=' + str(paddle.device.cuda.device_count()))",
+                            },
+                            appDirectory
+                        );
+                        usePaddleGpu =
+                            gpuCheck.Contains("PADDLE_CUDA=True", StringComparison.Ordinal) &&
+                            !gpuCheck.Contains("PADDLE_GPU_COUNT=0", StringComparison.Ordinal);
+                        if (!usePaddleGpu)
+                            throw new InvalidOperationException("PaddlePaddle's CUDA runtime did not detect a usable GPU.");
+                    }
+                    catch (Exception)
+                    {
+                        // Remove an incomplete or unusable GPU wheel before installing CPU PaddlePaddle.
+                        try
+                        {
+                            await RunProcessAsync(
+                                python,
+                                new[] { "-m", "pip", "uninstall", "-y", "paddlepaddle-gpu", "paddlepaddle" },
+                                appDirectory
+                            );
+                        }
+                        catch (Exception)
+                        {
+                            // A package that failed before installation may not need removal.
+                        }
+                        usePaddleGpu = false;
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Missing CUDA, an unsupported GPU, or a failed capability probe uses CPU PaddlePaddle.
+                usePaddleGpu = false;
+            }
+        }
+
+        if (!usePaddleGpu)
+        {
+            await SetStatusAsync("Installing PaddlePaddle CPU runtime…");
+            await RunProcessAsync(
+                python,
+                new[]
+                {
+                    "-m", "pip", "install",
+                    "--disable-pip-version-check",
+                    "--extra-index-url", PaddleCpuIndex,
+                    $"paddlepaddle=={PaddleVersion}",
+                },
+                appDirectory
+            );
+        }
+
+        await SetStatusAsync("Installing PaddleOCR recognition tools…");
+        await RunProcessAsync(
+            python,
+            new[]
+            {
+                "-m", "pip", "install",
+                "--disable-pip-version-check",
+                "--no-warn-script-location",
+                "-r", Path.Combine(appDirectory, "requirements-ocr-paddle.txt"),
+            },
+            appDirectory
+        );
+
+        await SetStatusAsync("Checking Python package consistency…");
+        await RunProcessAsync(
+            python,
+            new[] { "-m", "pip", "check" },
+            appDirectory
+        );
+
+        await SetStatusAsync("Verifying the PaddleOCR runtime…");
+        string verification = await RunProcessAsync(
+            python,
+            new[]
+            {
+                "-c",
+                "import paddle, paddleocr; paddle.utils.run_check(); " +
+                "print('PADDLE_OCR_READY=' + paddle.__version__)",
+            },
+            appDirectory
+        );
+        if (!verification.Contains("PADDLE_OCR_READY=", StringComparison.Ordinal))
+            throw new InvalidOperationException("PaddleOCR did not pass its runtime verification.");
+
+        return usePaddleGpu ? "cuda-12.6" : "cpu";
     }
 
     private async Task InstallTorchAsync(string python, string indexUrl)

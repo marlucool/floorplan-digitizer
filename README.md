@@ -2,11 +2,11 @@
 
 Planline is a local-first project for turning scanned or hand-drawn 2D floor plans into **editable, dimensionally constrained CAD geometry**.
 
-> **Desktop UI preview:** [Open the current drawing workspace](https://marlucool.github.io/floorplan-digitizer/). This is a static browser preview of the desktop UI with illustrative sample data; OCR, model inference, uploads and backend operations are disabled.
+> **Desktop UI preview:** [Open the current drawing workspace](https://marlucool.github.io/floorplan-digitizer/). This static preview uses illustrative sample data; OCR, model inference, uploads and backend operations are disabled. The repository owner must enable **Settings → Pages → Build and deployment → GitHub Actions** once before the site can publish.
 
 The important problem is not tracing pixels. Survey drawings can be skewed, faded, low-resolution, or drawn approximately rather than to scale. Planline is being developed to read written dimensions, relate them to the correct parts of the drawing, detect contradictions, and keep uncertain results in a human review workflow.
 
-> **Current status: drawing review plus OCR Studio workbench.** The local app now includes a crop editor, verified-label library, source/writer-safe dataset splits, background PP-OCRv5 fine-tuning jobs and held-out benchmark reporting. The desktop app opens the drawing workspace first; OCR Studio is available from the global navigation at `/ocr`, and application settings and GitHub release updates are available at `/settings`. The drawing-analysis workflow ranks geometric candidates linking dimension-value regions to dimension lines and wall spans, with explicit human confirmation. Local PaddleOCR can provide optional, unverified suggestions in Drawing. Manual two-point scale calibration and user-authored wall/room geometry are available, including SVG and DXF export. Automatic dimension-driven measured reconstruction and verified CAD export are not implemented.
+> **Current status: drawing review plus OCR Studio workbench.** The local app now includes a crop editor, verified-label library, source/writer-safe dataset splits, background PP-OCRv5 fine-tuning jobs and held-out benchmark reporting. The desktop app opens the drawing workspace first; OCR Studio is available from the global navigation at `/ocr`, and application settings and GitHub release updates are available at `/settings`. The drawing-analysis workflow ranks geometric candidates linking dimension-value regions to dimension lines and wall spans, with explicit human confirmation. The Windows installer provisions PaddlePaddle and PaddleOCR in Planline's private Python runtime; local recognition remains optional and every suggestion remains unverified until reviewed. Manual two-point scale calibration and user-authored wall/room geometry are available, including SVG and DXF export. Automatic dimension-driven measured reconstruction and verified CAD export are not implemented.
 
 ![Example survey drawing](docs/rysunek.png)
 
@@ -63,16 +63,16 @@ A detector score is **not** OCR confidence or a probability that a measurement i
 
 1. Open the repository's [Releases page](https://github.com/marlucool/floorplan-digitizer/releases). Download Planline-Setup.exe from the latest Planline release.
 2. Double-click the installer. Choose the installation folder and NVIDIA GPU or CPU mode, then select **Install Planline**.
-3. The installer downloads a private Python runtime, installs the application dependencies and WebView2 when needed, checks CUDA, and creates the Start-menu and optional desktop shortcuts.
+3. The installer downloads a private Python runtime, installs the application and PaddleOCR dependencies, selects a compatible Paddle CPU/GPU wheel, installs WebView2 when needed, checks the runtimes, and creates the Start-menu and optional desktop shortcuts.
 4. Open **Planline** from the shortcut. The app launches its local service automatically and opens the desktop workspace.
 
-No system Python, package installation commands, PATH edits, or administrator account are required. The Settings → Updates page checks the latest stable GitHub Release and can verify, download and install its Windows installer. Updates keep the private Python and CPU/CUDA runtime in place. The installer does not silently install or replace NVIDIA display drivers. If CUDA cannot initialise, it installs the CPU runtime instead.
+No system Python, package installation commands, PATH edits, or administrator account are required. The Settings → Updates page checks the latest stable GitHub Release and can verify, download and install its Windows installer. Updates keep the private Python, PyTorch and PaddleOCR runtimes in place. The installer does not silently install or replace NVIDIA display drivers. If CUDA cannot initialise, it installs the CPU runtime instead.
 
 The installer is built automatically by the Windows installer workflow. Until the first tagged release is published, its test build is available from the repository's **Actions → Windows installer → Planline-Setup-windows-x64** artifact.
 
 Your OCR crops and labels are kept outside the application folder at %LOCALAPPDATA%/Planline/ocr. Normal updates and uninstalling Planline keep this data; the uninstaller asks separately before deleting it.
 
-**OCR training note:** the initial installer includes the desktop app and detector runtime. The optional PaddlePaddle/PaddleOCR fine-tuning environment is not yet provisioned by this installer. It needs a separate compatible runtime and checkpoint, so the next step is an in-app training setup wizard; this is not something you should have to install manually.
+**OCR training note:** the Windows installer provisions PaddlePaddle and PaddleOCR automatically. OCR Studio can also download the pinned PaddleOCR v3.3.1 source checkout and the matching official mobile/server pretrained checkpoint; you no longer need to locate those files manually.
 
 ## Run from source (development only)
 

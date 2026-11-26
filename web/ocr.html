@@ -69,13 +69,16 @@
         <div class="training-heading"><div><p class="eyebrow">04 / MODEL TRAINING</p><h2>Fine-tune the dimension recogniser</h2><p>Start from an official PaddleOCR recognition checkpoint, then fine-tune on your verified crop labels. The held-out test group is kept out of training.</p></div><div class="training-readiness" id="trainingReadiness">Collecting labelled crops</div></div>
         <p id="ocrDependencyNote" class="studio-hint dependency-note">Checking local OCR dependencies…</p>
         <div class="training-settings">
-          <label>PaddleOCR source folder<input id="paddleSourcePath" type="text" spellcheck="false" placeholder="C:\\AI\\PaddleOCR"></label>
-          <label>Pretrained checkpoint (.pdparams)<input id="pretrainedPath" type="text" spellcheck="false" placeholder="C:\\AI\\PP-OCRv5_mobile_rec_pretrained.pdparams"></label>
-          <div class="training-links"><a href="https://github.com/PaddlePaddle/PaddleOCR" target="_blank" rel="noreferrer">PaddleOCR source ↗</a><a href="https://paddle-model-ecology.bj.bcebos.com/paddlex/official_pretrained_model/PP-OCRv5_mobile_rec_pretrained.pdparams" target="_blank" rel="noreferrer">Mobile weights ↗</a><a href="https://paddle-model-ecology.bj.bcebos.com/paddlex/official_pretrained_model/PP-OCRv5_server_rec_pretrained.pdparams" target="_blank" rel="noreferrer">Server weights ↗</a><a href="https://www.paddleocr.ai/latest/en/version3.x/installation.html" target="_blank" rel="noreferrer">Paddle install guide ↗</a></div>
+          <input id="paddleSourcePath" type="hidden">
+          <input id="pretrainedPath" type="hidden">
+          <div class="training-assets">
+            <button id="prepareTrainingAssetsButton" class="toolbar-button" type="button">Prepare official training files</button>
+            <p id="trainingAssetsStatus" class="studio-hint">Planline will download the pinned PaddleOCR source and matching pretrained weights automatically.</p>
+          </div>
           <label>Base recogniser<select id="modelVariant"><option value="mobile">PP-OCRv5 mobile · recommended for 11 GB GPUs</option><option value="server">PP-OCRv5 server · higher memory use</option></select></label>
           <label>Epochs<input id="trainingEpochs" type="number" min="1" max="500" value="30"></label>
           <label>Batch size<input id="trainingBatch" type="number" min="1" max="32" step="1" value="8"></label>
-          <label class="gpu-toggle"><input id="useGpu" type="checkbox" checked> Use NVIDIA GPU</label>
+          <label class="gpu-toggle"><input id="useGpu" type="checkbox" disabled> Use Paddle GPU</label><p id="gpuAvailabilityNote" class="studio-hint">Checking PaddlePaddle GPU support…</p>
         </div>
         <label class="saved-model-select">Fine-tuned model<select id="trainedModelSelect"><option value="">Select an exported fine-tuned model</option></select></label>
         <div class="training-actions"><button id="auditDatasetButton" class="toolbar-button" type="button">Audit dataset quality</button><button id="buildSplitsButton" class="toolbar-button" type="button">Build drawing-safe splits</button><button id="trainButton" class="primary-button" type="button" disabled>Start fine-tuning <span>→</span></button><button id="benchmarkBaseButton" class="toolbar-button" type="button" disabled>Benchmark base OCR</button><button id="benchmarkTrainedButton" class="toolbar-button" type="button" disabled>Benchmark trained model</button><button id="cancelJobButton" class="toolbar-button danger-button hidden" type="button">Cancel job</button></div>
