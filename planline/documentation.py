@@ -93,7 +93,7 @@ def discover_documents(docs_root: Path) -> list[dict[str, Any]]:
 
 
 def _page_path(path: str) -> str:
-    return f"documentation/{path}.html"
+    return f"documentation/{quote(path, safe='/')}.html"
 
 
 def _rewrite_markdown_links(
@@ -127,7 +127,7 @@ def _rewrite_markdown_links(
         if _kind(target) == "markdown":
             destination = _page_path(target)
         else:
-            destination = f"docs/{target}"
+            destination = f"docs/{quote(target, safe='/')}"
 
         if static_site:
             link = posixpath.relpath(destination, posixpath.dirname(current_output_path) or ".")
@@ -387,7 +387,7 @@ def render_document_page(
         toc_html = _render_toc(parser.toc)
     elif kind == "image":
         mime = mimetypes.guess_type(path)[0] or "application/octet-stream"
-        raw_href = f"docs/{path}" if static_site else f"/docs/{quote(path, safe='/')}"
+        raw_href = f"docs/{quote(path, safe='/')}" if static_site else f"/docs/{quote(path, safe='/')}"
         if static_site:
             raw_href = posixpath.relpath(raw_href, posixpath.dirname(current_output_path) or ".")
         body_content = (
