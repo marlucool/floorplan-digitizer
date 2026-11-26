@@ -5,7 +5,7 @@ The original CLI used a useful gap model: sort parallel walls, examine the
 spaces between them, and relate dimension-text centres to those spaces. This
 module retains that geometric idea but makes it local to each dimension line,
 uses wall-box faces instead of wall centres, checks perpendicular overlap,
-and globally assigns each detected dimension line to at most one text box.
+and globally assigns each candidate wall gap to at most one text label while allowing a dimension line to be shared by chained labels.
 
 All scores are relative candidate rankings, never probabilities. No candidate
 is confirmed here and no pixel-to-unit scale is inferred.

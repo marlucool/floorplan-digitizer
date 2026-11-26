@@ -5,13 +5,14 @@ The Windows installer is a native, single-file WinForms application. Setup displ
 ## What the installer does
 
 1. Offers an installation folder and detects a supported NVIDIA driver.
-2. Downloads the official Python 3.14.10 x64 installer and verifies its SHA-256 before use.
+2. Downloads the official Python 3.13.17 x64 installer and verifies its SHA-256 before use.
 3. Installs Python privately under the selected Planline directory. It does not modify PATH or replace another Python installation.
 4. Installs Microsoft Edge WebView2 if it is not already present.
 5. Extracts the exact Planline source snapshot embedded in the setup executable.
 6. Installs PyTorch 2.10.0 with CUDA 12.6 when selected, verifies that CUDA can actually initialise, and falls back to the CPU build if the GPU runtime is unavailable.
-7. Installs the remaining app requirements and performs an import smoke test.
-8. Creates Start-menu and optional desktop shortcuts, plus a per-user Windows uninstall entry.
+7. Installs the application requirements, including the shared Markdown page renderer.
+8. Installs PaddlePaddle and the pinned PaddleOCR 3.3.1 recognition runtime. The installer selects a compatible CPU/GPU runtime and verifies PaddleOCR initialisation.
+9. Performs an import/runtime smoke test, then creates Start-menu and optional desktop shortcuts plus a per-user Windows uninstall entry.
 
 The installer does not request administrator privileges. NVIDIA drivers are supplied by the computer manufacturer / NVIDIA and are not silently changed by Planline.
 
@@ -29,11 +30,13 @@ This keeps crop images, labels, split files and training outputs outside the app
 
 Source/development runs without PLANLINE_DATA_DIR continue using the repository's ignored datasets/ocr directory.
 
-## OCR training runtime status
+## OCR training assets and evaluation
 
-The first Windows installer installs the desktop app, drawing detector, and the normal application dependencies. It does **not** currently install the optional PaddlePaddle/PaddleOCR training stack. PaddlePaddle's supported Windows Python range does not yet include the Python 3.14 runtime used by this base installer. Training needs a separately managed compatible environment, PaddleOCR source checkout and matching pretrained checkpoint. The next installer phase should provision and validate that environment through an in-app setup screen, without requiring terminal commands.
+The installer includes the PaddlePaddle runtime and pinned PaddleOCR 3.3.1 recognition package used by the optional local OCR feature. The Drawing workspace can use this recogniser for suggestions; every prediction remains unverified until a person checks it against the source crop.
 
-Do not present the current installer as proof that fine-tuning has been run successfully. The training orchestration exists, but the actual GPU training and export still need a real environment test.
+Training assets are larger and are **not bundled in the installer**. When requested from OCR Studio, Planline downloads the matching PaddleOCR v3.3.1 source checkout and official PP-OCRv5 mobile/server pretrained checkpoint into the local OCR data directory. Training jobs can also prepare these assets automatically when no explicit paths are supplied.
+
+Training orchestration and asset provisioning are implemented, but a successful training run is not guaranteed by installation. It still depends on a compatible local PaddlePaddle environment, a rights-cleared and representative dataset, and a properly grouped held-out evaluation set. Do not present the installer smoke test as evidence that a Planline-specific recogniser has been trained or validated.
 
 ## Build and distribution
 

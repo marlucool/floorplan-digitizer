@@ -106,6 +106,16 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     expect(page.locator("#updateTitle")).to_have_text("Updates disabled in static preview")
                     expect(page.locator("#currentVersion")).to_have_text("Unavailable in preview")
 
+                    # The architecture document is a real, navigable page. The
+                    # historical .md URL remains usable as a directory index.
+                    page.goto(url + "architecture.md", wait_until="domcontentloaded")
+                    expect(page.locator("h1").first).to_contain_text("Planline architecture")
+                    expect(page.locator(".architecture-toc")).to_be_visible()
+                    expect(page.get_by_role("link", name="View Markdown source")).to_be_visible()
+                    expect(page.locator("html")).to_have_attribute("data-theme", "dark")
+                    assert page.locator(".architecture-prose h2").count() > 5
+
+
                     assert not api_requests, f"The static preview attempted backend requests: {api_requests}"
                 finally:
                     browser.close()

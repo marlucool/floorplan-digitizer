@@ -74,7 +74,7 @@ The Drawing workspace can export user-authored wall segments and closed room out
 - `POST /api/analyze` — candidate-region detection for one uploaded file. Optional multipart field `confidence_threshold` defaults to `0.25` and must be in `(0, 1]`; the UI exposes a narrower `0.05–0.80` range.
 - `POST /api/validate-dimension-chain` — arithmetic check for explicitly supplied dimension values and verification flags. This does not run OCR or associate dimensions with walls.
 - `GET /docs` — interactive FastAPI/OpenAPI documentation.
-- `GET /architecture` — the project architecture, research findings and implementation roadmap.
+- `GET /architecture` — renders the maintained architecture, implementation status, research findings and roadmap as a themed HTML page.
 
 
 ### Candidate review JSON
