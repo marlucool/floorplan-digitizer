@@ -255,6 +255,22 @@ def _page_shell(
     }})();
   </script>
   <script src="{asset_prefix}theme.js" defer></script>
+  <script>
+    (() => {{
+      const root = document.documentElement;
+      const syncOffset = () => {{
+        const header = document.querySelector(".topbar");
+        if (!header) return;
+        root.style.setProperty("--docs-anchor-offset", Math.ceil(header.getBoundingClientRect().height + 16) + "px");
+      }};
+      document.addEventListener("DOMContentLoaded", () => {{
+        syncOffset();
+        const header = document.querySelector(".topbar");
+        if (header && "ResizeObserver" in window) new ResizeObserver(syncOffset).observe(header);
+      }}, {{ once: true }});
+      window.addEventListener("resize", syncOffset, {{ passive: true }});
+    }})();
+  </script>
 </head>
 <body class="documentation-page">
 {_navigation(home_href=home_href, drawing_href=drawing_href, ocr_href=ocr_href, settings_href=settings_href, documentation_href=documentation_href)}
