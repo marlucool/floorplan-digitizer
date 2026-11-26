@@ -565,7 +565,7 @@ html[data-theme="dark"] .theme-toggle{background:#252d26;border-color:var(--line
   display:grid;grid-template-columns:250px minmax(0,880px);gap:clamp(28px,5vw,72px);align-items:start
 }
 .architecture-sidebar{
-  position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;
+  position:sticky;top:var(--docs-anchor-offset, 120px);max-height:calc(100vh - var(--docs-anchor-offset, 120px) - 20px);overflow:auto;
   padding:18px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface,#202620)
 }
 .architecture-sidebar .eyebrow{margin:0 0 14px}
