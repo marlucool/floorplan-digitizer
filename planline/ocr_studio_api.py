@@ -283,7 +283,7 @@ def get_training_assets(model_variant: str = "mobile") -> dict[str, Any]:
 def prepare_training_assets(request: TrainingAssetsRequest) -> dict[str, Any]:
     try:
         return ensure_training_assets(request.model_variant)
-    except (OSError, ValueError, zipfile.BadZipFile) as exc:
+    except Exception as exc:
         raise HTTPException(
             status_code=502,
             detail=f"Could not prepare official PaddleOCR training assets: {exc}",
@@ -566,7 +566,7 @@ def start_ocr_training(dataset_id: str, request: StartTrainingRequest) -> dict[s
             assets = ensure_training_assets(request.model_variant)
             paddleocr_dir = Path(assets["paddleocr_dir"])
             pretrained_model = Path(assets["pretrained_model"])
-    except (OSError, ValueError, zipfile.BadZipFile) as exc:
+    except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Could not prepare official PaddleOCR training assets: {exc}") from exc
 
     dataset_dir = _dataset_dir(dataset_id)
