@@ -64,6 +64,21 @@ def test_wall_dimension_comparison_accepts_full_precision_scale_values() -> None
     assert result["geometry_modified"] is False
 
 
+def test_wall_dimension_comparison_handles_extreme_valid_decimal_ranges() -> None:
+    # All values satisfy the API schema. The percentage result needs more than
+    # Decimal's default 28-digit context when the verified dimension is tiny.
+    result = compare_wall_dimension(WallDimensionCheckRequest(
+        wall_length_px="9999999999.99999999999999999999",
+        pixels_per_mm="0.000000000001",
+        dimension_mm="0.00000001",
+        tolerance_percent="1",
+    ))
+    assert result["status"] == "mismatch"
+    assert result["measured_length_mm"].startswith("9999999999999999999999")
+    assert result["difference_percent"].startswith("999999999999999999999999999999")
+    assert result["geometry_modified"] is False
+
+
 def test_wall_dimension_endpoint_returns_review_only_result() -> None:
     response = TestClient(app).post(
         "/api/validate-wall-dimension",
