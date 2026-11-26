@@ -8,7 +8,7 @@ import pytest
 from planline import updater
 
 
-def release(version: str = "0.1.2") -> dict:
+def release(version: str = "0.1.3") -> dict:
     base = "https://github.com/marlucool/floorplan-digitizer/releases/download/planline-v" + version
     return {
         "tag_name": "planline-v" + version,
@@ -24,13 +24,19 @@ def release(version: str = "0.1.2") -> dict:
     }
 
 
+def test_application_version_matches_windows_installer_version() -> None:
+    root = Path(__file__).resolve().parents[1]
+    project = (root / "packaging" / "windows" / "Planline.Setup.csproj").read_text(encoding="utf-8")
+    assert f"<Version>{updater.__version__}</Version>" in project
+
+
 def test_release_check_detects_newer_verified_installer(monkeypatch: pytest.MonkeyPatch) -> None:
     payload = json.dumps(release()).encode("utf-8")
     monkeypatch.setattr(updater, "_read_url", lambda _url, **_kwargs: payload)
     result = updater.fetch_latest_release()
     assert result["status"] == "update_available"
     assert result["current_version"] == updater.__version__
-    assert result["latest_version"] == "0.1.2"
+    assert result["latest_version"] == "0.1.3"
     assert result["install_available"] is True
     assert result["release_notes"] == "Update notes"
 
