@@ -6,6 +6,9 @@ on:
       - feature/desktop-ocr-studio
     tags:
       - "planline-v*"
+  release:
+    types:
+      - published
   pull_request:
     branches:
       - main
