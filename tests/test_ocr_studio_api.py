@@ -65,6 +65,43 @@ def test_local_ocr_studio_dataset_and_annotation_routes(tmp_path: Path, monkeypa
     assert deleted.json()["dataset"]["summary"]["samples"] == 2
 
 
+def test_malformed_split_metadata_does_not_break_dataset_views(
+    tmp_path: Path, monkeypatch
+) -> None:
+    root = tmp_path / "ocr"
+    monkeypatch.setattr(ocr_studio_api, "OCR_DATASET_ROOT", root)
+    app = FastAPI()
+    app.include_router(ocr_studio_api.router)
+    client = TestClient(app)
+
+    created = client.post("/api/ocr/datasets", json={"name": "split recovery"})
+    assert created.status_code == 201
+    dataset_id = created.json()["dataset_id"]
+    added = client.post(
+        f"/api/ocr/datasets/{dataset_id}/samples",
+        files={"file": ("crop.png", _png(), "image/png")},
+        data={
+            "text": "4200 mm",
+            "source_id": "plan-1",
+            "writer_id": "writer-1",
+            "verified": "true",
+        },
+    )
+    assert added.status_code == 201, added.text
+
+    (root / dataset_id / ocr_studio_api.SPLITS_NAME).write_text("[]", encoding="utf-8")
+
+    detail = client.get(f"/api/ocr/datasets/{dataset_id}")
+    listing = client.get("/api/ocr/datasets")
+    assert detail.status_code == 200, detail.text
+    assert listing.status_code == 200, listing.text
+    summary = detail.json()["summary"]
+    assert summary["valid"] is False
+    assert summary["split_error"] == "splits.json must contain a JSON object."
+    assert detail.json()["samples"][0]["split"] is None
+    assert listing.json()["datasets"][0]["summary"]["valid"] is False
+
+
 def test_local_ocr_studio_requires_verified_labels(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(ocr_studio_api, "OCR_DATASET_ROOT", tmp_path / "ocr")
     app = FastAPI(); app.include_router(ocr_studio_api.router)
