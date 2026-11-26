@@ -4,9 +4,15 @@ from __future__ import annotations
 import argparse
 import re
 import shutil
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from planline.architecture import render_architecture_page
+
 WEB = ROOT / "web"
 
 # The public site and every PR preview enter through index.html (the dashboard).
@@ -22,7 +28,7 @@ ROUTES = {
     "/drawing": "drawing.html",
     "/ocr": "ocr.html",
     "/settings": "settings.html",
-    "/architecture": "architecture.md",
+    "/architecture": "architecture.html",
 }
 SHARED_ASSETS = ("preview.js", "demo-floorplan.svg")
 
@@ -117,8 +123,44 @@ def build_preview(output_dir: Path) -> Path:
             raise RuntimeError(f"Page references a missing UI asset: web/{asset}")
 
     docs = ROOT / "docs" / "PLANLINE_ARCHITECTURE.md"
-    if docs.is_file():
-        shutil.copy2(docs, output_dir / "architecture.md")
+    if not docs.is_file():
+        raise RuntimeError("Required architecture notes are missing: docs/PLANLINE_ARCHITECTURE.md")
+
+    source = docs.read_text(encoding="utf-8")
+    (output_dir / "architecture-source.md").write_text(source, encoding="utf-8")
+
+    # The human-readable viewer is the primary page. Keep the historical
+    # /architecture.md URL working as a directory index as well; static hosts
+    # redirect that path to architecture.md/ and serve this index.html.
+    (output_dir / "architecture.html").write_text(
+        render_architecture_page(
+            source,
+            asset_prefix="",
+            home_href="index.html",
+            drawing_href="drawing.html",
+            ocr_href="ocr.html",
+            settings_href="settings.html",
+            architecture_href="architecture.html",
+            source_href="architecture-source.md",
+        ),
+        encoding="utf-8",
+    )
+
+    legacy_viewer = output_dir / "architecture.md"
+    legacy_viewer.mkdir()
+    (legacy_viewer / "index.html").write_text(
+        render_architecture_page(
+            source,
+            asset_prefix="../",
+            home_href="../index.html",
+            drawing_href="../drawing.html",
+            ocr_href="../ocr.html",
+            settings_href="../settings.html",
+            architecture_href="../architecture.html",
+            source_href="../architecture-source.md",
+        ),
+        encoding="utf-8",
+    )
 
     (output_dir / ".nojekyll").write_text("", encoding="utf-8")
     print(f"Included {page_count} workspace page(s); index.html is the dashboard.")
