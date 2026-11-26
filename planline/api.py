@@ -491,7 +491,8 @@ async def analyze_drawing(
 
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(WEB_DIR / "index.html")
+    """Open the dashboard as the single application entry point."""
+    return FileResponse(WEB_DIR / "dashboard.html")
 
 
 @app.get("/dashboard", response_class=FileResponse)
