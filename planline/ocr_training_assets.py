@@ -71,10 +71,18 @@ def training_assets_status(model_variant: str = "mobile", *, root: Path | None =
     }
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _download_atomic(url: str, destination: Path, *, max_bytes: int) -> str:
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.is_file() and _MIN_ASSET_BYTES <= destination.stat().st_size <= max_bytes:
-        return hashlib.sha256(destination.read_bytes()).hexdigest()
+        return _sha256_file(destination)
 
     temporary = destination.with_name(destination.name + f".{os.getpid()}.part")
     temporary.unlink(missing_ok=True)
@@ -102,7 +110,7 @@ def _download_atomic(url: str, destination: Path, *, max_bytes: int) -> str:
                     output.write(chunk)
         if total < _MIN_ASSET_BYTES:
             raise OSError(f"Downloaded asset is unexpectedly small ({total} bytes): {url}")
-        digest = hashlib.sha256(temporary.read_bytes()).hexdigest()
+        digest = _sha256_file(temporary)
         os.replace(temporary, destination)
         return digest
     except Exception:
@@ -166,9 +174,20 @@ def ensure_training_assets(
     paths = _paths(root or training_assets_root(), model_variant)
     with _PROVISION_LOCK:
         paths["root"].mkdir(parents=True, exist_ok=True)
+        source_archive_sha256 = None
         if not (paths["source_dir"] / "tools" / "train.py").is_file() or not paths["config_path"].is_file():
-            _download_atomic(SOURCE_URL, paths["archive_path"], max_bytes=_MAX_SOURCE_BYTES)
-            _extract_paddleocr_source(paths["archive_path"], paths["source_dir"])
+            source_archive_sha256 = _download_atomic(
+                SOURCE_URL, paths["archive_path"], max_bytes=_MAX_SOURCE_BYTES
+            )
+            try:
+                _extract_paddleocr_source(paths["archive_path"], paths["source_dir"])
+            except zipfile.BadZipFile:
+                # A truncated cached archive must not poison every future retry.
+                paths["archive_path"].unlink(missing_ok=True)
+                source_archive_sha256 = _download_atomic(
+                    SOURCE_URL, paths["archive_path"], max_bytes=_MAX_SOURCE_BYTES
+                )
+                _extract_paddleocr_source(paths["archive_path"], paths["source_dir"])
 
         weight_url = f"{WEIGHT_BASE_URL}/PP-OCRv5_{model_variant}_rec_pretrained.pdparams"
         _download_atomic(weight_url, paths["weights_path"], max_bytes=_MAX_WEIGHT_BYTES)
@@ -186,7 +205,8 @@ def ensure_training_assets(
             "paddleocr_dir": status["paddleocr_dir"],
             "config_path": status["config_path"],
             "pretrained_model": status["pretrained_model"],
-            "weights_sha256": hashlib.sha256(paths["weights_path"].read_bytes()).hexdigest(),
+            "source_archive_sha256": source_archive_sha256,
+            "weights_sha256": _sha256_file(paths["weights_path"]),
         }
         manifest_path = paths["root"] / "asset_manifest.json"
         manifest_path.write_text(
