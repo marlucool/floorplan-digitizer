@@ -37,6 +37,7 @@ def test_preview_contains_every_workspace_and_uses_one_stylesheet(tmp_path: Path
     legacy_architecture = (output / "architecture.md" / "index.html").read_text(encoding="utf-8")
     assert '<article class="documentation-article">' in architecture
     assert '<nav class="documentation-toc"' in architecture
+    assert 'href="documentation/index.html"' in architecture
     assert 'href="styles.css"' in architecture
     assert 'src="theme.js" defer' in architecture
     assert 'href="../styles.css"' in legacy_architecture
@@ -83,7 +84,6 @@ def test_preview_navigation_opens_dashboard_and_keeps_pages_separate(tmp_path: P
     assert 'href="drawing.html"' in dashboard
     assert 'href="ocr.html"' in dashboard
     assert 'href="settings.html"' in dashboard
-    assert 'href="documentation/index.html"' in architecture
 
     for page, app_script in ((drawing, "app.js"), (ocr, "ocr-studio.js"), (settings, "settings.js")):
         assert 'href="index.html"' in page
