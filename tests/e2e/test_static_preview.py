@@ -61,8 +61,16 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                         if "/api/" in request.url
                         else None,
                     )
+                    page.add_init_script("localStorage.setItem('planline-theme', 'light');")
                     page.goto(url, wait_until="domcontentloaded")
                     expect(page.locator("h1").first).to_contain_text("Your floor-plan")
+                    expect(page.locator("html")).to_have_attribute("data-theme", "dark")
+                    theme_toggle = page.locator("#themeToggle")
+                    expect(theme_toggle).to_be_visible()
+                    theme_toggle.click()
+                    expect(page.locator("html")).to_have_attribute("data-theme", "light")
+                    theme_toggle.click()
+                    expect(page.locator("html")).to_have_attribute("data-theme", "dark")
                     expect(page.locator("#healthTitle")).to_have_text("Static preview")
                     expect(page.locator("#healthDetails")).to_contain_text("Backend services are disabled")
                     expect(page.locator("#refreshHealth")).to_be_hidden()
@@ -72,6 +80,7 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     expect(page.locator('.top-links a[href="drawing.html"]')).to_be_visible()
 
                     page.goto(url + "drawing.html", wait_until="domcontentloaded")
+                    expect(page.locator("html")).to_have_attribute("data-theme", "dark")
                     expect(page.locator("#resultStatus")).to_have_text("DETECTION COMPLETE", timeout=15000)
                     expect(page.locator("#apiStatus")).to_contain_text("Static UI preview")
                     expect(page.locator("#detectionList .detection-row")).to_have_count(11)
@@ -86,11 +95,13 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     )
 
                     page.goto(url + "ocr.html", wait_until="domcontentloaded")
+                    expect(page.locator("html")).to_have_attribute("data-theme", "dark")
                     expect(page.locator("h1").first).to_be_visible()
                     expect(page.locator("#apiStatus")).to_contain_text("Static OCR preview")
                     expect(page.locator("#annotationMessage")).to_contain_text("disabled in this static preview")
 
                     page.goto(url + "settings.html", wait_until="domcontentloaded")
+                    expect(page.locator("html")).to_have_attribute("data-theme", "dark")
                     expect(page.locator("h1").first).to_be_visible()
                     expect(page.locator("#updateTitle")).to_have_text("Updates disabled in static preview")
                     expect(page.locator("#currentVersion")).to_have_text("Unavailable in preview")

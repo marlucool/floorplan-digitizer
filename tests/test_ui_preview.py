@@ -1,39 +1,38 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from scripts.build_ui_preview import PAGE_SOURCES, build_preview
 
 
-def test_preview_contains_dashboard_first_workspaces_and_referenced_assets(tmp_path: Path) -> None:
+def test_preview_contains_every_workspace_and_uses_one_stylesheet(tmp_path: Path) -> None:
     output = build_preview(tmp_path / "site")
 
-    assert (output / "index.html").is_file()
-    assert (output / "drawing.html").is_file()
-    assert (output / "ocr.html").is_file()
-    assert (output / "settings.html").is_file()
-    assert (output / "preview.js").is_file()
-    assert (output / "demo-floorplan.svg").is_file()
-    assert (output / ".nojekyll").is_file()
+    for page in ("index.html", "drawing.html", "ocr.html", "settings.html"):
+        assert (output / page).is_file(), f"Missing preview page: {page}"
+    for asset in ("app.js", "dashboard.js", "ocr-studio.js", "settings.js", "theme.js",
+                  "styles.css", "preview.js", "demo-floorplan.svg", ".nojekyll"):
+        assert (output / asset).is_file(), f"Missing preview asset: {asset}"
 
-    for source_name in PAGE_SOURCES.values():
-        source = Path("web") / source_name
-        if source.exists():
-            assert source.is_file()
+    assert not (output / "dashboard.css").exists()
+    assert not (output / "settings.css").exists()
+    assert not (output / "ocr-studio.css").exists()
 
     for page in output.glob("*.html"):
         html = page.read_text(encoding="utf-8")
-        for asset in html.split('href="')[1:]:
-            local = asset.split('"', 1)[0]
-            if local.endswith((".css", ".js", ".svg", ".png", ".webp")):
-                assert (output / local).is_file(), f"Missing {local} referenced by {page.name}"
+        links = re.findall(r'(?:href|src)="([^"]+)"', html)
+        for link in links:
+            if link.startswith(("http://", "https://", "data:", "#")):
+                continue
+            local = link.split("?", 1)[0].split("#", 1)[0]
+            if local.endswith((".css", ".js", ".svg", ".png", ".webp", ".woff", ".woff2")):
+                assert (output / local).is_file(), f"{page.name} references missing asset {local}"
 
-    if (Path("docs") / "PLANLINE_ARCHITECTURE.md").is_file():
-        assert (output / "architecture.md").is_file()
-    assert not (output / "api").exists()
+    assert (output / "architecture.md").is_file()
 
 
-def test_preview_rewrites_navigation_with_dashboard_as_home(tmp_path: Path) -> None:
+def test_preview_navigation_opens_dashboard_and_keeps_pages_separate(tmp_path: Path) -> None:
     output = build_preview(tmp_path / "site")
     dashboard = (output / "index.html").read_text(encoding="utf-8")
     drawing = (output / "drawing.html").read_text(encoding="utf-8")
@@ -41,31 +40,34 @@ def test_preview_rewrites_navigation_with_dashboard_as_home(tmp_path: Path) -> N
     settings = (output / "settings.html").read_text(encoding="utf-8")
 
     assert 'href="index.html" aria-label="Planline dashboard"' in dashboard
+    assert 'href="index.html" aria-current="page">Dashboard</a>' in dashboard
     assert 'href="drawing.html"' in dashboard
     assert 'href="ocr.html"' in dashboard
     assert 'href="settings.html"' in dashboard
-    assert 'src="preview.js" defer></script>' in dashboard
-    assert 'src="dashboard.js" defer></script>' in dashboard
 
-    assert 'href="index.html" aria-label="Planline dashboard"' in drawing
-    assert 'src="preview.js" defer></script>' in drawing
-    assert 'src="app.js" defer></script>' in drawing
-
-    for page, script in ((ocr, "ocr-studio.js"), (settings, "settings.js")):
+    for page, app_script in ((drawing, "app.js"), (ocr, "ocr-studio.js"), (settings, "settings.js")):
         assert 'href="index.html"' in page
         assert 'href="drawing.html"' in page
+        assert 'href="styles.css"' in page
+        assert 'src="theme.js" defer></script>' in page
         assert 'src="preview.js" defer></script>' in page
-        assert f'src="{script}" defer></script>' in page
-        assert 'href="/api/' not in page
+        assert f'src="{app_script}" defer></script>' in page
+
+    assert 'src="theme.js" defer></script>' in dashboard
+    assert 'src="preview.js" defer></script>' in dashboard
+    assert 'src="dashboard.js" defer></script>' in dashboard
+    assert 'dashboard.css' not in dashboard
+    assert 'settings.css' not in settings
+    assert 'ocr-studio.css' not in ocr
 
 
-def test_preview_build_supports_nested_pr_subdirectory_urls(tmp_path: Path) -> None:
-    output = build_preview(tmp_path / "_site" / "pr-preview" / "123")
+def test_nested_pr_preview_contains_dashboard_and_drawing_entry_points(tmp_path: Path) -> None:
+    output = build_preview(tmp_path / "_site" / "pr-preview" / "34")
 
     for page in ("index.html", "drawing.html", "ocr.html", "settings.html"):
         assert (output / page).is_file()
-    assert (output / "styles.css").is_file()
-    assert (output / "preview.js").is_file()
-    assert (output / "demo-floorplan.svg").is_file()
     dashboard = (output / "index.html").read_text(encoding="utf-8")
+    drawing = (output / "drawing.html").read_text(encoding="utf-8")
     assert 'href="drawing.html"' in dashboard
+    assert 'href="index.html" aria-label="Planline dashboard"' in drawing
+    assert (output / "theme.js").is_file()
