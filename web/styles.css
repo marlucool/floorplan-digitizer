@@ -1332,3 +1332,24 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea {
   .studio-workflow { grid-template-columns:1fr;gap:7px;padding:11px; }
   .studio-workflow>a { padding:10px; }
 }
+
+
+/* OCR Studio: readable instructions and labels without flattening data density. */
+.studio-hero>p { font-size:15px;line-height:1.7; }
+.studio-card-heading { font-size:12px; }
+.studio-hint,.studio-upload small,.training-warning,.dependency-note,
+.studio-message,.training-assets p,.quality-warning,.quality-good {
+  font-size:13px;line-height:1.6;
+}
+.studio-form-fields>label,.training-settings>label { font-size:14px;line-height:1.5; }
+.studio-form-fields label small { display:block;margin-top:5px;font-size:12px;line-height:1.5; }
+.studio-upload strong { font-size:15px; }
+.dataset-stats>div strong { font-size:20px; }
+.dataset-stats>div span { font-size:11px; }
+.samples-toolbar h2,.training-heading h2 { font-size:clamp(20px,2vw,25px); }
+.training-heading>div>p:not(.eyebrow) { font-size:14px;line-height:1.6; }
+.training-readiness { font-size:13px;line-height:1.5; }
+@media(max-width:760px) {
+  .studio-hero>p { font-size:14px; }
+  .training-settings { gap:12px; }
+}
