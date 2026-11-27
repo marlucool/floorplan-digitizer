@@ -56,6 +56,9 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                         "detector_loaded": False,
                         "ocr_available": False,
                         "dimension_chain_validation_available": True,
+                        "dimension_association_available": True,
+                        "manual_geometry_available": True,
+                        "automatic_geometry_available": False,
                         "geometry_available": False,
                     }
                 ),
