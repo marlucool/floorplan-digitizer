@@ -261,6 +261,8 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             )
             page.locator("#zoomIn").click()
             assert page.locator("#zoomLevel").inner_text() == "125%"
+            page.locator("details.advanced-options > summary").click()
+            assert page.locator("#confidenceValue").inner_text() == "0.25"
             page.locator("#brightnessControl").evaluate("(element) => { element.value = String(20); element.dispatchEvent(new Event('input', { bubbles: true })); }")
             page.locator("#contrastControl").evaluate("(element) => { element.value = String(1.25); element.dispatchEvent(new Event('input', { bubbles: true })); }")
             page.locator("#confidenceThreshold").evaluate(
