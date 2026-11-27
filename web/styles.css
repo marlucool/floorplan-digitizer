@@ -1152,3 +1152,12 @@ html[data-theme="light"] {
   .training-actions { display:grid;grid-template-columns:1fr; }
   .training-actions>* { width:100%; }
 }
+
+
+/* Anchor navigation must account for the floating, sticky workspace header. */
+html { scroll-padding-top:112px; }
+:target { scroll-margin-top:112px; }
+@media(max-width:760px) {
+  html { scroll-padding-top:88px; }
+  :target { scroll-margin-top:88px; }
+}
