@@ -135,7 +135,7 @@
         <ol class="pipeline">
           <li class="complete"><span class="pipeline-num">01</span><span><b>Image import</b><small>Ready when a file is selected</small></span><i>●</i></li>
           <li id="detectStep"><span class="pipeline-num">02</span><span><b>Object detection</b><small>YOLO candidate regions</small></span><i>○</i></li>
-          <li><span class="pipeline-num">03</span><span><b>Dimension OCR</b><small>Optional local PaddleOCR suggestions · manual verification required</small></span><i>◇</i></li>
+          <li><span class="pipeline-num">03</span><span><b>Dimension OCR</b><small>Automatic local OCR when available · manual verification required</small></span><i>◇</i></li>
           <li><span class="pipeline-num">04</span><span><b>Dimension association</b><small>Ranked line and wall-span candidates · review required</small></span><i>◇</i></li>
           <li><span class="pipeline-num">05</span><span><b>Manual geometry export</b><small>User-drawn walls and rooms to SVG/DXF; no automatic measured reconstruction</small></span><i>◇</i></li>
         </ol>
@@ -161,7 +161,7 @@
       <details class="text-review hidden" id="dimensionTextReview">
         <summary><span class="eyebrow">03 / DIMENSIONS</span><strong>Read and verify dimensions <span class="summary-hint">OCR suggestions · line and wall matching</span></strong></summary>
         <div class="ocr-assist-controls">
-          <button id="runOcrButton" class="toolbar-button" type="button" disabled>Run OCR on candidates</button>
+          <button id="runOcrButton" class="toolbar-button" type="button" disabled>Run OCR again</button>
           <output id="ocrAssistStatus" aria-live="polite">Checking optional OCR runtime…</output>
           <details class="ocr-options">
             <summary>Recognition settings</summary>
@@ -186,7 +186,7 @@
             <output id="datasetCaptureStatus" aria-live="polite">Only individually verified crops are saved. The full drawing stays in the current workspace.</output>
           </section>
         </details>
-        <p class="dimension-interpreter-note">Check the number against its crop, interpret it, then mark it verified. Use a verified dimension to set scale in one step.</p>
+        <p class="dimension-interpreter-note">OCR reads each detected dimension and proposes its line and wall span. Check the text and match, then confirm them.</p>
         <div id="dimensionTextItems" class="dimension-text-items"></div>
       </details>
       <div class="limitations"><div class="limitation-mark">i</div><div><strong>Important: detection is not measurement.</strong><p>This workflow ranks dimension-value boxes against dimension-line boxes, then proposes wall pairs whose facing edges bracket each line. These are axis-aligned geometric hypotheses, not verified measurements or CAD geometry. OCR suggestions are optional and unverified; every character, selected line and wall pair must be checked against the source drawing.</p></div></div>
