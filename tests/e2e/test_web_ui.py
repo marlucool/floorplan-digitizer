@@ -271,6 +271,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                 "!document.querySelector('#overlay').classList.contains('hidden')"
             )
             page.wait_for_function("!document.querySelector('#runOcrButton').disabled")
+            page.locator(".ocr-options > summary").click()
             page.locator("#runOcrButton").click()
             page.wait_for_selector(".ocr-suggestion")
             assert "4,200 mm" in page.locator(".ocr-suggestion").inner_text()
@@ -415,6 +416,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert wall_check_request["pixels_per_mm"] > 0
             assert abs(wall_check_request["wall_length_px"] - 230.217) < 1
             assert wall_check_request["tolerance_percent"] == 1
+            page.locator(".dataset-capture-details > summary").click()
             page.locator("#drawingDatasetSelect").select_option("handwritten-dimensions")
             page.locator("#drawingSourceId").fill("plan-01")
             page.locator("#drawingWriterId").fill("writer-a")
@@ -426,6 +428,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert "handwritten" in crop_saved["body"]
             assert "plan-01" in crop_saved["body"]
             assert "writer-a" in crop_saved["body"]
+            page.locator(".dimension-association-details > summary").click()
             page.locator(".dimension-line-select").select_option("det-002")
             page.locator(".dimension-wall-span-select").select_option("0")
             page.locator(".dimension-association-verified-input").check()
