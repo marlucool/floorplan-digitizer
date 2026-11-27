@@ -94,3 +94,4 @@ def test_documentation_path_resolver_rejects_paths_outside_docs_directory() -> N
         safe_document_path(docs_root, "../README.md")
     with pytest.raises(FileNotFoundError):
         safe_document_path(docs_root, "..\\README.md")
+\n\ndef test_documentation_and_architecture_share_primary_navigation() -> None:\n    client = TestClient(app)\n    for path in ("/documentation", "/documentation/ARCHITECTURE.md", "/architecture"):\n        response = client.get(path)\n        assert response.status_code == 200\n        assert 'href="/drawing">Drawing workspace</a>' in response.text\n        assert 'href="/architecture">Architecture</a>' in response.text\n
