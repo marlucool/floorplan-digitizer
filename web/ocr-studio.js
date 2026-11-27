@@ -201,6 +201,7 @@
     }
     $("#datasetState").textContent = summary.valid === false ? "CHECK DATA" : "LOCAL";
     $("#exportDatasetButton").disabled = !state.datasetId || summary.valid === false;
+    updateReviewImportButton();
     renderSamples();
     renderAvailableModels();
     refreshTrainingButtons();
