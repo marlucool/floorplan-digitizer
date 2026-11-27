@@ -305,7 +305,7 @@
         body: form
       });
       await loadDataset();
-      $("#datasetTransferStatus").textContent = "Imported " + payload.imported + " verified crops. Skipped " + (payload.skipped_unverified || 0) + " unverified, " + (payload.skipped_style || 0) + " other-style and " + (payload.skipped_blank || 0) + " blank rows.";
+      $("#datasetTransferStatus").textContent = "Imported " + payload.added + " verified crops. Skipped " + (payload.skipped_unverified || 0) + " unverified, " + (payload.skipped_style || 0) + " other-style and " + (payload.skipped_blank || 0) + " blank rows.";
       message("Dataset archive imported. Rebuild splits before training.", "success");
     } catch (error) {
       $("#datasetTransferStatus").textContent = "Import failed: " + error.message;
