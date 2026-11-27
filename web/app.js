@@ -1258,6 +1258,13 @@ function renderDimensionTextReview(regions) {
     });
 
     const association = region.association || { status: "unmatched", candidate_lines: [] };
+    const associationDetails = document.createElement("details");
+    associationDetails.className = "dimension-association-details";
+    const associationSummary = document.createElement("summary");
+    associationSummary.textContent = association.candidate_lines?.length
+      ? "Review suggested line and wall match"
+      : "Line and wall match unavailable";
+    associationDetails.append(associationSummary);
     const associationPanel = document.createElement("section");
     associationPanel.className = "dimension-association";
     const associationHeading = document.createElement("strong");
@@ -1278,8 +1285,8 @@ function renderDimensionTextReview(regions) {
     (association.candidate_lines || []).forEach((candidate) => {
       const option = document.createElement("option");
       option.value = candidate.dimension_line_id;
-      option.textContent = candidate.dimension_line_id + " · " + candidate.orientation +
-        " · rank " + Math.round((candidate.assignment_score ?? candidate.score) * 100);
+      option.textContent = (candidate.orientation === "horizontal" ? "Horizontal" : "Vertical") +
+        (candidate === association.candidate_lines[0] ? " · best match" : " · alternative");
       lineSelect.append(option);
     });
     lineLabel.append(lineSelect);
@@ -1323,9 +1330,8 @@ function renderDimensionTextReview(regions) {
           : span.globally_assigned_to
             ? " · gap suggested for " + span.globally_assigned_to
             : "";
-        option.textContent = span.wall_ids.join(" ↔ ") + " · " +
-          Math.round(span.span_px) + " px · rank " +
-          Math.round((span.assignment_score ?? span.score) * 100) + globalHint;
+        option.textContent = "Wall pair " + (spanIndex + 1) +
+          (span.globally_assigned ? " · suggested" : globalHint ? " · alternate" : "");
         spanSelect.append(option);
       });
       spanSelect.disabled = !selectedLine || !(selectedLine.wall_spans || []).length;
@@ -1348,13 +1354,24 @@ function renderDimensionTextReview(regions) {
       associationHelp.textContent = !selectedSpan
         ? "Choose a wall gap. A dimension-line detection may be shared by several labels in a chain."
         : selectedSpan.globally_assigned
-          ? "This is the globally preferred one-to-one wall-gap match. Check the drawing and explicitly confirm."
+          ? "This is the strongest geometric suggestion. Check the drawing, then confirm it."
           : selectedSpan.globally_assigned_to
-            ? "This wall gap is globally preferred for another dimension label. Selecting it here is an override; verify carefully."
-            : "Check that this wall pair describes the written dimension, then explicitly confirm.";
+            ? "This wall gap is suggested for another dimension label. Check carefully before overriding."
+            : "Check that this wall pair describes the written dimension, then confirm.";
     });
 
+    if (association.candidate_lines?.length) {
+      lineSelect.value = association.candidate_lines[0].dimension_line_id;
+      updateWallSpanOptions();
+      const suggestedIndex = association.candidate_lines[0].wall_spans?.findIndex((span) => span.globally_assigned) ?? -1;
+      if (suggestedIndex >= 0) {
+        spanSelect.value = String(suggestedIndex);
+        associationVerified.disabled = false;
+        associationHelp.textContent = "Best geometric match preselected. Check the drawing, then confirm if correct.";
+      }
+    }
     associationPanel.append(associationHeading, associationHelp, lineLabel, spanLabel, associationVerifiedLabel);
+    associationDetails.append(associationPanel);
 
     const saveCropButton = document.createElement("button");
     saveCropButton.type = "button";
@@ -1369,7 +1386,7 @@ function renderDimensionTextReview(regions) {
       updateUseScaleButton();
     });
 
-    fields.append(meta, textLabel, interpretButton, interpretation, styleLabel, verifiedLabel, useScaleButton, associationPanel, saveCropButton);
+    fields.append(meta, textLabel, interpretButton, interpretation, styleLabel, verifiedLabel, useScaleButton, associationDetails, saveCropButton);
     row.append(fields);
     container.append(row);
   });
@@ -1400,7 +1417,7 @@ function showOcrSuggestion(row, prediction) {
     showNotice("OCR suggestion inserted", "It is still unverified. Check every character against the original crop before marking it verified.");
   });
   wrapper.append(text, useButton);
-  const association = fields.querySelector(".dimension-association");
+  const association = fields.querySelector(".dimension-association-details");
   fields.insertBefore(wrapper, association || null);
 }
 
@@ -1989,6 +2006,13 @@ function restoreProjectReview(review) {
     if (textInput) textInput.value = entry.raw_text || "";
     if (styleInput) styleInput.value = entry.text_style || "unknown";
     if (verifiedInput) verifiedInput.checked = Boolean(entry.verified);
+    if (textInput && entry.parsed_value_mm && entry.dimension_type === "linear") {
+      const row = textInput.closest(".dimension-text-item");
+      row.dataset.parsedValueMm = entry.parsed_value_mm;
+      row.dataset.dimensionType = "linear";
+      const scaleButton = row.querySelector(".use-dimension-scale");
+      if (scaleButton) scaleButton.disabled = !verifiedInput?.checked;
+    }
     if (entry.ocr_suggestion && typeof entry.ocr_suggestion === "object") {
       state.ocrPredictions[entry.detection_id] = entry.ocr_suggestion;
       const row = [...document.querySelectorAll(".dimension-text-item")]
