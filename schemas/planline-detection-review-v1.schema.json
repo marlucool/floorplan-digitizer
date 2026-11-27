@@ -606,12 +606,13 @@
             "method": {
               "enum": [
                 "user_two_point_reference",
-                "verified_dimension_two_point_reference"
+                "verified_dimension_two_point_reference",
+                "verified_dimension_association"
               ]
             },
             "points_px": {
               "type": "array",
-              "minItems": 2,
+              "minItems": 0,
               "maxItems": 2,
               "items": {
                 "type": "object",
@@ -671,7 +672,8 @@
             "status": {
               "enum": [
                 "user_supplied_reference_not_geometry_validation",
-                "user_verified_dimension_reference_not_geometry_validation"
+                "user_verified_dimension_reference_not_geometry_validation",
+                "user_verified_association_reference_not_geometry_validation"
               ]
             },
             "reference_dimension_text": {
@@ -685,6 +687,18 @@
                 "string",
                 "null"
               ]
+            },
+            "reference_dimension_line_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reference_wall_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           }
         }
