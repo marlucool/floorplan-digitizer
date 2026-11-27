@@ -12,7 +12,6 @@ import sys
 import re
 import threading
 import tempfile
-import time
 import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Any
