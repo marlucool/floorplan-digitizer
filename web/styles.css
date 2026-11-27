@@ -1161,3 +1161,63 @@ html { scroll-padding-top:112px; }
   html { scroll-padding-top:88px; }
   :target { scroll-margin-top:88px; }
 }
+
+
+/* Readability and predictable control alignment: keep essential UI text comfortably legible. */
+body { font-size:16px; }
+p { font-size:15px; line-height:1.65; }
+.eyebrow { font-size:12px; letter-spacing:.09em; }
+.top-links .repo-link { font-size:13px; }
+.toolbar-button { font-size:13px; min-height:40px; }
+.primary-button { font-size:14px; min-height:46px; }
+.workspace-card { min-height:230px; padding:clamp(20px,2.4vw,30px); }
+.workspace-card h2 { font-size:clamp(20px,2vw,24px); margin:18px 0 9px; }
+.workspace-card p { font-size:15px; line-height:1.6; }
+.workspace-number { font-size:12px; letter-spacing:.06em; }
+.workspace-action { display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:700;margin-top:12px; }
+.dashboard-info h2 { font-size:clamp(21px,2.3vw,27px); }
+.dashboard-info li,.dashboard-info p { font-size:15px;line-height:1.7; }
+.dashboard-health strong { font-size:16px; }
+.dashboard-health span,.dashboard-health button { font-size:13px; }
+.panel-heading,.studio-card-heading,.settings-version,.update-indicator { font-size:12px; }
+.dropzone strong { font-size:16px; }
+.dropzone span,.dropzone small { font-size:13px; }
+.pipeline b { font-size:14px; }
+.pipeline small,.privacy-note,.studio-hint,.settings-footnote { font-size:13px;line-height:1.55; }
+label,.form-label { font-size:14px; }
+input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea { font-size:14px;min-height:42px; }
+.theme-toggle {
+  display:inline-grid !important;
+  place-items:center !important;
+  align-content:center !important;
+  justify-content:center !important;
+  flex:0 0 40px !important;
+  width:40px !important;
+  min-width:40px !important;
+  height:40px !important;
+  min-height:40px !important;
+  margin:0 !important;
+  padding:0 !important;
+  line-height:0 !important;
+  text-align:center !important;
+  vertical-align:middle;
+}
+.theme-toggle svg { display:block;width:19px;height:19px;margin:0; }
+@media(max-width:760px) {
+  .topbar .top-links .theme-toggle {
+    width:100% !important;
+    min-width:0 !important;
+    flex:0 0 44px !important;
+    height:44px !important;
+    min-height:44px !important;
+    margin:2px 0 0 !important;
+    justify-self:stretch;
+  }
+  .topbar .top-links .theme-toggle svg { width:20px;height:20px; }
+}
+@media(max-width:520px) {
+  body { font-size:16px; }
+  .workspace-card { padding:21px; }
+  .workspace-card p { font-size:15px; }
+  .dashboard-info li,.dashboard-info p { font-size:15px; }
+}
