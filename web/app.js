@@ -2090,7 +2090,10 @@ function restoreProjectReview(review) {
       if (spanSelect && spanIndex >= 0) {
         spanSelect.value = String(spanIndex);
         spanSelect.dispatchEvent(new Event("change", { bubbles: true }));
-        if (associationVerified) associationVerified.checked = Boolean(association.confirmed);
+        if (associationVerified) {
+          associationVerified.checked = Boolean(association.confirmed);
+          associationVerified.dispatchEvent(new Event("change", { bubbles: true }));
+        }
       }
     }
   });
