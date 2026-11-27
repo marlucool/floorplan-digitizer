@@ -66,22 +66,25 @@
           <small>Adjusts pixel intensity before detection and crop generation. It does not rotate, crop or move any coordinates.</small>
         </section>
         <section class="calibration-panel" aria-labelledby="calibrationHeading">
-          <div class="calibration-heading"><strong id="calibrationHeading">Scale calibration</strong><span class="calibration-state" id="calibrationState">Not set</span></div>
-          <p>Pick two points on a known dimension line. This records a user-supplied pixel scale; it does not verify walls or measurements.</p>
-          <button id="startCalibration" class="toolbar-button" type="button" disabled>Pick two points</button>
-          <div class="calibration-points" id="calibrationPoints" aria-live="polite">Point 1: not set · Point 2: not set</div>
-          <div class="calibration-inputs">
-            <label for="calibrationDistance">Known distance</label>
-            <input id="calibrationDistance" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 4200">
-            <select id="calibrationUnit" aria-label="Calibration distance unit">
-              <option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option><option value="in">in</option><option value="ft">ft</option>
-            </select>
-          </div>
-          <div class="calibration-actions">
-            <button id="applyCalibration" class="toolbar-button" type="button" disabled>Apply scale</button>
-            <button id="clearCalibration" class="toolbar-button" type="button" disabled>Clear</button>
-          </div>
-          <output id="calibrationResult" aria-live="polite">No scale applied.</output>
+          <div class="calibration-heading"><strong id="calibrationHeading">Drawing scale</strong><span class="calibration-state" id="calibrationState">Not set</span></div>
+          <output id="calibrationResult" aria-live="polite">Verify a written dimension below, then use it to set the scale.</output>
+          <div class="calibration-points" id="calibrationPoints" aria-live="polite">No scale reference selected.</div>
+          <details class="manual-calibration">
+            <summary>Set scale manually</summary>
+            <p>Use this only when no readable written dimension is available.</p>
+            <button id="startCalibration" class="toolbar-button" type="button" disabled>Pick two points</button>
+            <div class="calibration-inputs">
+              <label for="calibrationDistance">Known distance</label>
+              <input id="calibrationDistance" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 4200">
+              <select id="calibrationUnit" aria-label="Calibration distance unit">
+                <option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option><option value="in">in</option><option value="ft">ft</option>
+              </select>
+            </div>
+            <div class="calibration-actions">
+              <button id="applyCalibration" class="toolbar-button" type="button" disabled>Apply manual scale</button>
+              <button id="clearCalibration" class="toolbar-button" type="button" disabled>Clear scale</button>
+            </div>
+          </details>
         </section>
         <section class="geometry-panel" aria-labelledby="geometryHeading">
           <div class="geometry-heading"><strong id="geometryHeading">Manual wall geometry</strong><span id="geometryCount">0 manual walls</span></div>
@@ -156,7 +159,7 @@
       <div class="summary hidden" id="summary"></div>
       <div class="review-toolbar"><div class="review-filter"><label for="classFilter">Class</label><select id="classFilter"><option value="all">All detections</option><option value="wall">Walls</option><option value="dimension_line">Dimension lines</option><option value="dimension_value">Dimension values</option></select></div><div class="review-search"><label class="sr-only" for="detectionSearch">Search detections</label><input id="detectionSearch" type="search" placeholder="Search ID or class…" autocomplete="off"></div><div class="review-sort"><label for="detectionSort">Sort</label><select id="detectionSort"><option value="original">Original order</option><option value="confidence">Highest score</option><option value="size">Largest region</option></select></div><span class="review-hint">Select a row to locate it on the drawing.</span><button id="saveProject" class="toolbar-button" type="button" disabled>Save project ↓</button><button id="exportReview" class="toolbar-button" type="button" disabled>Export review ↗</button></div><div class="detection-list" id="detectionList"></div><p id="noDetectionMatches" class="no-detection-matches hidden">No candidate regions match these filters. Clear the search or choose another class.</p><aside id="selectedDetection" class="selected-detection hidden" aria-live="polite"><div><span class="eyebrow">SELECTED CANDIDATE</span><strong id="selectedDetectionName">—</strong></div><div class="selected-detection-metrics"><span><small>DETECTOR SCORE</small><b id="selectedDetectionScore">—</b></span><span><small>POSITION</small><b id="selectedDetectionPosition">—</b></span><span><small>BOX SIZE</small><b id="selectedDetectionSize">—</b></span></div></aside>
       <details class="text-review hidden" id="dimensionTextReview">
-        <summary><span class="eyebrow">03 / DIMENSION TEXT</span><strong>Manual transcription <span class="summary-hint">Optional local OCR · dimension interpretation</span></strong></summary>
+        <summary><span class="eyebrow">03 / DIMENSIONS</span><strong>Read and verify dimensions <span class="summary-hint">OCR suggestions · line and wall matching</span></strong></summary>
         <div class="ocr-assist-controls">
           <label for="ocrModelSelect">Recognition model</label>
           <select id="ocrModelSelect"><option value="base:PP-OCRv5_mobile_rec">PP-OCRv5 mobile · base</option></select>
@@ -177,7 +180,7 @@
           </div>
           <output id="datasetCaptureStatus" aria-live="polite">Only individually verified crops are saved. The full drawing stays in the current workspace.</output>
         </section>
-        <p class="dimension-interpreter-note">Interpret explicitly written units such as mm, cm, m, inches and feet. Bare numbers keep an unknown unit; ambiguous separators are not guessed. Interpretation is not a verified measurement.</p>
+        <p class="dimension-interpreter-note">Check the number against its crop, interpret it, then mark it verified. Use a verified dimension to set scale in one step.</p>
         <div id="dimensionTextItems" class="dimension-text-items"></div>
       </details>
       <div class="limitations"><div class="limitation-mark">i</div><div><strong>Important: detection is not measurement.</strong><p>This workflow ranks dimension-value boxes against dimension-line boxes, then proposes wall pairs whose facing edges bracket each line. These are axis-aligned geometric hypotheses, not verified measurements or CAD geometry. OCR suggestions are optional and unverified; every character, selected line and wall pair must be checked against the source drawing.</p></div></div>
