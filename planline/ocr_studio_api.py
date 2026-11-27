@@ -26,7 +26,7 @@ from .dataset import (
     validate_dataset,
     update_crop_sample,
 )
-from .ocr_training import cancel_job, get_job, start_benchmark_job, start_training_job
+from .ocr_training import cancel_job, get_job, list_jobs, start_benchmark_job, start_training_job
 from .ocr_training_assets import ensure_training_assets, training_assets_status
 from .ocr_quality import audit_dataset
 
@@ -609,6 +609,11 @@ def start_ocr_benchmark(dataset_id: str, request: StartBenchmarkRequest) -> dict
         )
     except (OSError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/jobs")
+def list_ocr_jobs() -> dict[str, Any]:
+    return {"jobs": list_jobs()}
 
 
 @router.get("/jobs/{job_id}")
