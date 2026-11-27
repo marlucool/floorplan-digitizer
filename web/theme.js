@@ -6,25 +6,32 @@
   const links = document.querySelector(".top-links");
   const menu = header?.querySelector(".nav-menu-toggle");
   if (header && links && menu) {
-    const closeMenu = () => {
+    const isMobile = () => window.matchMedia("(max-width: 760px)").matches;
+    const closeMenu = ({ restoreFocus = false } = {}) => {
+      const wasOpen = header.classList.contains("menu-open");
       header.classList.remove("menu-open");
       menu.setAttribute("aria-expanded", "false");
       menu.setAttribute("aria-label", "Open navigation");
+      if (restoreFocus && wasOpen && isMobile()) menu.focus();
     };
     menu.addEventListener("click", () => {
-      const open = header.classList.toggle("menu-open");
+      const open = !header.classList.contains("menu-open");
+      header.classList.toggle("menu-open", open);
       menu.setAttribute("aria-expanded", String(open));
       menu.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
+      if (open && isMobile()) links.querySelector("a")?.focus();
     });
     links.addEventListener("click", (event) => {
       if (event.target.closest("a")) closeMenu();
     });
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") closeMenu();
+      if (event.key === "Escape") closeMenu({ restoreFocus: true });
     });
     document.addEventListener("click", (event) => {
       if (!header.contains(event.target)) closeMenu();
     });
+    const mobileQuery = window.matchMedia("(max-width: 760px)");
+    mobileQuery.addEventListener?.("change", () => closeMenu());
   }
   const meta = document.querySelector('meta[name="theme-color"]');
   const key = "planline-theme-v2";
