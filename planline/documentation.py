@@ -262,7 +262,7 @@ def _page_shell(
       const syncOffset = () => {{
         const header = document.querySelector(".topbar");
         if (!header) return;
-        root.style.setProperty("--docs-anchor-offset", Math.ceil(header.getBoundingClientRect().height + 16) + "px");
+        root.style.setProperty("--docs-anchor-offset", Math.ceil(header.getBoundingClientRect().height + 28) + "px");
       }};
       document.addEventListener("DOMContentLoaded", () => {{
         syncOffset();
