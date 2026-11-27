@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const PREVIEW_MODE = window.PLANLINE_PREVIEW === true;
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, ocrReady: false, ocrModels: [], ocrDatasets: [], ocrPredictions: {}, ocrRunning: false, ocrModelId: null, ocrDevice: null, zoom: 1, calibration: { points: [], picking: false, applied: null, pendingDimension: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, ocrReady: false, ocrModels: [], ocrDatasets: [], ocrPredictions: {}, ocrRunning: false, ocrModelId: null, ocrDevice: null, ocrCapabilitiesLoaded: false, ocrCapabilitiesPromise: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -315,11 +315,11 @@ function drawDetections(previewUrl, detections, imageSize) {
 const CALIBRATION_UNIT_TO_MM = { mm: 1, cm: 10, m: 1000, in: 25.4, ft: 304.8 };
 
 function clearCalibration() {
-  state.calibration = { points: [], picking: false, applied: null, pendingDimension: null };
+  state.calibration = { points: [], picking: false, applied: null };
   const status = $("#calibrationState");
   if (!status) return;
   status.textContent = "Not set";
-  $("#calibrationPoints").textContent = "Point 1: not set · Point 2: not set";
+  $("#calibrationPoints").textContent = "No scale reference selected.";
   $("#calibrationResult").textContent = "No scale applied.";
   $("#startCalibration").disabled = !state.result;
   $("#startCalibration").textContent = "Pick two points";
@@ -332,10 +332,12 @@ function clearCalibration() {
 
 function renderCalibrationStatus() {
   const points = state.calibration.points;
-  $("#calibrationPoints").textContent = "Point 1: " +
-    (points[0] ? Math.round(points[0].x) + ", " + Math.round(points[0].y) + " px" : "not set") +
-    " · Point 2: " +
-    (points[1] ? Math.round(points[1].x) + ", " + Math.round(points[1].y) + " px" : "not set");
+  $("#calibrationPoints").textContent = state.calibration.applied?.method === "verified_dimension_association"
+    ? "Derived from a confirmed dimension-to-wall match."
+    : "Point 1: " +
+      (points[0] ? Math.round(points[0].x) + ", " + Math.round(points[0].y) + " px" : "not set") +
+      " · Point 2: " +
+      (points[1] ? Math.round(points[1].x) + ", " + Math.round(points[1].y) + " px" : "not set");
   $("#startCalibration").disabled = !state.result;
   $("#startCalibration").textContent = state.calibration.picking ? "Click the drawing…" : "Pick two points";
   $("#applyCalibration").disabled = points.length !== 2;
@@ -345,25 +347,42 @@ function renderCalibrationStatus() {
   $("#previewImage").classList.toggle("calibration-picking", state.calibration.picking);
 }
 
-function startCalibrationFromDimension(reference) {
-  if (!state.result || !reference || !(Number(reference.valueMm) > 0)) return;
-  state.geometry.mode = "select";
-  state.geometry.pendingPoint = null;
-  state.geometry.pendingRoom = [];
-  renderGeometryControls();
+function applyAssociatedDimensionScale(reference) {
+  const distanceMm = Number(reference?.valueMm);
+  const pixelDistance = Number(reference?.spanPx);
+  if (!state.result || !(distanceMm > 0) || !(pixelDistance > 0) ||
+      !Number.isFinite(distanceMm) || !Number.isFinite(pixelDistance)) return;
+  const pixelsPerMm = pixelDistance / distanceMm;
+  if (!Number.isFinite(pixelsPerMm) || pixelsPerMm <= 0) {
+    $("#calibrationResult").textContent = "The matched dimension cannot produce a valid scale.";
+    return;
+  }
   state.calibration = {
     points: [],
-    picking: true,
-    applied: null,
-    pendingDimension: {
-      valueMm: Number(reference.valueMm),
-      text: reference.text,
-      id: reference.id
+    picking: false,
+    applied: {
+      method: "verified_dimension_association",
+      points_px: [],
+      pixel_distance: Number(pixelDistance.toFixed(3)),
+      known_distance: distanceMm,
+      input_unit: "mm",
+      known_distance_mm: Number(distanceMm.toFixed(6)),
+      reference_dimension_text: reference.text || null,
+      reference_dimension_id: reference.id || null,
+      reference_dimension_line_id: reference.lineId || null,
+      reference_wall_ids: Array.isArray(reference.wallIds) ? reference.wallIds : [],
+      pixels_per_mm: Number(pixelsPerMm.toFixed(9)),
+      source_filename: state.file?.name || null,
+      source_page_index: state.result?.source?.page_index ?? 0,
+      status: "user_verified_association_reference_not_geometry_validation"
     }
   };
-  $("#calibrationResult").textContent = "Using verified dimension " + reference.text + ". Click the two ends of its dimension line on the drawing.";
+  $("#calibrationResult").textContent = "Scale derived from confirmed match: " +
+    reference.text + " · " + pixelDistance.toFixed(1) + " px / " +
+    distanceMm.toLocaleString(undefined, { maximumFractionDigits: 3 }) +
+    " mm = " + pixelsPerMm.toFixed(6) + " px/mm. Check against other dimensions.";
   renderCalibrationStatus();
-  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+  renderGeometryControls();
 }
 
 function startCalibration() {
@@ -372,7 +391,7 @@ function startCalibration() {
   state.geometry.pendingPoint = null;
   state.geometry.pendingRoom = [];
   renderGeometryControls();
-  state.calibration = { points: [], picking: true, applied: null, pendingDimension: null };
+  state.calibration = { points: [], picking: true, applied: null };
   $("#calibrationResult").textContent = "Click the first point, then the second point on the drawing.";
   renderCalibrationStatus();
   if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
@@ -392,61 +411,51 @@ function addCalibrationPoint(event) {
   renderCalibrationStatus();
   if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
   if (state.calibration.points.length === 2) {
-    if (state.calibration.pendingDimension) {
-      const reference = state.calibration.pendingDimension;
-      applyCalibration(reference.valueMm, reference);
-    } else {
-      $("#calibrationResult").textContent = "Two points selected. Enter their known distance and apply the scale.";
-    }
+    $("#calibrationResult").textContent = "Two points selected. Enter their known distance and apply the scale.";
   }
 }
 
-function applyCalibration(referenceDistanceMm = null, reference = null) {
+function applyCalibration() {
   const points = state.calibration.points;
-  const manualDistance = Number($("#calibrationDistance").value);
-  const manualUnit = $("#calibrationUnit").value;
+  const distance = Number($("#calibrationDistance").value);
+  const unit = $("#calibrationUnit").value;
   if (points.length !== 2) return;
-  const fromVerifiedDimension = referenceDistanceMm !== null;
-  const distance = fromVerifiedDimension ? Number(referenceDistanceMm) : manualDistance;
-  const unit = fromVerifiedDimension ? "mm" : manualUnit;
-  if (!Number.isFinite(distance) || distance <= 0 || (!fromVerifiedDimension && !CALIBRATION_UNIT_TO_MM[unit])) {
+  if (!Number.isFinite(distance) || distance <= 0 || !CALIBRATION_UNIT_TO_MM[unit]) {
     $("#calibrationResult").textContent = "Enter a positive distance and choose a supported unit.";
     $("#calibrationDistance").focus();
     return;
   }
-  const dx = points[1].x - points[0].x;
-  const dy = points[1].y - points[0].y;
-  const pixelDistance = Math.hypot(dx, dy);
+  const pixelDistance = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
   if (!Number.isFinite(pixelDistance) || pixelDistance < 1) {
     $("#calibrationResult").textContent = "The selected points are too close together. Pick two distinct points.";
     return;
   }
-  const distanceMm = fromVerifiedDimension ? distance : distance * CALIBRATION_UNIT_TO_MM[unit];
+  const distanceMm = distance * CALIBRATION_UNIT_TO_MM[unit];
   if (!Number.isFinite(distanceMm) || distanceMm <= 0) {
     $("#calibrationResult").textContent = "That distance is outside the supported numeric range.";
     return;
   }
   state.calibration.applied = {
-    method: fromVerifiedDimension ? "verified_dimension_two_point_reference" : "user_two_point_reference",
+    method: "user_two_point_reference",
     points_px: points.map((point) => ({ x: Number(point.x.toFixed(2)), y: Number(point.y.toFixed(2)) })),
     pixel_distance: Number(pixelDistance.toFixed(3)),
     known_distance: distance,
     input_unit: unit,
     known_distance_mm: Number(distanceMm.toFixed(6)),
-    reference_dimension_text: reference?.text || null,
-    reference_dimension_id: reference?.id || null,
+    reference_dimension_text: null,
+    reference_dimension_id: null,
     pixels_per_mm: Number((pixelDistance / distanceMm).toFixed(9)),
     source_filename: state.file?.name || null,
     source_page_index: state.result?.source?.page_index ?? 0,
-    status: fromVerifiedDimension ? "user_verified_dimension_reference_not_geometry_validation" : "user_supplied_reference_not_geometry_validation"
+    status: "user_supplied_reference_not_geometry_validation"
   };
-  $("#calibrationResult").textContent = fromVerifiedDimension
-    ? "Scale set from verified dimension " + reference.text + " · " + pixelDistance.toFixed(1) + " px / " + distanceMm.toLocaleString(undefined, { maximumFractionDigits: 3 }) + " mm."
-    : pixelDistance.toFixed(1) + " px / " + distanceMm.toLocaleString(undefined, { maximumFractionDigits: 3 }) + " mm = " + state.calibration.applied.pixels_per_mm.toFixed(6) + " px/mm. Manual reference.";
+  $("#calibrationResult").textContent = pixelDistance.toFixed(1) + " px / " +
+    distanceMm.toLocaleString(undefined, { maximumFractionDigits: 3 }) +
+    " mm = " + state.calibration.applied.pixels_per_mm.toFixed(6) +
+    " px/mm. Manual reference.";
   renderCalibrationStatus();
   renderGeometryControls();
 }
-
 $("#startCalibration").addEventListener("click", startCalibration);
 $("#applyCalibration").addEventListener("click", () => applyCalibration());
 $("#clearCalibration").addEventListener("click", clearCalibration);
@@ -1241,21 +1250,8 @@ function renderDimensionTextReview(regions) {
     const useScaleButton = document.createElement("button");
     useScaleButton.type = "button";
     useScaleButton.className = "toolbar-button use-dimension-scale";
-    useScaleButton.textContent = "Use this dimension to set scale";
+    useScaleButton.textContent = "Use confirmed match for scale";
     useScaleButton.disabled = true;
-    function updateUseScaleButton() {
-      useScaleButton.disabled = !verifiedInput.checked ||
-        row.dataset.dimensionType !== "linear" ||
-        !(Number(row.dataset.parsedValueMm) > 0);
-    }
-    useScaleButton.addEventListener("click", () => {
-      if (useScaleButton.disabled) return;
-      startCalibrationFromDimension({
-        valueMm: row.dataset.parsedValueMm,
-        text: textInput.value.trim(),
-        id: region.id
-      });
-    });
 
     const association = region.association || { status: "unmatched", candidate_lines: [] };
     const associationDetails = document.createElement("details");
@@ -1343,10 +1339,14 @@ function renderDimensionTextReview(regions) {
           ? "This line has no viable wall-gap candidate. Leave the association unresolved."
           : "Choose the wall gap that this dimension measures. The global recommendation is advisory and does not select anything automatically.";
     }
-    lineSelect.addEventListener("change", updateWallSpanOptions);
+    lineSelect.addEventListener("change", () => {
+      updateWallSpanOptions();
+      updateUseScaleButton();
+    });
     spanSelect.addEventListener("change", () => {
       associationVerified.checked = false;
       associationVerified.disabled = !lineSelect.value || !spanSelect.value;
+      updateUseScaleButton();
       const selectedLine = (association.candidate_lines || []).find(
         (candidate) => candidate.dimension_line_id === lineSelect.value
       );
@@ -1360,16 +1360,53 @@ function renderDimensionTextReview(regions) {
             : "Check that this wall pair describes the written dimension, then confirm.";
     });
 
-    if (association.candidate_lines?.length) {
-      lineSelect.value = association.candidate_lines[0].dimension_line_id;
+    const recommendedMatch = (association.candidate_lines || [])
+      .flatMap((candidate) => (candidate.wall_spans || []).map((span, spanIndex) => ({
+        candidate, span, spanIndex
+      })))
+      .filter(({ span }) => span.globally_assigned && span.globally_assigned_to === region.id)
+      .sort((a, b) => (b.span.assignment_score || 0) - (a.span.assignment_score || 0))[0];
+    const defaultCandidate = recommendedMatch?.candidate || association.candidate_lines?.[0];
+    if (defaultCandidate) {
+      lineSelect.value = defaultCandidate.dimension_line_id;
       updateWallSpanOptions();
-      const suggestedIndex = association.candidate_lines[0].wall_spans?.findIndex((span) => span.globally_assigned) ?? -1;
-      if (suggestedIndex >= 0) {
-        spanSelect.value = String(suggestedIndex);
+      if (recommendedMatch) {
+        spanSelect.value = String(recommendedMatch.spanIndex);
         associationVerified.disabled = false;
-        associationHelp.textContent = "Best geometric match preselected. Check the drawing, then confirm if correct.";
+        associationHelp.textContent = "Best global match preselected. Check the drawing, then confirm if correct.";
+        associationSummary.textContent = "Suggested match preselected · review before confirming";
       }
     }
+    function updateUseScaleButton() {
+      const selectedLine = (association.candidate_lines || []).find(
+        (candidate) => candidate.dimension_line_id === lineSelect.value
+      );
+      const selectedSpan = spanSelect.value !== ""
+        ? selectedLine?.wall_spans?.[Number(spanSelect.value)]
+        : null;
+      useScaleButton.disabled = !verifiedInput.checked ||
+        !associationVerified.checked ||
+        row.dataset.dimensionType !== "linear" ||
+        !(Number(row.dataset.parsedValueMm) > 0) ||
+        !(Number(selectedSpan?.span_px) > 0);
+    }
+    useScaleButton.addEventListener("click", () => {
+      if (useScaleButton.disabled) return;
+      const selectedLine = (association.candidate_lines || []).find(
+        (candidate) => candidate.dimension_line_id === lineSelect.value
+      );
+      const selectedSpan = selectedLine?.wall_spans?.[Number(spanSelect.value)];
+      applyAssociatedDimensionScale({
+        valueMm: row.dataset.parsedValueMm,
+        text: textInput.value.trim(),
+        id: region.id,
+        lineId: selectedLine?.dimension_line_id,
+        wallIds: selectedSpan?.wall_ids,
+        spanPx: selectedSpan?.span_px
+      });
+    });
+    associationVerified.addEventListener("change", updateUseScaleButton);
+    updateUseScaleButton();
     associationPanel.append(associationHeading, associationHelp, lineLabel, spanLabel, associationVerifiedLabel);
     associationDetails.append(associationPanel);
 
@@ -1398,23 +1435,35 @@ function showOcrSuggestion(row, prediction) {
   const fields = row.querySelector(".dimension-text-fields");
   if (!fields) return;
   fields.querySelector(".ocr-suggestion")?.remove();
+  const input = row.querySelector(".dimension-text-value");
+  const output = row.querySelector(".dimension-interpretation");
+  const interpretButton = row.querySelector(".interpret-dimension-button");
+  const verifiedInput = row.querySelector(".dimension-text-verified-input");
   const wrapper = document.createElement("div");
   wrapper.className = "ocr-suggestion";
   const text = document.createElement("span");
   const confidence = Number.isFinite(prediction.confidence)
     ? " · " + Math.round(prediction.confidence * 100) + "% recogniser score"
     : " · confidence unavailable";
-  text.textContent = "OCR suggestion: " + (prediction.text || "(no text recognised)") + confidence + " · unverified";
+  text.textContent = "OCR draft: " + (prediction.text || "(no text recognised)") + confidence + " · check against drawing";
+  if (prediction.text && input && !input.value.trim()) {
+    input.value = prediction.text;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    if (verifiedInput) verifiedInput.checked = false;
+    if (interpretButton && output) void interpretDimensionForRow(input, output, interpretButton);
+  }
   const useButton = document.createElement("button");
   useButton.type = "button";
   useButton.className = "toolbar-button";
-  useButton.textContent = "Use suggestion";
-  useButton.disabled = !prediction.text;
+  useButton.textContent = "Replace with OCR reading";
+  useButton.hidden = !prediction.text || input?.value.trim() === prediction.text;
   useButton.addEventListener("click", () => {
-    row.querySelector(".dimension-text-value").value = prediction.text;
-    row.querySelector(".dimension-text-value").dispatchEvent(new Event("input", { bubbles: true }));
-    row.querySelector(".dimension-text-verified-input").checked = false;
-    showNotice("OCR suggestion inserted", "It is still unverified. Check every character against the original crop before marking it verified.");
+    if (!input) return;
+    input.value = prediction.text;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    if (verifiedInput) verifiedInput.checked = false;
+    if (interpretButton && output) void interpretDimensionForRow(input, output, interpretButton);
+    showNotice("OCR draft inserted", "The reading has been interpreted but remains unverified. Check it against the original drawing.");
   });
   wrapper.append(text, useButton);
   const association = fields.querySelector(".dimension-association-details");
@@ -1575,7 +1624,7 @@ function updateOcrControls() {
   } else if (!hasCandidates) {
     $("#ocrAssistStatus").textContent = "Analyse a drawing with dimension candidates to run OCR.";
   } else {
-    $("#ocrAssistStatus").textContent = "OCR suggestions are unverified. Review each result before accepting it.";
+    $("#ocrAssistStatus").textContent = "OCR runs automatically after analysis. Check each reading before verifying it.";
   }
 }
 
@@ -1584,6 +1633,7 @@ async function loadOcrCapabilities() {
     state.ocrReady = false;
     state.ocrModels = [];
     state.ocrDatasets = [];
+    state.ocrCapabilitiesLoaded = true;
     updateOcrControls();
     return;
   }
@@ -1628,6 +1678,7 @@ async function loadOcrCapabilities() {
     state.ocrReady = false;
     $("#ocrAssistStatus").textContent = error.message || "OCR status unavailable.";
   }
+  state.ocrCapabilitiesLoaded = true;
   updateOcrControls();
 }
 
@@ -1792,6 +1843,10 @@ async function analyse() {
     state.result = payload;
     $("#detectStep").classList.add("complete");
     renderResults(payload);
+    if (state.ocrCapabilitiesPromise) await state.ocrCapabilitiesPromise;
+    if (state.result === payload && state.ocrReady && payload.dimension_regions?.length) {
+      void runOcrOnCandidates();
+    }
   } catch (error) {
     if (error.name !== "AbortError" && state.controller === controller) {
       $("#detectStep").classList.remove("complete");
@@ -2043,17 +2098,18 @@ function restoreProjectReview(review) {
     state.calibration = {
       points: (review.calibration.points_px || []).map((point) => ({ x: point.x, y: point.y })),
       picking: false,
-      applied: { ...review.calibration },
-      pendingDimension: null
+      applied: { ...review.calibration }
     };
     $("#calibrationDistance").value = String(review.calibration.known_distance);
     $("#calibrationUnit").value = review.calibration.input_unit;
-    $("#calibrationResult").textContent = review.calibration.method === "verified_dimension_two_point_reference"
-      ? "Restored scale from verified dimension " + (review.calibration.reference_dimension_text || review.calibration.known_distance_mm + " mm") + "."
-      : Number(review.calibration.pixel_distance).toFixed(1) + " px / " +
-        Number(review.calibration.known_distance_mm).toLocaleString(undefined, { maximumFractionDigits: 3 }) +
-        " mm = " + Number(review.calibration.pixels_per_mm).toFixed(6) +
-        " px/mm. Restored manual reference.";
+    $("#calibrationResult").textContent = review.calibration.method === "verified_dimension_association"
+      ? "Restored scale from confirmed match " + (review.calibration.reference_dimension_text || review.calibration.known_distance_mm + " mm") + "."
+      : review.calibration.method === "verified_dimension_two_point_reference"
+        ? "Restored scale from verified dimension " + (review.calibration.reference_dimension_text || review.calibration.known_distance_mm + " mm") + "."
+        : Number(review.calibration.pixel_distance).toFixed(1) + " px / " +
+          Number(review.calibration.known_distance_mm).toLocaleString(undefined, { maximumFractionDigits: 3 }) +
+          " mm = " + Number(review.calibration.pixels_per_mm).toFixed(6) +
+          " px/mm. Restored manual reference.";
     renderCalibrationStatus();
     drawDetections(state.previewUrl, state.detections, state.result.image);
   } else {
@@ -2377,4 +2433,4 @@ if (PREVIEW_MODE) {
 
 $("#drawingDatasetSelect").addEventListener("change", updateDatasetCaptureButtons);
 $("#drawingSourceId").addEventListener("input", updateDatasetCaptureButtons);
-loadOcrCapabilities();
+state.ocrCapabilitiesPromise = loadOcrCapabilities();
