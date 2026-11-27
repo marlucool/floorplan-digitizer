@@ -1,0 +1,11 @@
+# The modern application is the Planline package and web workspace.
+# Keep the historical prototype available in Git, but do not ship it in the
+# Windows installer source archive. These files are not imported by Planline.
+/main.py export-ignore
+/detection.py export-ignore
+/model.py export-ignore
+/ocr.py export-ignore
+/dxf_export.py export-ignore
+/trainer.py export-ignore
+/dataset_creator.py export-ignore
+/digit_ocr_resnet18.pth export-ignore
