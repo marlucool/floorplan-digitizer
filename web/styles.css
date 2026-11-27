@@ -833,3 +833,9 @@ html[data-theme="light"]{
 .manual-calibration[open]{display:grid;gap:8px}
 .manual-calibration p{margin:0;color:var(--muted);font-size:10px;line-height:1.5}
 .use-dimension-scale{justify-self:start}
+
+/* Keep secondary OCR and association controls out of the primary review path. */
+.ocr-options,.dataset-capture-details,.dimension-association-details{border-top:1px solid var(--line);padding-top:8px}
+.ocr-options>summary,.dataset-capture-details>summary,.dimension-association-details>summary{cursor:pointer;color:var(--muted);font-size:10px;font-weight:700;list-style:none}
+.ocr-options>summary::-webkit-details-marker,.dataset-capture-details>summary::-webkit-details-marker,.dimension-association-details>summary::-webkit-details-marker{display:none}
+.ocr-options[open],.dataset-capture-details[open],.dimension-association-details[open]{display:grid;gap:8px}
