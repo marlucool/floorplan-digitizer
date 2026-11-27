@@ -825,3 +825,11 @@ html[data-theme="light"]{
   .top-links{flex-wrap:wrap;justify-content:flex-start}
   .top-links .repo-link{display:inline-flex}
 }
+
+/* Compact scale controls: verified dimensions are the primary calibration path. */
+.manual-calibration{border-top:1px solid var(--line);padding-top:8px}
+.manual-calibration>summary{cursor:pointer;color:var(--muted);font-size:10px;font-weight:700;list-style:none}
+.manual-calibration>summary::-webkit-details-marker{display:none}
+.manual-calibration[open]{display:grid;gap:8px}
+.manual-calibration p{margin:0;color:var(--muted);font-size:10px;line-height:1.5}
+.use-dimension-scale{justify-self:start}
