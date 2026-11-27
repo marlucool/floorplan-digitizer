@@ -29,6 +29,7 @@ from .dataset import (
     add_crop_sample,
     create_grouped_splits,
     delete_crop_sample,
+    export_review_crops,
     import_crop_csv,
     validate_dataset,
     update_crop_sample,
@@ -583,6 +584,55 @@ async def import_ocr_dataset_archive(
             result = import_crop_csv(csv_path, dataset_dir, text_style=text_style)
     except (OSError, ValueError, zipfile.BadZipFile, csv.Error) as exc:
         raise HTTPException(status_code=422, detail=f"Dataset archive could not be imported: {exc}") from exc
+
+    return {**result, "dataset": _dataset_payload(dataset_id, dataset_dir)}
+
+
+@router.post("/datasets/{dataset_id}/import-review", status_code=201)
+async def import_verified_review_crops(
+    dataset_id: str,
+    file: UploadFile = File(...),
+    review_json: str = Form(...),
+    text_style: str = Form("handwritten"),
+    writer_id: str = Form(""),
+) -> dict[str, Any]:
+    """Bulk-import only verified dimension crops from a Drawing review export."""
+    dataset_dir = _dataset_dir(dataset_id)
+    if len(review_json.encode("utf-8")) > 2 * 1024 * 1024:
+        await file.close()
+        raise HTTPException(status_code=413, detail="Review JSON limit is 2 MB.")
+    suffix = Path(file.filename or "source.png").suffix.lower()
+    if suffix not in {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff"}:
+        await file.close()
+        raise HTTPException(status_code=415, detail="Use a PNG, JPG, WEBP or TIFF source image.")
+    if file.size is not None and file.size > MAX_CROP_BYTES:
+        await file.close()
+        raise HTTPException(status_code=413, detail="Source drawing limit is 25 MB.")
+    try:
+        image_bytes = await file.read(MAX_CROP_BYTES + 1)
+    finally:
+        await file.close()
+    if len(image_bytes) > MAX_CROP_BYTES:
+        raise HTTPException(status_code=413, detail="Source drawing limit is 25 MB.")
+    if len(writer_id) > 128:
+        raise HTTPException(status_code=422, detail="Writer ID must be 128 characters or fewer.")
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="planline-review-import-") as temporary:
+            temporary_dir = Path(temporary)
+            image_path = temporary_dir / ("source" + suffix)
+            review_path = temporary_dir / "review.json"
+            image_path.write_bytes(image_bytes)
+            review_path.write_text(review_json, encoding="utf-8")
+            result = export_review_crops(
+                review_path,
+                image_path,
+                dataset_dir,
+                text_style=text_style,
+                writer_id=writer_id.strip() or None,
+            )
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=f"Review crops could not be imported: {exc}") from exc
 
     return {**result, "dataset": _dataset_payload(dataset_id, dataset_dir)}
 
