@@ -54,13 +54,13 @@ On macOS/Linux, install requirements-desktop.txt and run sh run_planline_desktop
 5. Reuse the same source ID for all crops from the same drawing. Use a stable pseudonymous writer ID for one handwriting author when evaluating generalisation across writers.
 6. Review, correct or delete saved labels in the sample library. Any label/group change invalidates the previous split plan.
 
-Only the selected crop is sent to the local API. The full input scan stays in the browser. The Drawing workspace can also send an individual dimension crop directly into a selected OCR dataset after its transcription is manually verified. Saved crop images and manifests are written below datasets/ocr/ for source/development runs. Installed Windows builds use %LOCALAPPDATA%/Planline/ocr, outside the application folder. The OCR Studio endpoint accepts raster images only; add PDF pages through the drawing workflow or rasterise the desired page locally before adding it as an image. Do not commit personal property information or complete source plans into the repository.
+Normal crop annotation sends only the selected crop to the local API; the full scan stays in the browser. For bulk capture, OCR Studio can also import a Drawing review JSON together with its exact source raster and extract only the non-empty, verified crops whose bounds are recorded in that review. That optional operation sends the source raster to the local API for local crop extraction; it does not upload it to a remote service. The Drawing workspace can still save individual verified crops. OCR Studio also imports a ZIP containing one annotation CSV and its referenced crop images, and exports the current verified dataset plus split metadata without training checkpoints or logs. Saved crop images and manifests are written below datasets/ocr/ for source/development runs. Installed Windows builds use %LOCALAPPDATA%/Planline/ocr, outside the application folder. Bulk review import accepts raster images; rasterise PDF pages locally first. Do not commit personal property information or complete source plans into the repository.
 
 ### Training and evaluation
 
 The Windows installer provisions the compatible PaddlePaddle and PaddleOCR inference runtime in Planline's private Python environment. OCR Studio can prepare the pinned PaddleOCR source checkout and matching PP-OCRv5 pretrained checkpoint on demand for fine-tuning; those larger training assets are not bundled with the installer. The mobile recogniser is the initial low-memory option; the server model has higher memory requirements.
 
-Build drawing-safe splits before training. Samples sharing a source drawing or writer ID are kept in one connected group so crops from one drawing/author cannot leak across train, validation and test. Fine-tuning receives train and validation data only; the held-out test split is excluded from optimisation. Benchmark runs generate predictions and calculate exact full-string match, prediction coverage and character error rate on the held-out test group.
+Build drawing-safe splits before training. Samples sharing a source drawing or writer ID are kept in one connected group so crops from one drawing/author cannot leak across train, validation and test. Fine-tuning receives train and validation data only; the held-out test split is excluded from optimisation. Benchmark runs generate predictions and calculate exact full-string match, prediction coverage and character error rate on the held-out test group. Training and benchmark job status, progress and recent logs are written alongside each run; reloading the browser reconnects to an active local job, while restarting the application marks unfinished jobs as interrupted and preserves their logs and output files.
 
 A small number of crops validates the workflow, not model quality. No claim of useful recognition accuracy is made until representative, independent drawings have been labelled and the model has been evaluated on a sufficiently varied held-out set. OCR Studio manages training data and models; the Drawing workspace performs geometric candidate association and can derive a candidate scale from a confirmed dimension/span pair. Neither workspace automatically reconstructs measured CAD geometry.
 
@@ -73,6 +73,9 @@ The Drawing workspace can export user-authored wall segments and closed room out
 - `GET /api/health` — lightweight service/model readiness status; does not load the detector.
 - `POST /api/analyze` — candidate-region detection for one uploaded file. Optional multipart field `confidence_threshold` defaults to `0.25` and must be in `(0, 1]`; the UI exposes a narrower `0.05–0.80` range.
 - `POST /api/ocr/recognize-review` — recognition-only OCR for dimension crops from a review export; the Drawing UI calls it automatically when the local OCR runtime is ready.
+- `POST /api/ocr/datasets/{id}/import-review` — bulk-import verified crops from a review JSON and its matching raster image.
+- `POST /api/ocr/datasets/{id}/import-archive` and `GET /api/ocr/datasets/{id}/export` — transfer verified crop datasets through a bounded, path-checked ZIP archive.
+- `GET /api/ocr/jobs` — list recent persisted OCR training and benchmark jobs; `GET /api/ocr/jobs/{id}` retrieves an individual job.
 - `POST /api/interpret-dimension` — conservative parsing of explicitly written metric/imperial dimension strings.
 - `POST /api/validate-dimension-chain` — arithmetic check for explicitly supplied dimension values and verification flags. This remains separate from geometric association.
 - `GET /docs` — interactive FastAPI/OpenAPI documentation.
@@ -276,14 +279,14 @@ crops/plan-b-001.png,3.65m,plan-b,writer-02,handwritten,true
 crops/plan-c-001.png,1800,plan-c,writer-03,handwritten,true
 ~~~
 
-- image is a path relative to the CSV file (or an absolute path).
+- image is a path relative to the CSV file (or an absolute path for local CLI imports). For the OCR Studio ZIP importer, keep paths relative and include the referenced image files in the same ZIP.
 - text is the exact visible string; preserve decimal marks and units rather than normalising them.
 - source_id must be the same for every crop from the same drawing.
 - writer_id is optional but should be a stable pseudonymous ID when known. Do not use a person's real name. Samples with the same writer_id are kept in the same split, even across different drawings. If every crop is from one writer, keeping that writer_id will intentionally make one group and prevent an independent split. You can omit writer_id to measure generalisation to unseen drawings by that same writer, but that will not test generalisation to new handwriting styles.
 - text_style is handwritten, printed, unclear or unknown. The default import selects handwritten rows.
 - verified must be true only after the label has been checked against the source.
 
-Import, validate and split:
+For the UI, place the CSV and its crop images in one ZIP, then use **Import CSV + crop ZIP** in OCR Studio. Choose handwritten, printed or all verified styles. The ZIP must contain exactly one CSV; image paths must resolve inside the archive. Alternatively, import, validate and split from the CLI:
 
 ~~~bash
 python -m planline.dataset import-csv --annotations crops.csv --output-dir datasets/handwriting
