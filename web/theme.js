@@ -4,16 +4,8 @@
   const button = document.querySelector("#themeToggle");
   const header = document.querySelector(".topbar");
   const links = document.querySelector(".top-links");
-  if (header && links && !header.querySelector(".nav-menu-toggle")) {
-    const menu = document.createElement("button");
-    menu.className = "nav-menu-toggle";
-    menu.type = "button";
-    menu.setAttribute("aria-label", "Open navigation");
-    menu.setAttribute("aria-expanded", "false");
-    menu.setAttribute("aria-controls", "planlineNavigation");
-    menu.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
-    links.id = "planlineNavigation";
-    header.append(menu);
+  const menu = header?.querySelector(".nav-menu-toggle");
+  if (header && links && menu) {
     const closeMenu = () => {
       header.classList.remove("menu-open");
       menu.setAttribute("aria-expanded", "false");
@@ -43,7 +35,7 @@
     const dark = theme !== "light";
     const value = dark ? "dark" : "light";
     root.dataset.theme = value;
-    if (meta) meta.content = dark ? "#0b1017" : "#f4f7fa";
+    if (meta) meta.content = dark ? "#07090f" : "#f5f6fb";
     if (button) {
       button.innerHTML = dark ? sun : moon;
       button.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
