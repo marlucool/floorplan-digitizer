@@ -8,7 +8,7 @@
     pythonCompatible: false, paddleGpuAvailable: false, trainingAssets: null
   };
 
-  const terminalStatuses = new Set(["completed", "completed_no_export", "failed", "cancelled"]);
+  const terminalStatuses = new Set(["completed", "completed_no_export", "failed", "cancelled", "interrupted"]);
 
   function message(text, kind = "info") {
     const node = $("#annotationMessage");
@@ -31,7 +31,32 @@
   function setView() {
     const studio = $("#ocrStudio");
     if (studio) studio.classList.remove("hidden");
-    loadDatasets().catch((error) => message(error.message, "error"));
+    loadDatasets().then(restoreActiveJob).catch((error) => message(error.message, "error"));
+  }
+
+  async function restoreActiveJob() {
+    if (window.PLANLINE_PREVIEW === true) return;
+    try {
+      const payload = await api("/api/ocr/jobs");
+      const jobs = Array.isArray(payload.jobs) ? payload.jobs : [];
+      const active = jobs.find((job) => ["queued", "running"].includes(job.status));
+      if (active) {
+        beginJob(active, active.kind === "benchmark" ? "OCR benchmark" : "Fine-tuning dimension recogniser");
+        message("Restored the running OCR job after reloading the workspace.", "success");
+        return;
+      }
+      const interrupted = jobs.find((job) => job.status === "interrupted");
+      if (interrupted) {
+        $("#jobPanel").classList.remove("hidden");
+        $("#jobTitle").textContent = interrupted.kind === "benchmark" ? "OCR benchmark" : "Fine-tuning dimension recogniser";
+        $("#jobStatus").textContent = "INTERRUPTED";
+        $("#jobLog").textContent = (interrupted.logs || "") + "\n" + (interrupted.error || "The application restarted before this job finished.");
+        $("#jobProgressBar").style.width = "0%";
+        $("#cancelJobButton").classList.add("hidden");
+      }
+    } catch (error) {
+      message("Could not restore previous OCR job status: " + error.message, "error");
+    }
   }
 
   function setBusy(busy) {
