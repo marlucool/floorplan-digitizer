@@ -300,6 +300,7 @@
     try {
       const form = new FormData();
       form.append("file", file);
+      form.append("text_style", $("#datasetImportStyle").value);
       const payload = await api("/api/ocr/datasets/" + encodeURIComponent(state.datasetId) + "/import-archive", {
         method: "POST",
         body: form
