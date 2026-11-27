@@ -78,7 +78,9 @@ def test_documentation_renders_markdown_source_and_image_files() -> None:
     image = client.get("/docs/rysunek.png")
     assert image.status_code == 200
     assert image.headers["content-type"].startswith("image/png")
-    assert image.content[:8] == b"\x89PNG\r\n\x1a\n"
+    assert image.content[:8] == b"\x89PNG\r
+\x1a
+"
 
 
 def test_documentation_renders_archived_source_as_readable_code() -> None:
@@ -94,4 +96,12 @@ def test_documentation_path_resolver_rejects_paths_outside_docs_directory() -> N
         safe_document_path(docs_root, "../README.md")
     with pytest.raises(FileNotFoundError):
         safe_document_path(docs_root, "..\\README.md")
-\n\ndef test_documentation_and_architecture_share_primary_navigation() -> None:\n    client = TestClient(app)\n    for path in ("/documentation", "/documentation/ARCHITECTURE.md", "/architecture"):\n        response = client.get(path)\n        assert response.status_code == 200\n        assert 'href="/drawing">Drawing workspace</a>' in response.text\n        assert 'href="/architecture">Architecture</a>' in response.text\n
+
+
+def test_documentation_and_architecture_share_primary_navigation() -> None:
+    client = TestClient(app)
+    for path in ("/documentation", "/documentation/ARCHITECTURE.md", "/architecture"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert 'href="/drawing">Drawing workspace</a>' in response.text
+        assert 'href="/architecture">Architecture</a>' in response.text
