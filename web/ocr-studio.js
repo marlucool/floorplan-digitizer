@@ -315,6 +315,37 @@
       button.disabled = false;
     }
   });
+  function updateReviewImportButton() {
+    $("#importReviewButton").disabled = !state.datasetId || !$("#reviewJsonFile").files?.length || !$("#reviewImageFile").files?.length;
+  }
+  $("#reviewJsonFile").addEventListener("change", updateReviewImportButton);
+  $("#reviewImageFile").addEventListener("change", updateReviewImportButton);
+  $("#importReviewButton").addEventListener("click", async () => {
+    const reviewFile = $("#reviewJsonFile").files?.[0];
+    const imageFile = $("#reviewImageFile").files?.[0];
+    if (!state.datasetId || !reviewFile || !imageFile) return;
+    const button = $("#importReviewButton");
+    button.disabled = true;
+    $("#datasetTransferStatus").textContent = "Reading the review export and importing only verified crops…";
+    try {
+      const form = new FormData();
+      form.append("file", imageFile);
+      form.append("review_json", await reviewFile.text());
+      form.append("text_style", $("#datasetImportStyle").value);
+      form.append("writer_id", $("#reviewWriterId").value.trim());
+      const payload = await api("/api/ocr/datasets/" + encodeURIComponent(state.datasetId) + "/import-review", {
+        method: "POST",
+        body: form
+      });
+      await loadDataset();
+      $("#datasetTransferStatus").textContent = "Imported " + payload.added + " verified review crops. Skipped " + (payload.skipped_unverified || 0) + " unverified, " + (payload.skipped_style || 0) + " other-style, " + (payload.skipped_blank || 0) + " blank and " + (payload.skipped_no_crop || 0) + " crops without bounds.";
+      message("Verified crops imported from the drawing review. Rebuild splits before training.", "success");
+    } catch (error) {
+      $("#datasetTransferStatus").textContent = "Review import failed: " + error.message;
+    } finally {
+      updateReviewImportButton();
+    }
+  });
   $("#sampleFilter").addEventListener("change", renderSamples);
   $("#newDatasetButton").addEventListener("click", () => $("#newDatasetForm").classList.toggle("hidden"));
   $("#createDatasetButton").addEventListener("click", async () => {
