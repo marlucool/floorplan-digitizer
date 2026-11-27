@@ -47,6 +47,12 @@
               <input id="datasetArchiveFile" type="file" accept=".zip,application/zip" hidden>
             </div>
             <p id="datasetTransferStatus" class="studio-hint">Import a ZIP containing one annotations CSV and its referenced crop images, or export the current verified dataset.</p>
+            <div class="studio-form-fields dataset-review-import">
+              <label>Drawing review JSON <input id="reviewJsonFile" type="file" accept=".json,application/json"></label>
+              <label>Original drawing image <input id="reviewImageFile" type="file" accept=".png,.jpg,.jpeg,.webp,.tif,.tiff,image/png,image/jpeg,image/webp,image/tiff"></label>
+              <label>Optional writer ID <input id="reviewWriterId" type="text" maxlength="128" placeholder="Same handwriting author across drawings"></label>
+              <button id="importReviewButton" class="toolbar-button" type="button" disabled>Import verified crops from review</button>
+            </div>
             <p class="studio-hint" id="datasetHint">Each crop is stored locally under the repository's ignored datasets/ folder.</p>
             <div id="newDatasetForm" class="new-dataset-form hidden"><input id="newDatasetName" type="text" maxlength="64" placeholder="e.g. handwritten-dimensions"><button id="createDatasetButton" class="toolbar-button" type="button">Create dataset</button></div>
           </section>
