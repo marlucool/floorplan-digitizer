@@ -3,12 +3,13 @@ const PREVIEW_MODE = window.PLANLINE_PREVIEW === true;
 const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, ocrReady: false, ocrModels: [], ocrDatasets: [], ocrPredictions: {}, ocrRunning: false, ocrModelId: null, ocrDevice: null, ocrCapabilitiesLoaded: false, ocrCapabilitiesPromise: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
 
 function updateWorkflow(stage) {
-  const order = ["upload", "analyse", "review"];
+  const order = ["upload", "analyse", "review", "draw"];
   const activeIndex = Math.max(0, order.indexOf(stage));
   const labels = {
     upload: "Next: upload a floor-plan image or PDF.",
     analyse: "Next: analyse the drawing to find candidate walls and dimensions.",
-    review: "Next: review the detected regions. Verify written dimensions before using them as a scale reference."
+    review: "Next: review the detected regions. Verify written dimensions before using them as a scale reference.",
+    draw: "Next: trace the walls and room boundaries you need, then export your own geometry."
   };
   document.querySelectorAll(".workflow-step").forEach((step) => {
     const index = order.indexOf(step.dataset.step);
@@ -984,8 +985,8 @@ function exportManualGeometrySvg() {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-$("#drawWallTool").addEventListener("click", () => setGeometryMode("draw_wall"));
-$("#drawRoomTool").addEventListener("click", () => setGeometryMode("draw_room"));
+$("#drawWallTool").addEventListener("click", () => { setGeometryMode("draw_wall"); updateWorkflow("draw"); });
+$("#drawRoomTool").addEventListener("click", () => { setGeometryMode("draw_room"); updateWorkflow("draw"); });
 $("#finishRoom").addEventListener("click", finishManualRoom);
 $("#cancelRoom").addEventListener("click", cancelManualRoom);
 $("#deleteRoom").addEventListener("click", deleteSelectedManualRoom);
