@@ -67,11 +67,12 @@
         </section>
         <section class="calibration-panel" aria-labelledby="calibrationHeading">
           <div class="calibration-heading"><strong id="calibrationHeading">Drawing scale</strong><span class="calibration-state" id="calibrationState">Not set</span></div>
-          <output id="calibrationResult" aria-live="polite">Verify a written dimension below, then use it to set the scale.</output>
+          <output id="calibrationResult" aria-live="polite">Confirm a dimension's text and wall-span match below to derive scale.</output>
           <div class="calibration-points" id="calibrationPoints" aria-live="polite">No scale reference selected.</div>
+          <button id="clearCalibration" class="toolbar-button" type="button" disabled>Clear scale</button>
           <details class="manual-calibration">
             <summary>Set scale manually</summary>
-            <p>Use this only when no readable written dimension is available.</p>
+            <p>Use this only when no readable written dimension or reliable wall-span match is available.</p>
             <button id="startCalibration" class="toolbar-button" type="button" disabled>Pick two points</button>
             <div class="calibration-inputs">
               <label for="calibrationDistance">Known distance</label>
@@ -82,7 +83,6 @@
             </div>
             <div class="calibration-actions">
               <button id="applyCalibration" class="toolbar-button" type="button" disabled>Apply manual scale</button>
-              <button id="clearCalibration" class="toolbar-button" type="button" disabled>Clear scale</button>
             </div>
           </details>
         </section>
