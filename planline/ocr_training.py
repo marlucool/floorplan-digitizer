@@ -99,6 +99,7 @@ def _append_log(job_id: str, line: str) -> None:
             return
         job["_log_lines"].append(clean)
         job["_log_lines"] = job["_log_lines"][-300:]
+        _persist_job_locked(job)
         match = re.search(r"epoch\s*:\s*\[\s*(\d+)\s*/\s*(\d+)\s*\]", clean, re.I)
         if match:
             job["epoch"] = int(match.group(1))
@@ -113,10 +114,94 @@ def _public_job(job: dict[str, Any]) -> dict[str, Any]:
     } | {"logs": "\n".join(job.get("_log_lines", []))}
 
 
+def _job_roots() -> list[Path]:
+    roots: list[Path] = []
+    configured = os.environ.get("PLANLINE_DATA_DIR")
+    if configured:
+        roots.append(Path(configured).expanduser().resolve() / "ocr")
+    roots.append(Path(__file__).resolve().parents[1] / "datasets" / "ocr")
+    return list(dict.fromkeys(roots))
+
+
+def _persist_job_locked(job: dict[str, Any]) -> None:
+    state_path_value = job.get("_state_path")
+    if not state_path_value:
+        return
+    state_path = Path(state_path_value)
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = state_path.with_name(state_path.name + ".tmp")
+    temporary.write_text(
+        json.dumps(_public_job(job), indent=2, ensure_ascii=False) + "\\n",
+        encoding="utf-8",
+    )
+    temporary.replace(state_path)
+
+
+def _restore_job(job_id: str) -> dict[str, Any] | None:
+    if not re.fullmatch(r"[a-f0-9]{12}", job_id):
+        return None
+    for root in _job_roots():
+        if not root.is_dir():
+            continue
+        for pattern in ("*/training_runs/*/job.json", "*/benchmarks/*/job.json"):
+            for state_path in root.glob(pattern):
+                try:
+                    if not state_path.resolve().is_relative_to(root.resolve()):
+                        continue
+                    payload = json.loads(state_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError, ValueError):
+                    continue
+                if not isinstance(payload, dict) or payload.get("job_id") != job_id:
+                    continue
+                logs = payload.pop("logs", "")
+                job = {
+                    **payload,
+                    "_state_path": str(state_path),
+                    "_log_lines": logs.splitlines()[-300:] if isinstance(logs, str) else [],
+                    "cancel_event": threading.Event(),
+                }
+                if job.get("status") in {"queued", "running"}:
+                    job["status"] = "interrupted"
+                    job["current_step"] = "interrupted"
+                    job["error"] = (
+                        "The application restarted while this job was running. "
+                        "Its log and output files were preserved; rerun the job to continue."
+                    )
+                    job["finished_at"] = datetime.now(timezone.utc).isoformat()
+                with _JOB_LOCK:
+                    _JOBS[job_id] = job
+                    _persist_job_locked(job)
+                return job
+    return None
+
+
+def list_jobs(limit: int = 25) -> list[dict[str, Any]]:
+    for root in _job_roots():
+        if not root.is_dir():
+            continue
+        for pattern in ("*/training_runs/*/job.json", "*/benchmarks/*/job.json"):
+            for state_path in root.glob(pattern):
+                try:
+                    payload = json.loads(state_path.read_text(encoding="utf-8"))
+                    job_id = payload.get("job_id") if isinstance(payload, dict) else None
+                except (OSError, json.JSONDecodeError):
+                    continue
+                if isinstance(job_id, str) and job_id not in _JOBS:
+                    _restore_job(job_id)
+    with _JOB_LOCK:
+        jobs = sorted(_JOBS.values(), key=lambda item: item.get("created_at", ""), reverse=True)
+        return [_public_job(job) for job in jobs[:max(1, min(limit, 100))]]
+
+
 def get_job(job_id: str) -> dict[str, Any] | None:
     with _JOB_LOCK:
         job = _JOBS.get(job_id)
-        return _public_job(job) if job else None
+    if job is None:
+        job = _restore_job(job_id)
+    if job is None:
+        return None
+    with _JOB_LOCK:
+        return _public_job(job)
 
 
 def _run_process(job_id: str, command: list[str], cwd: Path, step: str) -> int:
@@ -126,6 +211,7 @@ def _run_process(job_id: str, command: list[str], cwd: Path, step: str) -> int:
             return 130
         job["current_step"] = step
         job["status"] = "running"
+        _persist_job_locked(job)
     _append_log(job_id, "$ " + subprocess.list2cmdline(command))
     process = subprocess.Popen(
         command,
@@ -219,11 +305,13 @@ def _finish(job_id: str, status: str, **fields: Any) -> None:
         job["status"] = status
         job["finished_at"] = datetime.now(timezone.utc).isoformat()
         job["current_step"] = "finished" if status == "completed" else status
+        _persist_job_locked(job)
 
 
 def _start_thread(job: dict[str, Any], target, args: tuple[Any, ...]) -> dict[str, Any]:
     with _JOB_LOCK:
         _JOBS[job["job_id"]] = job
+        _persist_job_locked(job)
     thread = threading.Thread(target=target, args=args, daemon=True, name=f"planline-ocr-{job['job_id']}")
     job["thread"] = thread
     thread.start()
@@ -298,6 +386,7 @@ def start_training_job(
         "test_samples": exported["test_samples"],
         "output_dir": str(run_dir),
         "model_dir": None,
+        "_state_path": str(run_dir / "job.json"),
         "cancel_event": threading.Event(),
         "_log_lines": [
             f"Prepared {exported['training_samples']} training and {exported['validation_samples']} validation crops.",
@@ -443,6 +532,8 @@ def start_benchmark_job(
         "model": selected_model,
         "metrics": None,
         "metrics_path": str(metrics_path),
+        "_state_path": str(result_dir / "job.json"),
+        "output_dir": str(result_dir),
         "cancel_event": threading.Event(),
         "_log_lines": ["OCR predictions are generated for the dataset; evaluation scores only the held-out test split."],
     }
@@ -496,8 +587,11 @@ def _benchmark_worker(
 def cancel_job(job_id: str) -> dict[str, Any] | None:
     with _JOB_LOCK:
         job = _JOBS.get(job_id)
-        if job is None:
-            return None
+    if job is None:
+        job = _restore_job(job_id)
+    if job is None:
+        return None
+    with _JOB_LOCK:
         job["cancel_event"].set()
         process = _PROCESSES.get(job_id)
         if process is not None and process.poll() is None:
@@ -506,4 +600,9 @@ def cancel_job(job_id: str) -> dict[str, Any] | None:
             except OSError:
                 # The process may have exited between poll() and terminate().
                 pass
+        elif job.get("status") == "interrupted":
+            job["status"] = "cancelled"
+            job["current_step"] = "cancelled"
+            job["finished_at"] = datetime.now(timezone.utc).isoformat()
+        _persist_job_locked(job)
         return _public_job(job)
