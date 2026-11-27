@@ -200,6 +200,7 @@
       $("#datasetHint").textContent = `${summary.independent_groups || 0} independent source/writer groups. Need at least three to make leak-resistant train, validation and test splits.`;
     }
     $("#datasetState").textContent = summary.valid === false ? "CHECK DATA" : "LOCAL";
+    $("#exportDatasetButton").disabled = !state.datasetId || summary.valid === false;
     renderSamples();
     renderAvailableModels();
     refreshTrainingButtons();
@@ -257,6 +258,61 @@
     state.editingId = null; clearEditMode();
     try { await loadDataset(); message("Dataset loaded."); }
     catch (error) { message(error.message, "error"); }
+  });
+  $("#exportDatasetButton").addEventListener("click", async () => {
+    if (!state.datasetId) return;
+    const button = $("#exportDatasetButton");
+    button.disabled = true;
+    $("#datasetTransferStatus").textContent = "Preparing a ZIP with verified labels, crop images and split metadata…";
+    try {
+      const response = await fetch("/api/ocr/datasets/" + encodeURIComponent(state.datasetId) + "/export");
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.detail || "Dataset export failed.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "planline-" + state.datasetId + "-dataset.zip";
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      $("#datasetTransferStatus").textContent = "Dataset ZIP exported. Model checkpoints and training logs are intentionally excluded.";
+    } catch (error) {
+      $("#datasetTransferStatus").textContent = "Export failed: " + error.message;
+    } finally {
+      button.disabled = !state.datasetId || state.dataset?.summary?.valid === false;
+    }
+  });
+
+  $("#importDatasetButton").addEventListener("click", () => {
+    $("#datasetArchiveFile").click();
+  });
+
+  $("#datasetArchiveFile").addEventListener("change", async () => {
+    const file = $("#datasetArchiveFile").files?.[0];
+    if (!file || !state.datasetId) return;
+    const button = $("#importDatasetButton");
+    button.disabled = true;
+    $("#datasetTransferStatus").textContent = "Checking the archive and importing verified crop labels…";
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const payload = await api("/api/ocr/datasets/" + encodeURIComponent(state.datasetId) + "/import-archive", {
+        method: "POST",
+        body: form
+      });
+      await loadDataset();
+      $("#datasetTransferStatus").textContent = "Imported " + payload.imported + " verified crops. Skipped " + (payload.skipped_unverified || 0) + " unverified, " + (payload.skipped_style || 0) + " other-style and " + (payload.skipped_blank || 0) + " blank rows.";
+      message("Dataset archive imported. Rebuild splits before training.", "success");
+    } catch (error) {
+      $("#datasetTransferStatus").textContent = "Import failed: " + error.message;
+    } finally {
+      $("#datasetArchiveFile").value = "";
+      button.disabled = false;
+    }
   });
   $("#sampleFilter").addEventListener("change", renderSamples);
   $("#newDatasetButton").addEventListener("click", () => $("#newDatasetForm").classList.toggle("hidden"));
