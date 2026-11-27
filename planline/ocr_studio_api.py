@@ -18,6 +18,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from starlette.background import BackgroundTask
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -473,9 +474,9 @@ def export_ocr_dataset(dataset_id: str) -> FileResponse:
     except (OSError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    export_dir = dataset_dir / "exports"
-    export_dir.mkdir(parents=True, exist_ok=True)
-    archive_path = export_dir / f"{dataset_id}-{time.time_ns()}.zip"
+    descriptor, archive_name = tempfile.mkstemp(prefix=f"planline-{dataset_id}-", suffix=".zip")
+    os.close(descriptor)
+    archive_path = Path(archive_name)
     try:
         with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             archive.write(dataset_dir / MANIFEST_NAME, arcname=MANIFEST_NAME)
@@ -497,11 +498,16 @@ def export_ocr_dataset(dataset_id: str) -> FileResponse:
         archive_path,
         media_type="application/zip",
         filename=f"planline-{dataset_id}-dataset.zip",
+        background=BackgroundTask(archive_path.unlink, missing_ok=True),
     )
 
 
 @router.post("/datasets/{dataset_id}/import-archive", status_code=201)
-async def import_ocr_dataset_archive(dataset_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
+async def import_ocr_dataset_archive(
+    dataset_id: str,
+    file: UploadFile = File(...),
+    text_style: str = Form("handwritten"),
+) -> dict[str, Any]:
     """Import verified pre-cropped samples from a ZIP containing one annotation CSV."""
     dataset_dir = _dataset_dir(dataset_id)
     if file.size is not None and file.size > 100 * 1024 * 1024:
@@ -518,11 +524,16 @@ async def import_ocr_dataset_archive(dataset_id: str, file: UploadFile = File(..
         with tempfile.TemporaryDirectory(prefix="planline-ocr-import-") as temporary:
             extract_root = Path(temporary).resolve()
             with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
-                members = [item for item in archive.infolist() if not item.is_dir()]
-                if not members or len(members) > 5000:
-                    raise ValueError("The archive must contain between 1 and 5,000 files.")
+                all_members = archive.infolist()
+                if not all_members or len(all_members) > 5000:
+                    raise ValueError("The archive must contain no more than 5,000 entries.")
+                members = [item for item in all_members if not item.is_dir()]
+                if not members:
+                    raise ValueError("The archive must contain at least one file.")
                 if sum(item.file_size for item in members) > 250 * 1024 * 1024:
                     raise ValueError("The expanded dataset archive exceeds 250 MB.")
+                if any(item.file_size > 10 * 1024 * 1024 for item in members if item.filename.lower().endswith(".csv")):
+                    raise ValueError("The annotation CSV must be 10 MB or smaller.")
                 csv_members = [item for item in members if item.filename.lower().endswith(".csv")]
                 if len(csv_members) != 1:
                     raise ValueError("Include exactly one annotation CSV in the dataset archive.")
@@ -570,7 +581,7 @@ async def import_ocr_dataset_archive(dataset_id: str, file: UploadFile = File(..
                     resolved_image = (csv_path.parent / image_path).resolve()
                     if not resolved_image.is_relative_to(extract_root) or not resolved_image.is_file():
                         raise ValueError(f"CSV image on row {row_number} is missing or outside the archive.")
-            result = import_crop_csv(csv_path, dataset_dir)
+            result = import_crop_csv(csv_path, dataset_dir, text_style=text_style)
     except (OSError, ValueError, zipfile.BadZipFile, csv.Error) as exc:
         raise HTTPException(status_code=422, detail=f"Dataset archive could not be imported: {exc}") from exc
 
