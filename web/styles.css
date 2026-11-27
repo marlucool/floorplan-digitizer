@@ -1306,3 +1306,29 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea {
 @media(min-width:761px) and (max-width:1050px) {
   .workflow-steps { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
+
+
+/* OCR Studio orientation: make the three main jobs visible and import tools secondary. */
+.studio-workflow {
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;
+  margin:0 0 22px;padding:14px;border:1px solid var(--app-border);
+  border-radius:18px;background:var(--app-panel);box-shadow:var(--app-shadow);
+}
+.studio-workflow>a {
+  display:grid;grid-template-columns:30px minmax(0,1fr);column-gap:10px;row-gap:3px;
+  align-items:center;padding:11px 12px;border:1px solid transparent;border-radius:13px;
+  background:var(--app-panel-soft);color:var(--ink);text-decoration:none;
+}
+.studio-workflow>a:hover { border-color:var(--app-border-strong);background:var(--hover); }
+.studio-workflow>a:focus-visible { outline:2px solid var(--app-accent);outline-offset:3px; }
+.studio-workflow>a>span { grid-row:1 / span 2;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--app-accent-soft);color:var(--app-accent);font-size:12px;font-weight:800; }
+.studio-workflow>a strong { font-size:14px; }
+.studio-workflow>a small { color:var(--muted);font-size:12px;line-height:1.4; }
+.dataset-transfer-details { margin:12px 0; }
+.dataset-transfer-details[open] { padding-bottom:10px; }
+.dataset-transfer-details .dataset-transfer-actions,.dataset-transfer-details .dataset-review-import { margin-left:10px;margin-right:10px; }
+.dataset-transfer-details>#datasetTransferStatus { margin-left:10px;margin-right:10px; }
+@media(max-width:760px) {
+  .studio-workflow { grid-template-columns:1fr;gap:7px;padding:11px; }
+  .studio-workflow>a { padding:10px; }
+}
