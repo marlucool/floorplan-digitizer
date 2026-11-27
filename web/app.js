@@ -2419,7 +2419,7 @@ if (PREVIEW_MODE) {
   fetch("/api/health").then((r) => r.json()).then((health) => {
     const meta = $(".top-meta");
     if (health.status === "ok") {
-      $("#apiStatus").textContent = health.detector_weights_present ? "API ready · detector weights found" : "API ready · detector missing";
+      $("#apiStatus").textContent = (health.detector_weights_present ? "Detector ready" : "Detector missing") + " · " + (health.ocr_available ? "OCR ready" : "OCR runtime missing") + " · " + (health.dimension_association_available ? "dimension matching ready" : "dimension matching unavailable");
       if (!health.detector_weights_present) showNotice("Detector model missing", "The UI and API are available, but yolo_floorplan.pt must be present in the repository root before analysis can run.");
     } else {
       meta.classList.add("api-error");
