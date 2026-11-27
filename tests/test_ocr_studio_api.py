@@ -123,6 +123,51 @@ def test_dataset_archive_import_rejects_csv_path_traversal(tmp_path: Path, monke
     assert "outside the archive" in response.json()["detail"]
 
 
+def test_import_review_bulk_saves_only_verified_dimension_crops(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(ocr_studio_api, "OCR_DATASET_ROOT", tmp_path / "ocr")
+    app = FastAPI()
+    app.include_router(ocr_studio_api.router)
+    client = TestClient(app)
+    dataset_id = client.post("/api/ocr/datasets", json={"name": "review import"}).json()["dataset_id"]
+    review = {
+        "schema_version": "planline-detection-review/v1",
+        "source": {
+            "filename": "plan.png",
+            "page_index": 0,
+            "image_width_px": 28,
+            "image_height_px": 16,
+        },
+        "manual_dimension_text_review": [
+            {
+                "detection_id": "det-verified",
+                "raw_text": "4,200 mm",
+                "text_style": "handwritten",
+                "verified": True,
+                "crop_bbox": {"x1": 2, "y1": 2, "x2": 24, "y2": 14},
+            },
+            {
+                "detection_id": "det-unverified",
+                "raw_text": "2500",
+                "text_style": "handwritten",
+                "verified": False,
+                "crop_bbox": {"x1": 2, "y1": 2, "x2": 24, "y2": 14},
+            },
+        ],
+    }
+    response = client.post(
+        f"/api/ocr/datasets/{dataset_id}/import-review",
+        data={"review_json": json.dumps(review), "text_style": "all", "writer_id": "writer-a"},
+        files={"file": ("plan.png", _png(), "image/png")},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["added"] == 1
+    assert response.json()["skipped_unverified"] == 1
+    sample = response.json()["dataset"]["samples"][0]
+    assert sample["text"] == "4,200 mm"
+    assert sample["writer_id"] == "writer-a"
+    assert sample["verified"] is True
+
+
 def test_malformed_split_metadata_does_not_break_dataset_views(
     tmp_path: Path, monkeypatch
 ) -> None:
