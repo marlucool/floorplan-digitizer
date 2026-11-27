@@ -71,7 +71,7 @@ def render_architecture_page(
     <div class="top-meta"><span class="local-dot"></span><span>TECHNICAL REFERENCE</span></div>
     <nav class="top-links" aria-label="Main navigation">
       <a class="repo-link" href="{home_href}">Dashboard</a>
-      <a class="repo-link" href="{drawing_href}">Drawing</a>
+      <a class="repo-link" href="{drawing_href}">Drawing workspace</a>
       <a class="repo-link" href="{ocr_href}">OCR Studio</a>
       <a class="repo-link" href="{settings_href}">Settings</a>
       <a class="repo-link" href="/documentation">Documentation</a>
