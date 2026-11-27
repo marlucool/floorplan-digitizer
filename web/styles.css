@@ -1278,3 +1278,27 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea {
   .advanced-options>summary { align-items:flex-start;flex-direction:column;gap:4px; }
   .advanced-options>summary span { margin-left:0;text-align:left; }
 }
+
+
+/* Make every drawing-workspace instruction readable at normal zoom. */
+.sidebar .panel-heading { font-size:12px;letter-spacing:.06em; }
+.sidebar .step-state,.file-info small,.project-controls small,.pdf-page-control small,
+.confidence-control small,.image-cleanup-panel small,.calibration-panel p,
+.calibration-points,.geometry-panel p,.geometry-panel output,.geometry-snap,
+.pipeline small { font-size:12px;line-height:1.55; }
+.confidence-control label,.image-cleanup-panel label,.calibration-inputs label { font-size:13px; }
+.calibration-heading strong,.geometry-heading strong { font-size:14px; }
+.geometry-heading span,.room-heading span { font-size:11px; }
+.geometry-tools button { font-size:12px;min-height:40px; }
+.geometry-panel output { overflow-wrap:anywhere; }
+.privacy-note { font-size:12px;line-height:1.6; }
+.workflow-step { text-decoration:none; }
+.workflow-step:hover { border-color:var(--app-border-strong);background:var(--hover); }
+.workflow-step:focus-visible { outline:2px solid var(--app-accent);outline-offset:3px; }
+.workspace-nav { flex-wrap:wrap; }
+.workspace-nav-item { font-size:13px; }
+@media(max-width:760px) {
+  .workspace-nav { gap:6px; }
+  .workspace-nav-item { padding:9px 11px; }
+  .workspace-nav-hint { width:100%;margin:3px 0 0; }
+}
