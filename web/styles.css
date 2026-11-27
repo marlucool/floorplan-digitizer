@@ -1044,3 +1044,14 @@ html[data-theme="dark"] {
   --panel:rgba(22,27,43,.72);--surface:rgba(22,27,43,.68);--hover:rgba(255,255,255,.085);
   --accent:#8183f0;
 }
+
+/* Keyboard users can bypass the floating global navigation. */
+.skip-link {
+  position:fixed;top:8px;left:8px;z-index:1000;padding:10px 14px;
+  transform:translateY(-160%);border:1px solid var(--app-border-strong);
+  border-radius:999px;background:var(--app-panel-raised);color:var(--ink);
+  box-shadow:var(--app-shadow);font:600 12px var(--font-body);text-decoration:none;
+}
+.skip-link:focus { transform:translateY(0);outline:2px solid var(--app-accent);outline-offset:3px; }
+.top-links { list-style:none; }
+.nav-menu-toggle { cursor:pointer; }
