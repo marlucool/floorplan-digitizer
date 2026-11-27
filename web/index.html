@@ -161,25 +161,31 @@
       <details class="text-review hidden" id="dimensionTextReview">
         <summary><span class="eyebrow">03 / DIMENSIONS</span><strong>Read and verify dimensions <span class="summary-hint">OCR suggestions · line and wall matching</span></strong></summary>
         <div class="ocr-assist-controls">
-          <label for="ocrModelSelect">Recognition model</label>
-          <select id="ocrModelSelect"><option value="base:PP-OCRv5_mobile_rec">PP-OCRv5 mobile · base</option></select>
-          <label for="ocrDeviceSelect">Device</label>
-          <select id="ocrDeviceSelect">
-            <option value="cpu">CPU</option>
-            <option value="gpu:0">GPU (requires a compatible Paddle GPU runtime)</option>
-          </select>
           <button id="runOcrButton" class="toolbar-button" type="button" disabled>Run OCR on candidates</button>
           <output id="ocrAssistStatus" aria-live="polite">Checking optional OCR runtime…</output>
+          <details class="ocr-options">
+            <summary>Recognition settings</summary>
+            <label for="ocrModelSelect">Recognition model</label>
+            <select id="ocrModelSelect"><option value="base:PP-OCRv5_mobile_rec">PP-OCRv5 mobile · base</option></select>
+            <label for="ocrDeviceSelect">Device</label>
+            <select id="ocrDeviceSelect">
+              <option value="cpu">CPU</option>
+              <option value="gpu:0">GPU (requires a compatible Paddle GPU runtime)</option>
+            </select>
+          </details>
         </div>
-        <section class="dataset-capture-panel" aria-label="Save reviewed dimension crops to OCR training data">
-          <div class="dataset-capture-heading"><strong>Save verified crops to training data</strong><a href="/ocr">Manage datasets ↗</a></div>
-          <div class="dataset-capture-fields">
-            <label for="drawingDatasetSelect">OCR dataset<select id="drawingDatasetSelect"><option value="">Loading local datasets…</option></select></label>
-            <label for="drawingSourceId">Source drawing ID<input id="drawingSourceId" type="text" maxlength="128" placeholder="Drawing filename"></label>
-            <label for="drawingWriterId">Writer ID (optional)<input id="drawingWriterId" type="text" maxlength="128" placeholder="Reuse for the same handwriting author"></label>
-          </div>
-          <output id="datasetCaptureStatus" aria-live="polite">Only individually verified crops are saved. The full drawing stays in the current workspace.</output>
-        </section>
+        <details class="dataset-capture-details">
+          <summary>Save verified crops for OCR training</summary>
+          <section class="dataset-capture-panel" aria-label="Save reviewed dimension crops to OCR training data">
+            <div class="dataset-capture-heading"><strong>Training dataset</strong><a href="/ocr">Manage datasets ↗</a></div>
+            <div class="dataset-capture-fields">
+              <label for="drawingDatasetSelect">OCR dataset<select id="drawingDatasetSelect"><option value="">Loading local datasets…</option></select></label>
+              <label for="drawingSourceId">Source drawing ID<input id="drawingSourceId" type="text" maxlength="128" placeholder="Drawing filename"></label>
+              <label for="drawingWriterId">Writer ID (optional)<input id="drawingWriterId" type="text" maxlength="128" placeholder="Reuse for the same handwriting author"></label>
+            </div>
+            <output id="datasetCaptureStatus" aria-live="polite">Only individually verified crops are saved. The full drawing stays in the current workspace.</output>
+          </section>
+        </details>
         <p class="dimension-interpreter-note">Check the number against its crop, interpret it, then mark it verified. Use a verified dimension to set scale in one step.</p>
         <div id="dimensionTextItems" class="dimension-text-items"></div>
       </details>
