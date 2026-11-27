@@ -448,7 +448,7 @@ function applyCalibration(referenceDistanceMm = null, reference = null) {
 }
 
 $("#startCalibration").addEventListener("click", startCalibration);
-$("#applyCalibration").addEventListener("click", applyCalibration);
+$("#applyCalibration").addEventListener("click", () => applyCalibration());
 $("#clearCalibration").addEventListener("click", clearCalibration);
 function getSourcePoint(event) {
   if (!state.result) return null;
