@@ -30,11 +30,12 @@ Planline is no longer just a detector preview. The current application is a **lo
 - A separate conservative dimension-text parser recognises supported explicit units and formats (including metric and common imperial forms). A bare number without a unit is not assumed to be millimetres, and ambiguous separators remain unresolved. Parsing is not proof that the OCR reading is correct.
 - The dimension-association module ranks candidate relationships from dimension-value regions to dimension-line regions and wall gaps using orientation, alignment, projected position and nearby wall-box geometry. A dimension line may be shared by multiple labels in a chained dimension; the same candidate wall gap is not assigned to competing labels. Scores are relative rankings, not probabilities. Every proposed relationship requires reviewer confirmation.
 - The dimension-chain checker uses decimal arithmetic to compare explicitly entered segment values with an overall value and a stated tolerance. It reports missing, unverified and conflicting values. It can propose the remainder for exactly one missing segment only when all known segments and the overall value are verified; that proposal still requires confirmation.
-- A separate wall-dimension comparison checks a user-supplied pixel scale against an explicitly supplied dimension. It reports the difference and tolerance status, but does not rescale, move or validate the wall geometry.
+- A separate wall-dimension comparison checks the active pixel scale against an explicitly supplied dimension and reports its provenance (confirmed dimension/span association or manual two-point reference). It reports the difference and tolerance status, but does not rescale, move or validate the wall geometry.
 
 ### OCR Studio and datasets
 
-- OCR Studio includes a crop editor, verified-label library, dataset import/export, manifest and checksum validation, source/writer-grouped split creation, dataset-quality reporting and training-job monitoring.
+- OCR Studio includes a crop editor, verified-label library, bulk import from verified Drawing reviews, bounded CSV-plus-images ZIP import, verified dataset ZIP export, manifest and checksum validation, source/writer-grouped split creation, dataset-quality reporting and training-job monitoring.
+- Training and benchmark job snapshots and recent logs are persisted beside their run outputs. A browser reload reconnects to active jobs; an application restart marks unfinished jobs as interrupted rather than pretending that their subprocesses resumed.
 - Local PaddleOCR PP-OCRv5 fine-tuning jobs can be configured from a matching pretrained checkpoint and PaddleOCR source checkout. Benchmark tooling evaluates a recogniser against a held-out test split and reports exact-string accuracy and character error rate.
 - These features provide a reproducible training/evaluation workflow; they do **not** prove that a recogniser is accurate on real architectural drawings. Training still requires compatible local PaddlePaddle/PaddleOCR assets, representative rights-cleared crops and a genuinely independent held-out set. Do not describe a model as validated merely because a training job completes.
 - The Windows installer provisions PaddlePaddle and the pinned PaddleOCR recognition runtime in Planline's private Python environment. OCR Studio downloads the pinned PaddleOCR source checkout and matching pretrained training checkpoint on demand when training assets are prepared or a training job is started; these larger assets are not bundled in the installer. The core web requirements keep the heavyweight training stack separate.
@@ -183,7 +184,7 @@ Reference: https://doi.org/10.1016/j.autcon.2023.105156
 
 ### Audit of the repository's existing digit OCR
 
-The legacy main.py pipeline is not ready to be called from the web API as-is:
+The legacy main.py pipeline is not ready to be called from the web API as-is. It remains in Git for research, but its retired scripts and digit-only checkpoint are excluded from the Windows installer source archive:
 
 - It executes image loading, model loading, inference, file writes and DXF generation at module import time. Importing it from FastAPI would trigger the entire legacy workflow.
 - Its ResNet18 classifier has ten outputs (0–9), so it is a **digit classifier**, not a full-string OCR recognizer.
