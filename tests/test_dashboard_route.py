@@ -78,9 +78,7 @@ def test_documentation_renders_markdown_source_and_image_files() -> None:
     image = client.get("/docs/rysunek.png")
     assert image.status_code == 200
     assert image.headers["content-type"].startswith("image/png")
-    assert image.content[:8] == b"\x89PNG\r
-\x1a
-"
+    assert image.content[:8] == b"\x89PNG\r\n\x1a\n"
 
 
 def test_documentation_renders_archived_source_as_readable_code() -> None:
