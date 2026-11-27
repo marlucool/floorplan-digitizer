@@ -276,6 +276,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert "93%" in page.locator(".ocr-suggestion").inner_text()
             assert "check against drawing" in page.locator(".ocr-suggestion").inner_text()
             assert page.locator(".dimension-text-value").input_value() == "4,200 mm"
+            page.wait_for_function("document.querySelector('.dimension-text-item').dataset.parsedValueMm === \"4200\"")
             assert page.locator(".dimension-text-item").get_attribute("data-parsed-value-mm") == "4200"
             assert not page.locator(".dimension-text-verified-input").is_checked()
             page.locator("#fitView").click()
@@ -426,6 +427,8 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert "handwritten" in crop_saved["body"]
             assert "plan-01" in crop_saved["body"]
             assert "writer-a" in crop_saved["body"]
+            assert page.locator(".dimension-line-select").input_value() == "det-002"
+            assert page.locator(".dimension-wall-span-select").input_value() == "0"
             page.locator(".dimension-association-details > summary").click()
             page.locator(".dimension-line-select").select_option("det-002")
             page.locator(".dimension-wall-span-select").select_option("0")
