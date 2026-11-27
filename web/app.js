@@ -1860,6 +1860,8 @@ function buildReviewObject() {
       return {
         detection_id: region.id,
         raw_text: textInputs[index]?.value || "",
+        parsed_value_mm: textInputs[index]?.closest(".dimension-text-item")?.dataset.parsedValueMm || null,
+        dimension_type: textInputs[index]?.closest(".dimension-text-item")?.dataset.dimensionType || null,
         text_style: document.querySelectorAll(".dimension-text-style")[index]?.value || "unknown",
         verified: verifiedInputs[index]?.checked || false,
         detector_confidence: region.confidence,
