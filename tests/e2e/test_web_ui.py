@@ -525,6 +525,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert page.locator(".dimension-text-style").input_value() == "handwritten"
             assert page.locator(".dimension-text-verified-input").is_checked()
             assert page.locator(".dimension-association-verified-input").is_checked()
+            assert page.locator(".use-dimension-scale").is_enabled()
             assert page.locator("#calibrationState").inner_text() == "Applied"
             assert page.locator("#fileName").inner_text() == "plan.png"
             assert page.locator("#brightnessControl").input_value() == "20"
