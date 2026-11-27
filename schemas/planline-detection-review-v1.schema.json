@@ -587,7 +587,10 @@
           ],
           "properties": {
             "method": {
-              "const": "user_two_point_reference"
+              "enum": [
+                "user_two_point_reference",
+                "verified_dimension_two_point_reference"
+              ]
             },
             "points_px": {
               "type": "array",
@@ -649,7 +652,22 @@
               "minimum": 0
             },
             "status": {
-              "const": "user_supplied_reference_not_geometry_validation"
+              "enum": [
+                "user_supplied_reference_not_geometry_validation",
+                "user_verified_dimension_reference_not_geometry_validation"
+              ]
+            },
+            "reference_dimension_text": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reference_dimension_id": {
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         }
