@@ -79,7 +79,7 @@ def test_dataset_archive_import_and_export_round_trip(tmp_path: Path, monkeypatc
     with zipfile.ZipFile(archive_buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr(
             "annotations.csv",
-            "image,text,source_id,writer_id,text_style,verified\ncrop.png,4200 mm,plan-a,writer-a,handwritten,true\\n",
+            "image,text,source_id,writer_id,text_style,verified\ncrop.png,4200 mm,plan-a,writer-a,handwritten,true\n",
         )
         archive.writestr("crop.png", _png())
 
@@ -111,7 +111,7 @@ def test_dataset_archive_import_rejects_csv_path_traversal(tmp_path: Path, monke
     with zipfile.ZipFile(archive_buffer, "w") as archive:
         archive.writestr(
             "annotations.csv",
-            "image,text,source_id,text_style,verified\n../outside.png,4200,plan-a,handwritten,true\\n",
+            "image,text,source_id,text_style,verified\n../outside.png,4200,plan-a,handwritten,true\n",
         )
         archive.writestr("outside.png", _png())
 
