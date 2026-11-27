@@ -78,14 +78,15 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             )
             def interpret_dimension(route) -> None:
                 text = json.loads(route.request.post_data or "{}").get("text", "")
-                if text == "2685 mm":
+                if text in {"2685 mm", "4,200 mm"}:
+                    value = "2685" if text == "2685 mm" else "4200"
                     route.fulfill(json={
                         "raw_text": text,
                         "status": "parsed",
                         "dimension_type": "linear",
-                        "value": "2685",
+                        "value": value,
                         "unit": "mm",
-                        "value_mm": "2685",
+                        "value_mm": value,
                         "reason": None,
                         "requires_review": True,
                     })
@@ -270,15 +271,12 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.wait_for_function(
                 "!document.querySelector('#overlay').classList.contains('hidden')"
             )
-            page.wait_for_function("!document.querySelector('#runOcrButton').disabled")
-            page.locator(".ocr-options > summary").click()
-            page.locator("#runOcrButton").click()
             page.wait_for_selector(".ocr-suggestion")
             assert "4,200 mm" in page.locator(".ocr-suggestion").inner_text()
             assert "93%" in page.locator(".ocr-suggestion").inner_text()
-            assert "unverified" in page.locator(".ocr-suggestion").inner_text()
-            page.locator(".ocr-suggestion .toolbar-button").click()
+            assert "check against drawing" in page.locator(".ocr-suggestion").inner_text()
             assert page.locator(".dimension-text-value").input_value() == "4,200 mm"
+            assert page.locator(".dimension-text-item").get_attribute("data-parsed-value-mm") == "4200"
             assert not page.locator(".dimension-text-verified-input").is_checked()
             page.locator("#fitView").click()
             page.locator(".manual-calibration > summary").click()
@@ -452,10 +450,8 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert "Chain matches" in page.locator("#chainResult").inner_text()
 
             page.locator(".use-dimension-scale").click()
-            assert "Click the two ends" in page.locator("#calibrationResult").inner_text()
-            page.locator("#previewImage").click(position={"x": 110, "y": 52})
-            page.locator("#previewImage").click(position={"x": 290, "y": 52})
-            assert "Scale set from verified dimension 2685 mm" in page.locator("#calibrationResult").inner_text()
+            assert "Scale derived from confirmed match: 2685 mm" in page.locator("#calibrationResult").inner_text()
+            assert "0.067039" in page.locator("#calibrationResult").inner_text()
             assert page.locator("#calibrationState").inner_text() == "Applied"
 
             with page.expect_download() as download_info:
@@ -473,13 +469,13 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert exported["analysis"]["confidence_threshold"] == 0.4
             assert exported["analysis"]["preprocessing"]["brightness"] == 20
             assert exported["analysis"]["preprocessing"]["contrast"] == 1.25
-            assert exported["calibration"]["method"] == "verified_dimension_two_point_reference"
+            assert exported["calibration"]["method"] == "verified_dimension_association"
             assert exported["calibration"]["input_unit"] == "mm"
             assert exported["calibration"]["known_distance_mm"] == 2685
             assert exported["calibration"]["reference_dimension_text"] == "2685 mm"
             assert exported["calibration"]["reference_dimension_id"] == "det-004"
             assert exported["calibration"]["pixels_per_mm"] > 0
-            assert exported["calibration"]["status"] == "user_verified_dimension_reference_not_geometry_validation"
+            assert exported["calibration"]["status"] == "user_verified_association_reference_not_geometry_validation"
             assert exported["detections"][0]["bbox"]["x1"] == 100
             assert exported["manual_dimension_text_review"][0]["detection_id"] == "det-004"
             assert exported["manual_dimension_text_review"][0]["raw_text"] == "2685 mm"
