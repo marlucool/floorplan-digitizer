@@ -1229,7 +1229,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea {
   border-radius:18px;background:var(--app-panel);box-shadow:var(--app-shadow);
 }
 .workflow-steps {
-  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;
   list-style:none;margin:0;padding:0;
 }
 .workflow-step {
@@ -1301,4 +1301,8 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea {
   .workspace-nav { gap:6px; }
   .workspace-nav-item { padding:9px 11px; }
   .workspace-nav-hint { width:100%;margin:3px 0 0; }
+}
+
+@media(min-width:761px) and (max-width:1050px) {
+  .workflow-steps { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
