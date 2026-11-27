@@ -1,10 +1,15 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0b1017">
+  <meta name="theme-color" content="#07090f">
+  <meta name="description" content="Planline drawing workspace: inspect floor-plan scans, review candidate detections, verify dimensions and create manual 2D geometry.">
+  <meta name="color-scheme" content="dark light">
   <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <title>Planline — Floor-plan digitiser</title>
 <script>
   try {
@@ -17,13 +22,15 @@
   <script src="/theme.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
-<body>
+<body data-page="drawing">
+  <a class="skip-link" href="#mainContent">Skip to content</a>
   <header class="topbar">
     <a class="brand" href="/" aria-label="Planline dashboard"><img class="brand-mark" src="/icon.svg" alt=""><span>planline<span class="brand-dot">.</span></span></a>
     <div class="top-meta"><span class="local-dot" id="apiDot"></span><span id="apiStatus">Checking local API…</span><span class="divider">/</span> 2D workspace</div>
-    <div class="top-links"><a class="repo-link" href="/dashboard">Dashboard</a><a class="repo-link active" href="/drawing" aria-current="page">Drawing workspace</a><a class="repo-link" href="/ocr">OCR Studio</a><a class="repo-link" href="/settings">Settings</a><a class="repo-link" href="/architecture">Architecture</a><button id="themeToggle" class="toolbar-button theme-toggle" type="button" aria-label="Switch theme" title="Switch theme" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.2 15.1A8.5 8.5 0 0 1 8.9 3.8 8.7 8.7 0 1 0 20.2 15.1Z"/></svg></button></div>
+    <button class="nav-menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="primaryNavigation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <nav class="top-links" id="primaryNavigation" aria-label="Primary navigation"><a class="repo-link" href="/dashboard">Dashboard</a><a class="repo-link active" href="/drawing" aria-current="page">Drawing workspace</a><a class="repo-link" href="/ocr">OCR Studio</a><a class="repo-link" href="/settings">Settings</a><a class="repo-link" href="/architecture">Architecture</a><button id="themeToggle" class="toolbar-button theme-toggle" type="button" aria-label="Switch theme" title="Switch theme" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.2 15.1A8.5 8.5 0 0 1 8.9 3.8 8.7 8.7 0 1 0 20.2 15.1Z"/></svg></button></nav>
   </header>
-  <main>
+  <main id="mainContent">
     <nav class="workspace-nav" aria-label="Workspace sections"><a class="workspace-nav-item active" href="#sourceDrawing"><span>01</span> Drawing</a><a class="workspace-nav-item" href="#candidateReview"><span>02</span> Review detections</a><a class="workspace-nav-item" href="#chainChecker"><span>03</span> Dimension checks</a><span class="workspace-nav-hint">Shortcuts <kbd>Ctrl</kbd> + <kbd>O</kbd> open · <kbd>Ctrl</kbd> + <kbd>Enter</kbd> analyse</span></nav>
     <section class="intro">
       <div><p class="eyebrow">SCAN TO CAD · EARLY INTEGRATION</p><h1>Turn a scanned plan<br><em>into editable geometry.</em></h1></div>
