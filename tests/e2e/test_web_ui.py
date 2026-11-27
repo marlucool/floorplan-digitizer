@@ -280,6 +280,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert page.locator(".dimension-text-value").input_value() == "4,200 mm"
             assert not page.locator(".dimension-text-verified-input").is_checked()
             page.locator("#fitView").click()
+            page.locator(".manual-calibration > summary").click()
             page.locator("#startCalibration").click()
             page.locator("#previewImage").click(position={"x": 50, "y": 100})
             page.locator("#previewImage").click(position={"x": 350, "y": 100})
@@ -447,6 +448,13 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert submitted["overall_value"] == "7500"
             assert "Chain matches" in page.locator("#chainResult").inner_text()
 
+            page.locator(".use-dimension-scale").click()
+            assert "Click the two ends" in page.locator("#calibrationResult").inner_text()
+            page.locator("#previewImage").click(position={"x": 110, "y": 52})
+            page.locator("#previewImage").click(position={"x": 290, "y": 52})
+            assert "Scale set from verified dimension 2685 mm" in page.locator("#calibrationResult").inner_text()
+            assert page.locator("#calibrationState").inner_text() == "Applied"
+
             with page.expect_download() as download_info:
                 page.locator("#exportReview").click()
             download = download_info.value
@@ -462,11 +470,13 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert exported["analysis"]["confidence_threshold"] == 0.4
             assert exported["analysis"]["preprocessing"]["brightness"] == 20
             assert exported["analysis"]["preprocessing"]["contrast"] == 1.25
-            assert exported["calibration"]["method"] == "user_two_point_reference"
-            assert exported["calibration"]["input_unit"] == "m"
-            assert exported["calibration"]["known_distance_mm"] == 3500
+            assert exported["calibration"]["method"] == "verified_dimension_two_point_reference"
+            assert exported["calibration"]["input_unit"] == "mm"
+            assert exported["calibration"]["known_distance_mm"] == 2685
+            assert exported["calibration"]["reference_dimension_text"] == "2685 mm"
+            assert exported["calibration"]["reference_dimension_id"] == "det-004"
             assert exported["calibration"]["pixels_per_mm"] > 0
-            assert exported["calibration"]["status"] == "user_supplied_reference_not_geometry_validation"
+            assert exported["calibration"]["status"] == "user_verified_dimension_reference_not_geometry_validation"
             assert exported["detections"][0]["bbox"]["x1"] == 100
             assert exported["manual_dimension_text_review"][0]["detection_id"] == "det-004"
             assert exported["manual_dimension_text_review"][0]["raw_text"] == "2685 mm"
