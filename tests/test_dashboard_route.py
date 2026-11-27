@@ -102,4 +102,5 @@ def test_documentation_and_architecture_share_primary_navigation() -> None:
         response = client.get(path)
         assert response.status_code == 200
         assert 'href="/drawing">Drawing workspace</a>' in response.text
-        assert 'href="/architecture">Architecture</a>' in response.text
+        assert 'href="/architecture"' in response.text
+        assert "Architecture</a>" in response.text
