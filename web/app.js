@@ -1337,7 +1337,7 @@ function renderDimensionTextReview(regions) {
         ? "Choose a dimension-line candidate. One detected line may serve multiple labels in a chained dimension."
         : !(selectedLine.wall_spans || []).length
           ? "This line has no viable wall-gap candidate. Leave the association unresolved."
-          : "Choose the wall gap that this dimension measures. The global recommendation is advisory and does not select anything automatically.";
+          : "Choose the wall gap that this dimension measures. The best global suggestion is preselected when available; check it against the drawing.";
     }
     lineSelect.addEventListener("change", () => {
       updateWallSpanOptions();
@@ -1512,9 +1512,7 @@ async function interpretDimensionForRow(input, output, button) {
   } finally {
     button.textContent = originalText;
     button.disabled = !input.value.trim();
-    const row = input.closest(".dimension-text-item");
-    const scaleButton = row?.querySelector(".use-dimension-scale");
-    if (scaleButton) scaleButton.disabled = !(row.dataset.dimensionType === "linear" && Number(row.dataset.parsedValueMm) > 0 && row.querySelector(".dimension-text-verified-input")?.checked);
+
   }
 }
 
