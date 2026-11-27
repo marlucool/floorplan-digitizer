@@ -32,29 +32,29 @@
   </header>
   <main class="dashboard-main" id="mainContent">
     <section class="dashboard-hero">
-      <div><p class="eyebrow">PLANLINE / WORKSPACE</p><h1>Your floor-plan<br><em>workbench.</em></h1><p>Choose a workspace to continue. Your drawings stay local unless you explicitly export or save a project.</p></div>
+      <div><p class="eyebrow">PLANLINE / WORKSPACE</p><h1>Your floor-plan<br><em>workbench.</em></h1><p>Start with a floor-plan drawing. Planline helps you inspect it, check dimensions and create editable geometry. Your files stay on this computer.</p></div>
       <div class="dashboard-health" id="healthCard" role="status" aria-live="polite"><span class="health-mark">●</span><div><strong id="healthTitle">Connecting to local API</strong><span id="healthDetails">Checking application readiness…</span></div><button id="refreshHealth" class="toolbar-button" type="button">Refresh</button></div>
     </section>
     <section class="workspace-grid" aria-label="Planline workspaces">
       <a class="workspace-card drawing-card" href="/drawing">
-        <span class="workspace-number">01 / ANALYSE</span><span class="workspace-icon" aria-hidden="true">▧</span>
-        <h2>Drawing workspace</h2><p>Import floor plans, inspect detections, trace manual walls and rooms, review dimensions, and export geometry.</p><span class="workspace-action">Open drawing workspace <b>→</b></span>
+        <span class="workspace-number">START HERE</span><span class="workspace-icon" aria-hidden="true">▧</span>
+        <h2>Work with a floor plan</h2><p>Upload a drawing, inspect suggested areas, check written dimensions, then trace walls and rooms.</p><span class="workspace-action">Open drawing workspace <b>→</b></span>
       </a>
       <a class="workspace-card ocr-card" href="/ocr">
-        <span class="workspace-number">02 / TRAIN</span><span class="workspace-icon" aria-hidden="true">Aa</span>
-        <h2>OCR Studio</h2><p>Build verified crop datasets, annotate handwritten dimensions, prepare training assets and manage model fine-tuning.</p><span class="workspace-action">Open OCR Studio <b>→</b></span>
+        <span class="workspace-number">OPTIONAL · ADVANCED</span><span class="workspace-icon" aria-hidden="true">Aa</span>
+        <h2>Improve text reading</h2><p>For advanced users: label dimension text examples and prepare a dataset to improve OCR.</p><span class="workspace-action">Open OCR tools <b>→</b></span>
       </a>
       <a class="workspace-card settings-card" href="/settings">
-        <span class="workspace-number">03 / CONFIGURE</span><span class="workspace-icon" aria-hidden="true">⚙</span>
-        <h2>Settings</h2><p>Check the installed version, review application readiness and manage stable application updates.</p><span class="workspace-action">Open settings <b>→</b></span>
+        <span class="workspace-number">APP PREFERENCES</span><span class="workspace-icon" aria-hidden="true">⚙</span>
+        <h2>Settings</h2><p>Check the app version and install available updates.</p><span class="workspace-action">Open settings <b>→</b></span>
       </a>
       <a class="workspace-card docs-card" href="/architecture">
-        <span class="workspace-number">04 / LEARN</span><span class="workspace-icon" aria-hidden="true">⌘</span>
-        <h2>Architecture &amp; docs</h2><p>Understand the detection pipeline, review boundaries, data handling and current technical limitations.</p><span class="workspace-action">Read technical notes <b>→</b></span>
+        <span class="workspace-number">HELP &amp; REFERENCE</span><span class="workspace-icon" aria-hidden="true">⌘</span>
+        <h2>Guides and technical details</h2><p>Read how Planline works, what its tools do and which results need checking.</p><span class="workspace-action">Read technical notes <b>→</b></span>
       </a>
     </section>
     <section class="dashboard-lower">
-      <div class="dashboard-info"><p class="eyebrow">HOW THE WORKSPACES FIT TOGETHER</p><h2>From scanned plan to reviewed output</h2><ol><li><b>Import and inspect.</b> Load a scan or PDF and review candidate regions.</li><li><b>Verify the text.</b> Use OCR suggestions as drafts; confirm every dimension manually.</li><li><b>Trace and export.</b> Draw geometry yourself and export only reviewed manual geometry.</li></ol></div>
+      <div class="dashboard-info"><p class="eyebrow">YOUR FIRST TASK</p><h2>Three simple steps</h2><ol><li><b>Upload your plan.</b> Choose an image or PDF in the Drawing workspace.</li><li><b>Check the suggestions.</b> Review detected areas and confirm dimensions against the drawing.</li><li><b>Draw and export.</b> Trace the walls or rooms you need, then export your work.</li></ol></div>
       <aside class="dashboard-info limits"><p class="eyebrow">IMPORTANT</p><h2>Human review stays in control</h2><p>Detector scores are not measurement confidence. OCR output is not verified automatically. Pixel scale is user-supplied, and automatic CAD reconstruction is not claimed.</p></aside>
     </section>
     <footer><span>PLANLINE · LOCAL-FIRST FLOOR-PLAN WORKSPACE</span><span><a href="https://github.com/marlucool/floorplan-digitizer" target="_blank" rel="noreferrer">Source repository ↗</a></span></footer>
