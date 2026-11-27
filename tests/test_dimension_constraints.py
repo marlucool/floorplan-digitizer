@@ -77,6 +77,19 @@ def test_wall_dimension_comparison_handles_extreme_valid_decimal_ranges() -> Non
     assert result["geometry_modified"] is False
 
 
+def test_wall_dimension_comparison_reports_association_scale_provenance() -> None:
+    result = compare_wall_dimension(WallDimensionCheckRequest(
+        wall_length_px="4200",
+        pixels_per_mm="1",
+        dimension_mm="4200",
+        calibration_method="verified_dimension_association",
+    ))
+    assert result["calibration_source"] == "verified_dimension_association"
+    assert "reviewer-confirmed" in result["note"]
+    assert result["requires_review"] is True
+    assert result["geometry_modified"] is False
+
+
 def test_wall_dimension_endpoint_returns_review_only_result() -> None:
     response = TestClient(app).post(
         "/api/validate-wall-dimension",
@@ -90,5 +103,6 @@ def test_wall_dimension_endpoint_returns_review_only_result() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "within_tolerance"
-    assert payload["calibration_source"] == "user_supplied_two_point_reference"
+    assert payload["calibration_source"] == "user_two_point_reference"
+    assert "manual two-point" in payload["note"]
     assert payload["geometry_modified"] is False

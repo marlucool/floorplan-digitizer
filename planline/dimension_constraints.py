@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP, localcontext
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -12,6 +12,7 @@ class WallDimensionCheckRequest(BaseModel):
     pixels_per_mm: Decimal = Field(ge=Decimal("0.000000000001"), le=Decimal("1000000"), max_digits=30, decimal_places=20)
     dimension_mm: Decimal = Field(gt=0, max_digits=24, decimal_places=8)
     tolerance_percent: Decimal = Field(default=Decimal("1.0"), ge=0, le=10, max_digits=5, decimal_places=2)
+    calibration_method: Literal["verified_dimension_association", "user_two_point_reference"] = "user_two_point_reference"
 
     @model_validator(mode="after")
     def validate_finite_values(self) -> "WallDimensionCheckRequest":
@@ -48,11 +49,14 @@ def compare_wall_dimension(request: WallDimensionCheckRequest) -> dict[str, Any]
         "delta_mm": _format(delta_mm),
         "difference_percent": _format(difference_percent),
         "tolerance_percent": _format(request.tolerance_percent),
-        "calibration_source": "user_supplied_two_point_reference",
+        "calibration_source": request.calibration_method,
         "requires_review": True,
         "geometry_modified": False,
         "note": (
-            "This comparison uses a user-supplied, unverified scale and a manually verified dimension. "
+            "This comparison uses a scale derived from a reviewer-confirmed dimension-to-wall-span association. "
+            "It remains a candidate scale, does not independently validate the drawing, and does not alter geometry."
+            if request.calibration_method == "verified_dimension_association"
+            else "This comparison uses a user-supplied manual two-point scale and a manually verified dimension. "
             "It does not prove the wall association or alter geometry."
         ),
     }

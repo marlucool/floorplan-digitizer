@@ -546,7 +546,10 @@ async function compareSelectedWallToDimension() {
         wall_length_px: wallLengthPx,
         pixels_per_mm: pixelsPerMm,
         dimension_mm: dimensionMm,
-        tolerance_percent: tolerance
+        tolerance_percent: tolerance,
+        calibration_method: state.calibration.applied?.method === "verified_dimension_association"
+          ? "verified_dimension_association"
+          : "user_two_point_reference"
       })
     });
     const result = await response.json().catch(() => ({}));
