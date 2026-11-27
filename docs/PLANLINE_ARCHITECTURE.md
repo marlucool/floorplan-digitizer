@@ -26,7 +26,7 @@ Planline is no longer just a detector preview. The current application is a **lo
 ### Dimension review, OCR and association
 
 - Reviewers can inspect bounded crops from detected dimension-value regions, enter the complete visible text, classify it as printed/handwritten/unclear and mark it verified. Candidate-review JSON exports preserve the source dimensions, model metadata, bounding boxes, scores, text transcriptions, verification state and optional user-supplied scale reference. The export is not a verified measurement record and excludes source/crop pixels.
-- The Drawing workspace can run the optional local PaddleOCR recogniser on selected crops. Base or locally fine-tuned recognition models can be selected where installed. OCR output remains a suggestion with recogniser confidence; it is never verified automatically.
+- The Drawing workspace automatically runs the local PaddleOCR recogniser on detected dimension crops (up to the current 30-crop limit) when the inference runtime is available. Base or locally fine-tuned recognition models can be selected. OCR output is inserted as an interpreted draft with recogniser confidence; it is never verified automatically.
 - A separate conservative dimension-text parser recognises supported explicit units and formats (including metric and common imperial forms). A bare number without a unit is not assumed to be millimetres, and ambiguous separators remain unresolved. Parsing is not proof that the OCR reading is correct.
 - The dimension-association module ranks candidate relationships from dimension-value regions to dimension-line regions and wall gaps using orientation, alignment, projected position and nearby wall-box geometry. A dimension line may be shared by multiple labels in a chained dimension; the same candidate wall gap is not assigned to competing labels. Scores are relative rankings, not probabilities. Every proposed relationship requires reviewer confirmation.
 - The dimension-chain checker uses decimal arithmetic to compare explicitly entered segment values with an overall value and a stated tolerance. It reports missing, unverified and conflicting values. It can propose the remainder for exactly one missing segment only when all known segments and the overall value are verified; that proposal still requires confirmation.
@@ -104,7 +104,7 @@ Do not attach a number to the nearest wall by distance alone. Store candidate as
 
 ### 5. Solve metric geometry as a constraint problem — partial validators implemented
 
-The current application has a manual dimension-chain arithmetic checker and a review-only comparison between a user-supplied scale and an explicitly supplied wall dimension. A global graph solver that propagates verified dimensions through identified geometric entities is not implemented. The future solver should treat each verified dimension as a constraint on a span between identified endpoints or references, use independent dimensions to detect contradictions, and estimate only genuinely shared calibration parameters.
+The current application ranks dimension-value → dimension-line → wall-span candidates, preselects the global best match, and derives a candidate scale from a manually confirmed text/association pair. It also retains a manual dimension-chain arithmetic checker and a review-only comparison between a user-supplied scale and an explicitly supplied wall dimension. A global graph solver that propagates verified dimensions through identified geometric entities is not implemented. The future solver should treat each verified dimension as a constraint on a span between identified endpoints or references, use independent dimensions to detect contradictions, and estimate only genuinely shared calibration parameters.
 
 Important safeguards:
 
@@ -291,7 +291,7 @@ A clean dataset-quality report is only a data-hygiene check. It does not prove t
 - [x] Add candidate-region review, class filtering, selection, zoom and confidence-threshold control.
 - [x] Add versioned candidate-review JSON export and a schema contract.
 - [x] Add manual dimension transcription with style and verification metadata.
-- [x] Add optional local PaddleOCR recognition suggestions for selected dimension crops.
+- [x] Automatically run local PaddleOCR on detected dimension crops when the inference runtime is available; retain manual verification.
 - [x] Add explicit-unit dimension parsing that keeps missing-unit and ambiguous values unresolved.
 - [x] Add reviewable text-to-dimension-line and dimension-line-to-wall-gap candidate association.
 - [x] Add a manual decimal dimension-chain checker with explicit verification and tolerance states.
