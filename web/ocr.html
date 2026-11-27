@@ -38,6 +38,11 @@
             <div id="datasetStats" class="dataset-stats"><div><strong>—</strong><span>CROPS</span></div><div><strong>—</strong><span>DRAWINGS</span></div><div><strong>—</strong><span>WRITERS</span></div></div>
             <div class="annotation-actions dataset-transfer-actions">
               <button id="exportDatasetButton" class="toolbar-button" type="button" disabled>Export dataset ZIP</button>
+              <select id="datasetImportStyle" aria-label="Import crop text style">
+                <option value="handwritten">Handwritten only</option>
+                <option value="printed">Printed only</option>
+                <option value="all">All verified styles</option>
+              </select>
               <button id="importDatasetButton" class="toolbar-button" type="button">Import CSV + crop ZIP</button>
               <input id="datasetArchiveFile" type="file" accept=".zip,application/zip" hidden>
             </div>
