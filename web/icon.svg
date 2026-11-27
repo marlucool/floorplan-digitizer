@@ -1,1 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="88" fill="#171717"/><g fill="none" stroke="#fff" stroke-width="27" stroke-linecap="square" stroke-linejoin="round"><path d="M104 112H408V400H104Z"/><path d="M256 112V270M104 256H256M256 400V344M256 270H319M319 270V310Q319 350 359 350H408"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<rect width="512" height="512" rx="88" fill="#171717"/>
+<g fill="none" stroke="#fff" stroke-width="24" stroke-linecap="square" stroke-linejoin="round">
+<path d="M104 104H408V408H104Z"/>
+<path d="M256 104V204 M256 268V408"/>
+<path d="M104 256H192 M256 256H308 M372 256H408"/>
+</g>
+<g fill="none" stroke="#fff" stroke-width="12" stroke-linecap="square">
+<path d="M256 204H204 A52 52 0 0 1 256 256"/>
+<path d="M308 256V308 A64 64 0 0 0 372 244"/>
+</g>
+</svg>
