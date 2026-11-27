@@ -36,6 +36,12 @@
             <div class="studio-card-heading"><span>DATASET</span><span id="datasetState">LOADING</span></div>
             <div class="dataset-select-row"><select id="datasetSelect" aria-label="Select OCR dataset"></select><button id="newDatasetButton" class="toolbar-button" type="button">New</button></div>
             <div id="datasetStats" class="dataset-stats"><div><strong>—</strong><span>CROPS</span></div><div><strong>—</strong><span>DRAWINGS</span></div><div><strong>—</strong><span>WRITERS</span></div></div>
+            <div class="annotation-actions dataset-transfer-actions">
+              <button id="exportDatasetButton" class="toolbar-button" type="button" disabled>Export dataset ZIP</button>
+              <button id="importDatasetButton" class="toolbar-button" type="button">Import CSV + crop ZIP</button>
+              <input id="datasetArchiveFile" type="file" accept=".zip,application/zip" hidden>
+            </div>
+            <p id="datasetTransferStatus" class="studio-hint">Import a ZIP containing one annotations CSV and its referenced crop images, or export the current verified dataset.</p>
             <p class="studio-hint" id="datasetHint">Each crop is stored locally under the repository's ignored datasets/ folder.</p>
             <div id="newDatasetForm" class="new-dataset-form hidden"><input id="newDatasetName" type="text" maxlength="64" placeholder="e.g. handwritten-dimensions"><button id="createDatasetButton" class="toolbar-button" type="button">Create dataset</button></div>
           </section>
