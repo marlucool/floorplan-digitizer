@@ -35,7 +35,7 @@ The important problem is not tracing pixels. Survey drawings can be skewed, fade
 | Dimension chain | Dimension-chain checker validates explicit values and can propose the remainder for exactly one missing segment when all other inputs are verified; the proposed value remains unverified until the user confirms it |
 | Optional OCR | Standalone PaddleOCR recognition runner for saved dimension crops; raw results remain unverified |
 | OCR evaluation | Compare predictions against verified review labels or curated crop datasets using exact-match rate, coverage and character error rate |
-| Crop dataset curation | Export verified full-string crops or import manual crops; validate manifests and create source/writer-safe splits |
+| Crop dataset curation | Bulk-import verified crops from Drawing reviews, import CSV + image ZIP archives, export verified datasets and create source/writer-safe splits |
 | OCR dataset quality | Read-only audit of label quality, character coverage, duplicate crops, source/writer counts and split leakage |
 | OCR Studio | Crop editor, verified label library, dataset management, split creation and training-job monitor |
 | Fine-tuning | Local PaddleOCR PP-OCRv5 mobile/server training from a matching `.pdparams` checkpoint |
@@ -57,7 +57,7 @@ Open OCR Studio from Planline's desktop window to create a dataset, add one or m
 
 For new drawings, crop the **whole dimension string** as one image (for example, “4,200 mm”), not individual digits. Transcribe exactly what is visible, preserve decimals and units, and only mark a label verified after checking it against the drawing. Keep crops from one plan under the same source ID. Use the same pseudonymous writer ID for samples written by the same person.
 
-The dataset is local and excluded from Git. Detailed commands and the CSV format are in [the crop-data guide](web/README.md#handwritten-dimension-crop-dataset).
+The dataset is local and excluded from Git. OCR Studio supports bulk import from a review JSON plus its source raster, CSV + crop ZIP import, and verified dataset ZIP export. Detailed commands and the CSV format are in [the crop-data guide](web/README.md#handwritten-dimension-crop-dataset).
 
 A detector score is **not** OCR confidence or a probability that a measurement is correct. A bounding box is a candidate region, not a wall centreline or a measurement. Pixel distances are not millimetres.
 
@@ -141,7 +141,7 @@ The repository retains an earlier Python pipeline separate from the Planline web
 - detection.py, ocr.py, model.py, dxf_export.py — legacy pipeline modules
 - yolo_floorplan.pt and digit_ocr_resnet18.pth — tracked experimental weights
 
-That pipeline can produce a DXF from its test input, but its heuristic dimension matching and geometry are not validated for arbitrary scanned or non-scale plans. It is not called by the web API and should be treated as a research baseline, not the production reconstruction engine.
+That pipeline can produce a DXF from its test input, but its heuristic dimension matching and geometry are not validated for arbitrary scanned or non-scale plans. It is not called by the web API and should be treated as a research baseline, not the production reconstruction engine. The Windows installer intentionally excludes these retired scripts and the digit-only checkpoint from its source archive; they remain available in Git for research.
 
 To run the separate experiment, install the root ML dependencies and use the repository's test.jpg input:
 
