@@ -36,13 +36,20 @@
         <div><p class="eyebrow">PLANLINE / OCR LAB</p><h1>Teach Planline<br><em>to read dimensions.</em></h1></div>
         <p>Build a private dataset from scanned plan crops. Draw a box around one complete dimension, type exactly what it says, and save. Planline keeps the crop, your transcription and its drawing/writer group together.</p>
       </div>
+      <nav class="studio-workflow" aria-label="OCR Studio workflow">
+        <a href="#datasetSetup"><span>01</span><strong>Choose a dataset</strong><small>Create one or open an existing set</small></a>
+        <a href="#cropAnnotation"><span>02</span><strong>Add and label crops</strong><small>Check each transcription carefully</small></a>
+        <a href="#modelTraining"><span>03</span><strong>Train and evaluate</strong><small>Check readiness before training</small></a>
+      </nav>
 
       <div class="studio-workspace">
         <aside class="studio-sidebar">
-          <section class="studio-card dataset-card">
+          <section class="studio-card dataset-card" id="datasetSetup">
             <div class="studio-card-heading"><span>DATASET</span><span id="datasetState">LOADING</span></div>
             <div class="dataset-select-row"><select id="datasetSelect" aria-label="Select OCR dataset"></select><button id="newDatasetButton" class="toolbar-button" type="button">New</button></div>
             <div id="datasetStats" class="dataset-stats"><div><strong>—</strong><span>CROPS</span></div><div><strong>—</strong><span>DRAWINGS</span></div><div><strong>—</strong><span>WRITERS</span></div></div>
+            <details class="advanced-options dataset-transfer-details">
+              <summary>Import or export data <span>CSV · ZIP · Drawing review</span></summary>
             <div class="annotation-actions dataset-transfer-actions">
               <button id="exportDatasetButton" class="toolbar-button" type="button" disabled>Export dataset ZIP</button>
               <select id="datasetImportStyle" aria-label="Import crop text style">
@@ -60,11 +67,12 @@
               <label>Optional writer ID <input id="reviewWriterId" type="text" maxlength="128" placeholder="Same handwriting author across drawings"></label>
               <button id="importReviewButton" class="toolbar-button" type="button" disabled>Import verified crops from review</button>
             </div>
+            </details>
             <p class="studio-hint" id="datasetHint">Each crop is stored locally under the repository's ignored datasets/ folder.</p>
             <div id="newDatasetForm" class="new-dataset-form hidden"><input id="newDatasetName" type="text" maxlength="64" placeholder="e.g. handwritten-dimensions"><button id="createDatasetButton" class="toolbar-button" type="button">Create dataset</button></div>
           </section>
 
-          <section class="studio-card annotation-card">
+          <section class="studio-card annotation-card" id="cropAnnotation">
             <div class="studio-card-heading"><span>01 / ANNOTATE</span><span id="queueStatus">NO IMAGE</span></div>
             <label class="studio-upload" for="cropFiles"><span class="upload-icon">＋</span><strong>Add plan or crop images</strong><small>Select one plan or several crops from the same drawing. Only the crop you save is sent to the local API; the full scan stays in this browser window.</small><input id="cropFiles" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" multiple></label>
             <div class="studio-form-fields">
@@ -81,7 +89,7 @@
         </aside>
 
         <div class="studio-main">
-          <section class="studio-card crop-editor-card">
+          <section class="studio-card crop-editor-card" id="cropEditorCard">
             <div class="studio-card-heading"><span>02 / CROP EDITOR</span><span id="cropDimensions">WAITING FOR IMAGE</span></div>
             <p class="studio-hint">Drag around one complete dimension string. Keep commas, decimal points and units inside the crop, with a little margin. Zoom in on high-resolution scans. For an image that is already cropped, choose “Use entire image”.</p>
             <div class="crop-zoom-controls"><label for="cropZoom">IMAGE ZOOM</label><input id="cropZoom" type="range" min="1" max="4" step="0.25" value="1"><span id="cropZoomValue">1.0×</span></div>
@@ -97,7 +105,7 @@
         </div>
       </div>
 
-      <section class="studio-card training-card">
+      <section class="studio-card training-card" id="modelTraining">
         <div class="training-heading"><div><p class="eyebrow">04 / MODEL TRAINING</p><h2>Fine-tune the dimension recogniser</h2><p>Start from an official PaddleOCR recognition checkpoint, then fine-tune on your verified crop labels. The held-out test group is kept out of training.</p></div><div class="training-readiness" id="trainingReadiness">Collecting labelled crops</div></div>
         <p id="ocrDependencyNote" class="studio-hint dependency-note">Checking local OCR dependencies…</p>
         <div class="training-settings">
