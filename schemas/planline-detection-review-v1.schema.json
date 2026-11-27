@@ -561,6 +561,23 @@
                 "maximum": 1
               }
             }
+          },
+          "parsed_value_mm": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9]+(?:\\.[0-9]+)?$"
+          },
+          "dimension_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "linear",
+              null
+            ]
           }
         }
       }
