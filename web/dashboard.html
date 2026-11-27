@@ -1,10 +1,15 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0b1017">
+  <meta name="theme-color" content="#07090f">
+  <meta name="description" content="Planline dashboard: open the drawing workspace, manage OCR datasets and review local application status.">
+  <meta name="color-scheme" content="dark light">
   <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <title>Planline — Dashboard</title>
 <script>
   try {
@@ -17,13 +22,15 @@
   <script src="/theme.js" defer></script>
   <script src="/dashboard.js" defer></script>
 </head>
-<body>
+<body data-page="dashboard">
+  <a class="skip-link" href="#mainContent">Skip to content</a>
   <header class="topbar">
     <a class="brand" href="/" aria-label="Planline dashboard"><img class="brand-mark" src="/icon.svg" alt=""><span>planline<span class="brand-dot">.</span></span></a>
     <div class="top-meta"><span class="local-dot" id="healthDot"></span><span id="healthLabel">Checking local services…</span><span class="divider">/</span> Dashboard</div>
-    <div class="top-links"><a class="repo-link active" href="/dashboard" aria-current="page">Dashboard</a><a class="repo-link" href="/drawing">Drawing workspace</a><a class="repo-link" href="/ocr">OCR Studio</a><a class="repo-link" href="/settings">Settings</a><a class="repo-link" href="/architecture">Architecture</a><button id="themeToggle" class="toolbar-button theme-toggle" type="button" aria-label="Switch theme" title="Switch theme" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.2 15.1A8.5 8.5 0 0 1 8.9 3.8 8.7 8.7 0 1 0 20.2 15.1Z"/></svg></button></div>
+    <button class="nav-menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="primaryNavigation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <nav class="top-links" id="primaryNavigation" aria-label="Primary navigation"><a class="repo-link active" href="/dashboard" aria-current="page">Dashboard</a><a class="repo-link" href="/drawing">Drawing workspace</a><a class="repo-link" href="/ocr">OCR Studio</a><a class="repo-link" href="/settings">Settings</a><a class="repo-link" href="/architecture">Architecture</a><button id="themeToggle" class="toolbar-button theme-toggle" type="button" aria-label="Switch theme" title="Switch theme" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.2 15.1A8.5 8.5 0 0 1 8.9 3.8 8.7 8.7 0 1 0 20.2 15.1Z"/></svg></button></nav>
   </header>
-  <main class="dashboard-main">
+  <main class="dashboard-main" id="mainContent">
     <section class="dashboard-hero">
       <div><p class="eyebrow">PLANLINE / WORKSPACE</p><h1>Your floor-plan<br><em>workbench.</em></h1><p>Choose a workspace to continue. Your drawings stay local unless you explicitly export or save a project.</p></div>
       <div class="dashboard-health" id="healthCard" role="status" aria-live="polite"><span class="health-mark">●</span><div><strong id="healthTitle">Connecting to local API</strong><span id="healthDetails">Checking application readiness…</span></div><button id="refreshHealth" class="toolbar-button" type="button">Refresh</button></div>
