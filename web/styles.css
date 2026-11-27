@@ -1029,3 +1029,18 @@ html[data-theme="dark"] .documentation-group,html[data-theme="dark"] .documentat
 @media(prefers-reduced-motion:reduce) {
   *,*::before,*::after { scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important; }
 }
+
+/* Override the legacy dark palette with the Stillframe gallery tokens. */
+html[data-theme="dark"] {
+  color-scheme:dark;
+  --ink:#eef1f8;--muted:#929bad;--line:rgba(255,255,255,.09);
+  --paper:#07090f;--canvas:#0d1320;--green:#a5a6ff;--green-dark:#8183f0;
+  --amber:#e4b477;--red:#e18b8b;
+  --app-bg:#07090f;--app-panel:rgba(22,27,43,.72);--app-panel-raised:#151b2c;
+  --app-panel-soft:rgba(255,255,255,.055);--app-border:rgba(255,255,255,.09);
+  --app-border-strong:rgba(255,255,255,.16);--app-text:#eef1f8;--app-muted:#929bad;
+  --app-accent:#a5a6ff;--app-accent-strong:#8183f0;--app-accent-soft:rgba(129,131,240,.13);
+  --app-shadow:0 12px 38px rgba(0,0,0,.32);--app-radius:22px;
+  --panel:rgba(22,27,43,.72);--surface:rgba(22,27,43,.68);--hover:rgba(255,255,255,.085);
+  --accent:#8183f0;
+}
