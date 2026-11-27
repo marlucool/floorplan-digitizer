@@ -139,7 +139,7 @@ def test_analyse_returns_regions_without_fabricating_ocr(monkeypatch) -> None:
     assert "value" not in payload["dimension_regions"][0]
     assert payload["export_ready"] is False
     assert payload["preview_data_url"].startswith("data:image/jpeg;base64,")
-    assert any("OCR has not run" in note for note in payload["notes"])
+    assert any("Drawing UI runs local OCR automatically" in note for note in payload["notes"])
 
 
 def make_pdf_bytes() -> bytes:
