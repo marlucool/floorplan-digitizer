@@ -818,4 +818,10 @@ html[data-theme="light"]{
   --app-accent:#327fb8;--app-accent-strong:#246b9f;--app-accent-soft:#e7f1f8;
   --app-shadow:0 12px 30px rgb(32 57 79 / .07);
 }
-\n\n/* Keep the primary navigation usable at tablet widths. */\n@media(max-width:760px){\n  .top-links{flex-wrap:wrap;justify-content:flex-start}\n  .top-links .repo-link{display:inline-flex}\n}\n
+
+
+/* Keep the primary navigation usable at tablet widths. */
+@media(max-width:760px){
+  .top-links{flex-wrap:wrap;justify-content:flex-start}
+  .top-links .repo-link{display:inline-flex}
+}
