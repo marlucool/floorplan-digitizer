@@ -131,7 +131,7 @@ def _persist_job_locked(job: dict[str, Any]) -> None:
     state_path.parent.mkdir(parents=True, exist_ok=True)
     temporary = state_path.with_name(state_path.name + ".tmp")
     temporary.write_text(
-        json.dumps(_public_job(job), indent=2, ensure_ascii=False) + "\\n",
+        json.dumps(_public_job(job), indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
     temporary.replace(state_path)
