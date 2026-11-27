@@ -2,6 +2,38 @@
 (() => {
   const root = document.documentElement;
   const button = document.querySelector("#themeToggle");
+  const header = document.querySelector(".topbar");
+  const links = document.querySelector(".top-links");
+  if (header && links && !header.querySelector(".nav-menu-toggle")) {
+    const menu = document.createElement("button");
+    menu.className = "nav-menu-toggle";
+    menu.type = "button";
+    menu.setAttribute("aria-label", "Open navigation");
+    menu.setAttribute("aria-expanded", "false");
+    menu.setAttribute("aria-controls", "planlineNavigation");
+    menu.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
+    links.id = "planlineNavigation";
+    header.append(menu);
+    const closeMenu = () => {
+      header.classList.remove("menu-open");
+      menu.setAttribute("aria-expanded", "false");
+      menu.setAttribute("aria-label", "Open navigation");
+    };
+    menu.addEventListener("click", () => {
+      const open = header.classList.toggle("menu-open");
+      menu.setAttribute("aria-expanded", String(open));
+      menu.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
+    });
+    links.addEventListener("click", (event) => {
+      if (event.target.closest("a")) closeMenu();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeMenu();
+    });
+    document.addEventListener("click", (event) => {
+      if (!header.contains(event.target)) closeMenu();
+    });
+  }
   const meta = document.querySelector('meta[name="theme-color"]');
   const key = "planline-theme-v2";
   const moon = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.2 15.1A8.5 8.5 0 0 1 8.9 3.8 8.7 8.7 0 1 0 20.2 15.1Z"/></svg>';
