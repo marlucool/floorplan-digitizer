@@ -1141,7 +1141,7 @@ function renderResults(payload) {
   renderDetectionRows(detections);
   renderDimensionTextReview(payload.dimension_regions || []);
   const notes = (payload.notes || []).join(" ");
-  showNotice(detections.length ? "Detection finished — OCR has not run" : "No candidate regions detected", detections.length ? notes : "The model returned no boxes at its current confidence threshold. This does not prove that the drawing contains no walls or dimensions. " + notes);
+  showNotice(detections.length ? "Detection finished — preparing dimension review" : "No candidate regions detected", detections.length ? notes : "The model returned no boxes at its current confidence threshold. This does not prove that the drawing contains no walls or dimensions. " + notes);
   if (payload.source?.source_type === "pdf") {
     const pageNumber = Number(payload.source.page_index || 0) + 1;
     const pageCount = Number(payload.source.page_count || 1);
