@@ -2,6 +2,29 @@ const $ = (selector) => document.querySelector(selector);
 const PREVIEW_MODE = window.PLANLINE_PREVIEW === true;
 const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, ocrReady: false, ocrModels: [], ocrDatasets: [], ocrPredictions: {}, ocrRunning: false, ocrModelId: null, ocrDevice: null, ocrCapabilitiesLoaded: false, ocrCapabilitiesPromise: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
 
+function updateWorkflow(stage) {
+  const order = ["upload", "analyse", "review"];
+  const activeIndex = Math.max(0, order.indexOf(stage));
+  const labels = {
+    upload: "Next: upload a floor-plan image or PDF.",
+    analyse: "Next: analyse the drawing to find candidate walls and dimensions.",
+    review: "Next: review the detected regions. Verify written dimensions before using them as a scale reference."
+  };
+  document.querySelectorAll(".workflow-step").forEach((step) => {
+    const index = order.indexOf(step.dataset.step);
+    const complete = index < activeIndex;
+    const active = index === activeIndex;
+    step.classList.toggle("is-complete", complete);
+    step.classList.toggle("is-active", active);
+    if (active) step.setAttribute("aria-current", "step");
+    else step.removeAttribute("aria-current");
+    const stateLabel = step.querySelector(".workflow-step-state");
+    if (stateLabel) stateLabel.textContent = complete ? "Done" : active ? "Current" : "Later";
+  });
+  const next = $("#workflowNext");
+  if (next) next.textContent = labels[stage] || labels.upload;
+}
+
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
@@ -9,6 +32,7 @@ function formatBytes(bytes) {
 }
 
 function resetWorkspace() {
+  updateWorkflow("upload");
   if (state.controller) { state.controller.abort(); state.controller = null; }
   if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
   if (state.resizeObserver) state.resizeObserver.disconnect();
@@ -90,6 +114,7 @@ function setFile(file) {
   $("#previewImage").onload = null;
   $("#previewImage").onerror = null;
   state.file = file;
+  updateWorkflow("analyse");
   if ($("#drawingSourceId")) $("#drawingSourceId").value = (file.name.replace(/\\.[^.]+$/, "") || "drawing").slice(0, 128);
   updateDatasetCaptureButtons();
   $("#brightnessControl").value = "0";
@@ -1810,6 +1835,7 @@ async function analyse() {
     return;
   }
   const controller = new AbortController();
+  updateWorkflow("analyse");
   state.controller = controller;
   const button = $("#analyzeButton");
   button.disabled = true;
@@ -1844,6 +1870,8 @@ async function analyse() {
     state.result = payload;
     $("#detectStep").classList.add("complete");
     renderResults(payload);
+    updateWorkflow("review");
+    $("#geometryDetails").open = true;
     if (state.ocrCapabilitiesPromise) await state.ocrCapabilitiesPromise;
     if (state.result === payload && state.ocrReady && payload.dimension_regions?.length) {
       void runOcrOnCandidates();
@@ -2195,6 +2223,8 @@ async function openProjectFile(file) {
     state.previewUrl = project.analysis_result.preview_data_url;
     state.detections = project.analysis_result.detections || [];
     renderResults(state.result);
+    updateWorkflow("review");
+    $("#geometryDetails").open = true;
     renderGeometryControls();
     restoreProjectReview(project.review);
     $("#saveProject").disabled = false;
