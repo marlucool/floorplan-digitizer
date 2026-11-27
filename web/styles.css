@@ -1055,3 +1055,100 @@ html[data-theme="dark"] {
 .skip-link:focus { transform:translateY(0);outline:2px solid var(--app-accent);outline-offset:3px; }
 .top-links { list-style:none; }
 .nav-menu-toggle { cursor:pointer; }
+
+
+/* Consistent surfaces across the drawing, dashboard, OCR and settings workspaces.
+   Older page-specific rules used fixed light colours; route them through the theme
+   tokens so the light and dark themes remain complete. */
+:root {
+  --app-warning-bg:rgba(226,180,119,.09);
+  --app-warning-border:rgba(226,180,119,.25);
+  --app-success-bg:rgba(91,170,126,.11);
+  --app-success-border:rgba(91,170,126,.28);
+  --app-danger-bg:rgba(225,139,139,.10);
+  --app-danger-border:rgba(225,139,139,.28);
+  --app-grid-line:rgba(145,155,180,.075);
+}
+html[data-theme="light"] {
+  --app-warning-bg:rgba(180,122,46,.08);
+  --app-warning-border:rgba(180,122,46,.24);
+  --app-success-bg:rgba(75,132,83,.08);
+  --app-success-border:rgba(75,132,83,.22);
+  --app-danger-bg:rgba(180,91,78,.08);
+  --app-danger-border:rgba(180,91,78,.22);
+  --app-grid-line:rgba(75,83,105,.075);
+}
+.privacy-note,.pipeline,.view-tag,.result-status,.selected-detection,
+.dashboard-health,.workspace-card,.dashboard-info,.settings-card,
+.view-nav,.studio-card,.dataset-stats>div,.studio-upload,.saved-image-preview img,
+.samples-filter select,.sample-row,.sample-row img,.sample-split,.training-warning,
+.job-panel,.benchmark-metric,.dependency-note,.quality-panel,.quality-heading span,
+.quality-stat,.quality-warning,.quality-good,.quality-character,
+.review-toolbar select,.review-search input,.review-filter select,.review-sort select {
+  color:var(--ink);
+  border-color:var(--app-border);
+}
+.privacy-note,.view-tag,.result-status,.view-nav,.dataset-stats>div,
+.studio-upload,.saved-image-preview img,.sample-row img,.sample-split,
+.job-panel,.benchmark-metric,.dependency-note,.quality-panel,.quality-stat,
+.quality-character,.review-toolbar select,.review-search input,
+.review-filter select,.review-sort select {
+  background:var(--app-panel-soft);
+}
+.pipeline b,.notice b { color:var(--ink); }
+.pipeline small,.pipeline li,.privacy-note { color:var(--muted); }
+.privacy-note strong { color:var(--app-accent); }
+.view-nav-button.active { background:var(--app-panel-raised);color:var(--ink); }
+.selected-detection { background:var(--app-accent-soft); }
+.dashboard-health,.dashboard-info,.settings-card,.studio-card,.workspace-card {
+  background:var(--app-panel);
+}
+.workspace-card { box-shadow:var(--app-shadow); }
+.workspace-card:hover { border-color:var(--app-border-strong); }
+.workspace-card p,.settings-copy,.settings-footnote { color:var(--muted); }
+.limits { background:var(--app-warning-bg); }
+.update-indicator[data-state=available],.update-indicator[data-state=current] {
+  color:var(--app-accent);border-color:var(--app-success-border);background:var(--app-success-bg);
+}
+.update-indicator[data-state=error],.update-indicator[data-state=warning] {
+  color:var(--red);border-color:var(--app-danger-border);background:var(--app-danger-bg);
+}
+.workspace-links a:hover { border-color:var(--app-border-strong);background:var(--hover); }
+.dataset-select-row select,.new-dataset-form input,.studio-form-fields input,
+.studio-form-fields select,.training-settings input,.training-settings select,
+.saved-model-select select,.samples-filter select {
+  background:var(--app-panel-soft);color:var(--ink);border-color:var(--app-border);
+}
+.sample-row { background:transparent;border-bottom-color:var(--app-border); }
+.sample-row:hover,.sample-row.selected { background:var(--hover); }
+.sample-split { background:var(--app-panel-soft); }
+.training-warning,.quality-warning {
+  background:var(--app-warning-bg);border-color:var(--app-warning-border);color:var(--muted);
+}
+.quality-heading span { background:var(--app-warning-bg);color:var(--amber); }
+.quality-heading span[data-ready=true],.quality-good {
+  background:var(--app-success-bg);border-color:var(--app-success-border);color:var(--app-accent);
+}
+.canvas-loader { background:color-mix(in srgb,var(--app-bg) 86%,transparent);color:var(--ink); }
+.limitations { background:var(--app-warning-bg);border-color:var(--app-warning-border); }
+.limitations strong,.limitation-mark { color:var(--amber); }
+.limitation-mark { background:var(--app-warning-bg); }
+.geometry-tools button.active-tool { background:var(--app-accent-soft);color:var(--app-accent);border-color:var(--app-accent); }
+.detection-row:hover,.detection-row.selected { background:var(--hover);border-color:var(--app-border-strong); }
+.topbar .repo-link:focus-visible,.workspace-card:focus-visible { outline-offset:4px; }
+@media(max-width:760px) {
+  .dashboard-hero { gap:18px; }
+  .dashboard-health { min-width:0;width:100%; }
+  .workspace-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .dashboard-lower { grid-template-columns:1fr; }
+  .settings-meta-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media(max-width:520px) {
+  .workspace-grid { grid-template-columns:1fr; }
+  .workspace-card { min-height:0; }
+  .settings-meta-grid { grid-template-columns:1fr; }
+  .dataset-transfer-actions { align-items:stretch; }
+  .dataset-transfer-actions>* { min-width:0;max-width:100%; }
+  .training-actions { display:grid;grid-template-columns:1fr; }
+  .training-actions>* { width:100%; }
+}
