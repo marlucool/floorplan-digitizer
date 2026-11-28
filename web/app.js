@@ -361,22 +361,34 @@ function clearCalibration() {
 
 function renderCalibrationStatus() {
   const points = state.calibration.points;
-  $("#calibrationPoints").textContent = state.calibration.applied?.method === "verified_dimension_association"
-    ? "Derived from a confirmed dimension-to-wall match."
-    : "Point 1: " +
-      (points[0] ? Math.round(points[0].x) + ", " + Math.round(points[0].y) + " px" : "not set") +
-      " · Point 2: " +
-      (points[1] ? Math.round(points[1].x) + ", " + Math.round(points[1].y) + " px" : "not set");
+  if (state.reconstruction?.scale?.pixels_per_mm_x && state.reconstruction?.scale?.pixels_per_mm_y) {
+    $("#calibrationPoints").textContent =
+      "Confirmed dimensions · X " + state.reconstruction.scale.pixels_per_mm_x.toFixed(6) +
+      " px/mm · Y " + state.reconstruction.scale.pixels_per_mm_y.toFixed(6) + " px/mm";
+    $("#calibrationResult").textContent =
+      "Separate horizontal and vertical scales derived from confirmed dimension-to-wall matches. Draft geometry only; inspect for scan distortion.";
+  } else {
+    $("#calibrationPoints").textContent = state.calibration.applied?.method === "verified_dimension_association"
+      ? "Derived from a confirmed dimension-to-wall match."
+      : "Point 1: " +
+        (points[0] ? Math.round(points[0].x) + ", " + Math.round(points[0].y) + " px" : "not set") +
+        " · Point 2: " +
+        (points[1] ? Math.round(points[1].x) + ", " + Math.round(points[1].y) + " px" : "not set");
+  }
   $("#startCalibration").disabled = !state.result;
   $("#startCalibration").textContent = state.calibration.picking ? "Click the drawing…" : "Pick two points";
   $("#applyCalibration").disabled = points.length !== 2;
-  $("#clearCalibration").disabled = points.length === 0 && !state.calibration.applied;
-  $("#calibrationState").textContent = state.calibration.applied ? "Applied" :
+  $("#clearCalibration").disabled = points.length === 0 && !state.calibration.applied && !state.reconstruction;
+  $("#calibrationState").textContent = state.reconstruction ? "X/Y scales" : state.calibration.applied ? "Applied" :
     state.calibration.picking ? "Picking points" : points.length ? "2 points ready" : "Not set";
   $("#previewImage").classList.toggle("calibration-picking", state.calibration.picking);
 }
 
 function applyAssociatedDimensionScale(reference) {
+  if (state.reconstruction && state.geometry.segments.some((segment) => segment.created_by_reconstruction)) {
+    $("#calibrationResult").textContent = "Clear the generated wall draft before applying a single-dimension scale.";
+    return;
+  }
   const distanceMm = Number(reference?.valueMm);
   const pixelDistance = Number(reference?.spanPx);
   if (!state.result || !(distanceMm > 0) || !(pixelDistance > 0) ||
@@ -446,6 +458,10 @@ function addCalibrationPoint(event) {
 }
 
 function applyCalibration() {
+  if (state.reconstruction && state.geometry.segments.some((segment) => segment.created_by_reconstruction)) {
+    $("#calibrationResult").textContent = "Clear the generated wall draft before replacing its confirmed X/Y scales with one manual scale.";
+    return;
+  }
   const points = state.calibration.points;
   const distance = Number($("#calibrationDistance").value);
   const unit = $("#calibrationUnit").value;
@@ -534,10 +550,23 @@ function refreshWallDimensionOptions() {
   updateWallDimensionCheckControls();
 }
 
+function getPixelsPerMmForSegment(segment) {
+  if (segment && state.reconstruction?.scale) {
+    const dx = segment.end_px.x - segment.start_px.x;
+    const dy = segment.end_px.y - segment.start_px.y;
+    const value = Math.abs(dx) >= Math.abs(dy)
+      ? state.reconstruction.scale.pixels_per_mm_x
+      : state.reconstruction.scale.pixels_per_mm_y;
+    if (Number.isFinite(value) && value > 0) return value;
+  }
+  const uniform = state.calibration.applied?.pixels_per_mm;
+  return Number.isFinite(uniform) && uniform > 0 ? uniform : null;
+}
+
 function updateWallDimensionCheckControls() {
   const select = $("#wallDimensionSelect");
   const selectedWall = state.geometry?.segments?.find((segment) => segment.id === state.geometry.selectedId);
-  const hasCalibration = Number(state.calibration.applied?.pixels_per_mm) > 0;
+  const hasCalibration = Boolean(getPixelsPerMmForSegment(selectedWall));
   const hasDimension = Boolean(select?.selectedOptions?.[0]?.dataset.valueMm);
   const toleranceText = $("#wallDimensionTolerance").value.trim();
   const tolerance = Number(toleranceText);
@@ -556,7 +585,7 @@ async function compareSelectedWallToDimension() {
   const selectedWall = state.geometry.segments.find((segment) => segment.id === state.geometry.selectedId);
   const option = $("#wallDimensionSelect").selectedOptions[0];
   const dimensionMm = option?.dataset.valueMm;
-  const pixelsPerMm = state.calibration.applied?.pixels_per_mm;
+  const pixelsPerMm = getPixelsPerMmForSegment(selectedWall);
   const tolerance = Number($("#wallDimensionTolerance").value);
   if (!selectedWall || !dimensionMm || !(pixelsPerMm > 0)) {
     updateWallDimensionCheckControls();
@@ -578,9 +607,11 @@ async function compareSelectedWallToDimension() {
         pixels_per_mm: pixelsPerMm,
         dimension_mm: dimensionMm,
         tolerance_percent: tolerance,
-        calibration_method: state.calibration.applied?.method === "verified_dimension_association"
+        calibration_method: state.reconstruction
           ? "verified_dimension_association"
-          : "user_two_point_reference"
+          : state.calibration.applied?.method === "verified_dimension_association"
+            ? "verified_dimension_association"
+            : "user_two_point_reference"
       })
     });
     const result = await response.json().catch(() => ({}));
@@ -919,6 +950,12 @@ function undoManualWall() {
 function deleteSelectedManualWall() {
   if (!state.geometry.selectedId) return;
   state.geometry.segments = state.geometry.segments.filter((segment) => segment.id !== state.geometry.selectedId);
+  if (!state.geometry.segments.some((segment) => segment.created_by_reconstruction)) {
+    state.reconstruction = null;
+    $("#reconstructionStatus").textContent = "No generated wall edges remain.";
+    $("#reconstructionStatus").dataset.state = "";
+    renderCalibrationStatus();
+  }
   state.geometry.selectedId = null;
   renderGeometryControls();
   if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
@@ -1116,7 +1153,10 @@ $("#clearRooms").addEventListener("click", clearManualRooms);
 $("#selectWallTool").addEventListener("click", () => setGeometryMode("select"));
 $("#undoWall").addEventListener("click", undoManualWall);
 $("#deleteWall").addEventListener("click", deleteSelectedManualWall);
-$("#clearWalls").addEventListener("click", clearManualWalls);
+$("#clearWalls").addEventListener("click", () => {
+  clearManualWalls();
+  $("#reconstructionStatus").textContent = "All wall edges cleared, including any generated draft.";
+});
 $("#exportGeometry").addEventListener("click", exportManualGeometrySvg);
 $("#exportDxf").addEventListener("click", exportManualGeometryDxf);
 $("#reconstructWalls").addEventListener("click", reconstructWallDraft);
@@ -2032,7 +2072,7 @@ function buildReviewObject() {
     analysis: {
       model: "yolo_floorplan.pt",
       confidence_threshold: result.confidence_threshold ?? 0.25,
-      status: "candidate_detection_only",
+      status: state.reconstruction ? "dimension_constrained_wall_edge_draft" : "candidate_detection_only",
       preprocessing: result.preprocessing || { brightness: 0, contrast: 1, method: "linear_intensity_only" },
       ocr_model_id: state.ocrModelId,
       ocr_device: state.ocrDevice,
@@ -2119,7 +2159,9 @@ function buildReviewObject() {
         : "No pixel-to-unit scale or measured geometry has been inferred.",
       "Bounding boxes are detector candidates, not measured wall geometry.",
       "Manual wall segments are user-created linework and have not been independently validated or topologically connected.",
-      "No measured DXF geometry is included."
+      state.reconstruction
+        ? "Dimension-constrained detected wall-face edges are included as editable draft geometry. They are not topologically joined or certified, and no room, opening or diagonal-wall reconstruction is included."
+        : "No dimension-constrained CAD geometry has been generated."
     ]
   };
   return review;
@@ -2176,6 +2218,7 @@ async function saveProject() {
     },
     analysis_result: state.result,
     geometry: state.geometry.segments,
+    reconstruction: state.reconstruction,
     geometry_next_id: state.geometry.nextId,
     rooms: state.geometry.rooms,
     room_next_id: state.geometry.nextRoomId,
@@ -2348,6 +2391,11 @@ async function openProjectFile(file) {
     state.geometry.segments = Array.isArray(project.geometry) ? project.geometry : [];
     state.reconstruction = project.reconstruction && typeof project.reconstruction === "object"
       ? project.reconstruction : null;
+    $("#reconstructionStatus").textContent = state.reconstruction
+      ? "Restored " + (state.reconstruction.segments?.length || 0) +
+        " generated wall-face edges. Inspect them before exporting."
+      : "Analyse a drawing, verify horizontal and vertical dimensions, and confirm their wall pairs.";
+    $("#reconstructionStatus").dataset.state = state.reconstruction ? "warning" : "";
     state.geometry.nextId = Number.isInteger(project.geometry_next_id) ? project.geometry_next_id : state.geometry.segments.length + 1;
     state.geometry.rooms = Array.isArray(project.rooms) ? project.rooms : [];
     state.geometry.nextRoomId = Number.isInteger(project.room_next_id) ? project.room_next_id : state.geometry.rooms.length + 1;
