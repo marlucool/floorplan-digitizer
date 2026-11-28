@@ -130,6 +130,14 @@
               <p>Closed wall-edge loops are only suggestions. Add a room outline after checking it against the drawing.</p>
               <div id="roomLoopCandidateList" class="junction-candidate-list"></div>
             </section>
+            <section id="openingReview" class="junction-review hidden" aria-label="Review possible openings">
+              <div class="junction-review-heading">
+                <strong>Possible openings</strong>
+                <span id="openingReviewSummary">No candidates</span>
+              </div>
+              <p>Aligned wall gaps are only heuristics. Classify each candidate as a door or window before adding an editable CAD marker.</p>
+              <div id="openingCandidateList" class="junction-candidate-list"></div>
+            </section>
           </section>
           <details id="geometryDetails" class="geometry-tools-details">
             <summary><span>Open drawing tools</span><small>Walls · rooms · export</small></summary>
