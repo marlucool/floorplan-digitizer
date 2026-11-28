@@ -1291,7 +1291,7 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             assert all(item["source_detection_id"] for item in requests["dxf"]["segments"])
             joined_edges = {item["id"]: item for item in requests["dxf"]["segments"]}
             assert joined_edges["reconstructed-wall-0002"]["start_px"] == {"x": 60.75, "y": 50}
-            assert joined_edges["reconstructed-wall-0004"]["start_px"] == {"x": 60.75, "y": 50}
+            assert joined_edges["reconstructed-wall-0006"]["start_px"] == {"x": 60.75, "y": 50}
 
             with page.expect_download() as review_download_info:
                 page.locator("#exportReview").click()
