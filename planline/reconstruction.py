@@ -213,6 +213,88 @@ def _axis_scale(measurements: list[dict[str, Any]], axis: str, tolerance_percent
     return float(centre)
 
 
+def _junction_candidates(
+    segments: list[dict[str, Any]],
+    tolerance_px: float = 2.0,
+) -> list[dict[str, Any]]:
+    """Find near-coincident wall-face endpoints without changing linework.
+
+    This is deliberately a review hint, not automatic snapping or topology
+    repair. Spatial buckets keep the search bounded for large detection sets.
+    """
+    endpoints: list[dict[str, Any]] = []
+    for segment in segments:
+        for endpoint_name in ("start_px", "end_px"):
+            point = segment[endpoint_name]
+            endpoints.append({
+                "segment_id": segment["id"],
+                "source_detection_id": segment["source_detection_id"],
+                "endpoint": endpoint_name,
+                "x": float(point["x"]),
+                "y": float(point["y"]),
+            })
+
+    parent = list(range(len(endpoints)))
+    rank = [0] * len(endpoints)
+
+    def find(index: int) -> int:
+        while parent[index] != index:
+            parent[index] = parent[parent[index]]
+            index = parent[index]
+        return index
+
+    def union(first: int, second: int) -> None:
+        root_a, root_b = find(first), find(second)
+        if root_a == root_b:
+            return
+        if rank[root_a] < rank[root_b]:
+            root_a, root_b = root_b, root_a
+        parent[root_b] = root_a
+        if rank[root_a] == rank[root_b]:
+            rank[root_a] += 1
+
+    cell_size = tolerance_px
+    buckets: dict[tuple[int, int], list[int]] = {}
+    for index, endpoint in enumerate(endpoints):
+        cell_x = math.floor(endpoint["x"] / cell_size)
+        cell_y = math.floor(endpoint["y"] / cell_size)
+        for offset_x in (-1, 0, 1):
+            for offset_y in (-1, 0, 1):
+                for other_index in buckets.get((cell_x + offset_x, cell_y + offset_y), []):
+                    other = endpoints[other_index]
+                    if other["source_detection_id"] == endpoint["source_detection_id"]:
+                        continue
+                    if math.hypot(endpoint["x"] - other["x"], endpoint["y"] - other["y"]) <= tolerance_px:
+                        union(index, other_index)
+        buckets.setdefault((cell_x, cell_y), []).append(index)
+
+    groups: dict[int, list[dict[str, Any]]] = {}
+    for index, endpoint in enumerate(endpoints):
+        groups.setdefault(find(index), []).append(endpoint)
+
+    junctions: list[dict[str, Any]] = []
+    for group in groups.values():
+        source_ids = sorted({item["source_detection_id"] for item in group})
+        if len(source_ids) < 2:
+            continue
+        edge_ids = sorted({item["segment_id"] for item in group})
+        junctions.append({
+            "point_px": {
+                "x": round(sum(item["x"] for item in group) / len(group), 2),
+                "y": round(sum(item["y"] for item in group) / len(group), 2),
+            },
+            "source_detection_ids": source_ids,
+            "segment_ids": edge_ids,
+            "endpoint_count": len(group),
+            "status": "candidate_requires_review",
+        })
+
+    junctions.sort(key=lambda item: (
+        item["point_px"]["y"], item["point_px"]["x"], item["source_detection_ids"]
+    ))
+    return junctions
+
+
 def reconstruct_wall_edges(
     request: WallReconstructionRequest,
 ) -> dict[str, Any]:
@@ -266,10 +348,13 @@ def reconstruct_wall_edges(
             "The current detector does not reconstruct diagonal walls."
         )
 
+    junction_candidates = _junction_candidates(segments)
     return {
         "status": "draft",
         "geometry_kind": "detected_wall_face_edges",
         "segments": segments,
+        "junction_candidates": junction_candidates,
+        "junction_tolerance_px": 2.0,
         "scale": {
             "pixels_per_mm_x": round(px_per_mm_x, 9),
             "pixels_per_mm_y": round(px_per_mm_y, 9),
@@ -284,7 +369,7 @@ def reconstruct_wall_edges(
         "wall_regions_used": len({item["source_detection_id"] for item in segments}),
         "warnings": [
             "This is editable draft wall-face linework, not a verified construction drawing.",
-            "Each detected wall bounding box becomes two parallel face lines; wall junctions are not topologically joined.",
+            "Each detected wall bounding box becomes two parallel face lines. Near-coincident endpoints are reported as junction candidates only; no snapping or topology repair is applied.",
             "Doors, windows, room boundaries, diagonal walls and missing wall regions are not inferred.",
             "X and Y scales are derived independently from confirmed dimensions. Local perspective, skew and paper distortion are not rectified.",
             "Inspect every generated edge against the source scan before relying on the DXF.",
