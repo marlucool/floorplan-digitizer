@@ -1,7 +1,8 @@
-"""Minimal, validated DXF export for Planline's user-authored 2D geometry.
+"""Minimal, validated DXF export for Planline's editable 2D geometry.
 
-Only manually drawn wall segments and room outlines are exported. Detector
-boxes, OCR suggestions and unverified dimensions are never converted to CAD.
+Manual wall segments and room outlines are exported separately from explicitly
+generated, review-required detected wall-face draft edges. Raw detector boxes,
+OCR suggestions and unverified dimensions are never converted to CAD.
 """
 from __future__ import annotations
 
