@@ -4,10 +4,12 @@ import base64
 import json
 import struct
 import threading
+import time
 import zlib
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 from playwright.sync_api import sync_playwright
 
@@ -15,6 +17,67 @@ from playwright.sync_api import sync_playwright
 class QuietHandler(SimpleHTTPRequestHandler):
     def log_message(self, format: str, *args: object) -> None:
         pass
+
+
+class OCRRaceHandler(QuietHandler):
+    def _json(self, payload: dict) -> None:
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self) -> None:
+        parsed = urlparse(self.path)
+        if not parsed.path.startswith("/api/ocr/"):
+            return super().do_GET()
+        if parsed.path == "/api/ocr/status":
+            return self._json({
+                "python_compatible_for_paddle": True,
+                "training_runtime_ready": True,
+                "inference_runtime_ready": True,
+                "paddle_installed": True,
+                "paddleocr_installed": True,
+                "paddle_cuda_available": False,
+                "training_note": "Test OCR runtime ready.",
+            })
+        if parsed.path == "/api/ocr/training-assets":
+            variant = parse_qs(parsed.query).get("model_variant", ["mobile"])[0]
+            if variant == "mobile":
+                time.sleep(0.9)
+            return self._json({
+                "ready": True,
+                "paddleocr_dir": f"/assets/{variant}",
+                "pretrained_model": f"/models/{variant}",
+                "source_version": "test",
+            })
+        if parsed.path == "/api/ocr/datasets":
+            return self._json({"datasets": [
+                {"dataset_id": "dataset-one", "summary": {"samples": 1}},
+                {"dataset_id": "dataset-two", "summary": {"samples": 2}},
+            ]})
+        if parsed.path.startswith("/api/ocr/datasets/"):
+            dataset_id = parsed.path.rsplit("/", 1)[-1]
+            if dataset_id == "dataset-one":
+                time.sleep(0.9)
+            samples = 1 if dataset_id == "dataset-one" else 2
+            return self._json({
+                "dataset_id": dataset_id,
+                "summary": {
+                    "samples": samples,
+                    "sources": 1,
+                    "writers": 1,
+                    "independent_groups": 3,
+                    "splits_present": False,
+                    "valid": True,
+                },
+                "samples": [],
+                "available_models": [],
+            })
+        if parsed.path == "/api/ocr/jobs":
+            return self._json({"jobs": []})
+        self.send_error(404)
 
 
 def make_png(width: int = 2, height: int = 2) -> bytes:
@@ -737,6 +800,40 @@ def test_dashboard_health_indicator_handles_online_and_unavailable_states() -> N
               return value;
             }""")
             assert actual_error_color == expected_error_color
+            browser.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_ocr_studio_ignores_stale_training_asset_and_dataset_responses() -> None:
+    web_dir = Path(__file__).resolve().parents[2] / "web"
+    handler = partial(OCRRaceHandler, directory=str(web_dir))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(f"http://127.0.0.1:{server.server_port}/ocr.html", wait_until="domcontentloaded")
+
+            page.wait_for_request(lambda request: "/api/ocr/training-assets?model_variant=mobile" in request.url)
+            page.locator("#modelVariant").select_option("server")
+            page.wait_for_function("document.querySelector('#pretrainedPath')?.value === '/models/server'")
+
+            # The delayed mobile response must not overwrite the newer server selection.
+            page.wait_for_request(lambda request: request.url.endswith("/api/ocr/datasets/dataset-one"))
+            assert page.locator("#pretrainedPath").input_value() == "/models/server"
+
+            # Select another dataset while the first dataset's detail request is still pending.
+            page.locator("#datasetSelect").select_option("dataset-two")
+            page.wait_for_function("document.querySelector('#datasetStats strong')?.textContent === '2'")
+            page.wait_for_timeout(1100)
+            assert page.locator("#datasetSelect").input_value() == "dataset-two"
+            assert page.locator("#datasetStats strong").first.inner_text() == "2"
             browser.close()
     finally:
         server.shutdown()
