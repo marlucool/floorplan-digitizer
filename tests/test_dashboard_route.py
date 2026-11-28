@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
+import pytest
 
 from planline.api import app
+from planline.documentation import discover_documents
 
 
 def test_application_root_and_dashboard_route_open_dashboard() -> None:
@@ -82,3 +84,16 @@ def test_architecture_and_documentation_have_mobile_navigation_controls() -> Non
         assert 'href="#mainContent"' in response.text
         assert 'href="/architecture"' in response.text
         assert 'href="/documentation"' in response.text
+
+
+def test_document_catalog_does_not_follow_symlinks_outside_docs(tmp_path) -> None:
+    docs_root = tmp_path / "docs"
+    docs_root.mkdir()
+    private_file = tmp_path / "private.md"
+    private_file.write_text("# Private title", encoding="utf-8")
+    try:
+        (docs_root / "external.md").symlink_to(private_file)
+    except (OSError, NotImplementedError):
+        pytest.skip("Symlinks are not available in this environment")
+
+    assert discover_documents(docs_root) == []
