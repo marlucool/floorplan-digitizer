@@ -727,7 +727,16 @@ def test_dashboard_health_indicator_handles_online_and_unavailable_states() -> N
             page.wait_for_function("document.querySelector('#healthTitle')?.textContent === 'Local API unavailable'")
             assert page.locator("#healthLabel").inner_text() == "API unavailable"
             assert page.locator("#healthDetails").inner_text().startswith("Local API returned HTTP 503")
-            assert page.locator(".health-mark").evaluate("el => getComputedStyle(el).color") == "rgb(237, 141, 131)"
+            actual_error_color = page.locator(".health-mark").evaluate("el => getComputedStyle(el).color")
+            expected_error_color = page.evaluate("""() => {
+              const probe = document.createElement("span");
+              probe.style.color = getComputedStyle(document.documentElement).getPropertyValue("--red").trim();
+              document.body.appendChild(probe);
+              const value = getComputedStyle(probe).color;
+              probe.remove();
+              return value;
+            }""")
+            assert actual_error_color == expected_error_color
             browser.close()
     finally:
         server.shutdown()
