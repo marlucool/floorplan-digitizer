@@ -14,6 +14,7 @@ def render_architecture_page(
     ocr_href: str = "/ocr",
     settings_href: str = "/settings",
     architecture_href: str = "/architecture",
+    documentation_href: str = "/documentation",
     source_href: str = "https://github.com/marlucool/floorplan-digitizer/blob/main/docs/PLANLINE_ARCHITECTURE.md",
 ) -> str:
     """Render repository-owned Markdown inside the Planline application shell."""
@@ -74,10 +75,10 @@ def render_architecture_page(
     <button class="nav-menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="primaryNavigation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <nav class="top-links" id="primaryNavigation" aria-label="Primary navigation">
       <a class="repo-link" href="{home_href}">Dashboard</a>
-      <a class="repo-link" href="{drawing_href}">Drawing</a>
+      <a class="repo-link" href="{drawing_href}">Drawing workspace</a>
       <a class="repo-link" href="{ocr_href}">OCR Studio</a>
       <a class="repo-link" href="{settings_href}">Settings</a>
-      <a class="repo-link" href="/documentation">Documentation</a>
+      <a class="repo-link" href="{documentation_href}">Documentation</a>
       <a class="repo-link active" href="{architecture_href}" aria-current="page">Architecture</a>
       <button id="themeToggle" class="toolbar-button theme-toggle" type="button"
               aria-label="Switch to light theme" title="Switch to light theme" aria-pressed="false">

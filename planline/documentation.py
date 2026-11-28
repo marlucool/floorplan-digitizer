@@ -532,9 +532,14 @@ def render_document_page(
 
 def safe_document_path(docs_root: Path, requested_path: str) -> Path:
     """Resolve a requested file without allowing traversal outside docs_root."""
-    root = Path(docs_root).resolve()
-    decoded = unquote(requested_path).replace("\\", "/")
-    candidate = (root / decoded).resolve()
-    if not candidate.is_relative_to(root) or not candidate.is_file():
-        raise FileNotFoundError(requested_path)
-    return candidate
+    try:
+        root = Path(docs_root).resolve()
+        decoded = unquote(requested_path).replace("\\", "/")
+        candidate = (root / decoded).resolve()
+        if not candidate.is_relative_to(root) or not candidate.is_file():
+            raise FileNotFoundError(requested_path)
+        return candidate
+    except (OSError, ValueError, RuntimeError):
+        # Malformed paths (NUL bytes, invalid filesystem names, symlink loops)
+        # are ordinary not-found responses, not unhandled server errors.
+        raise FileNotFoundError(requested_path) from None

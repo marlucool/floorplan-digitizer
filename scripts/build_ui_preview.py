@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from planline.architecture import render_architecture_page
 from planline.documentation import discover_documents, render_documentation_index, render_document_page
 
 WEB = ROOT / "web"
@@ -201,7 +202,16 @@ def build_preview(output_dir: Path) -> Path:
         raise RuntimeError("Required architecture document is missing: docs/PLANLINE_ARCHITECTURE.md")
 
     (output_dir / "architecture.html").write_text(
-        render_doc_page(architecture_doc, "architecture.html"),
+        render_architecture_page(
+            architecture_source.read_text(encoding="utf-8"),
+            asset_prefix="",
+            home_href="index.html",
+            drawing_href="drawing.html",
+            ocr_href="ocr.html",
+            settings_href="settings.html",
+            architecture_href="architecture.html",
+            documentation_href=documentation_index_path,
+        ),
         encoding="utf-8",
     )
 
