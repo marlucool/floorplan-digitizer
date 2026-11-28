@@ -1339,10 +1339,12 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             # A diagonal manual wall must use both independent axis scales:
             # sqrt((30 / 0.04)^2 + (40 / 0.06)^2) = 1003.47 mm.
             page.locator("#drawWallTool").click()
-            page.locator("#previewImage").click(position={"x":100,"y":100})
-            page.locator("#previewImage").click(position={"x":130,"y":140})
+            # Keep the diagonal test wall outside the newly added room polygon
+            # so selection unambiguously targets the wall rather than the room.
+            page.locator("#previewImage").click(position={"x":300,"y":100})
+            page.locator("#previewImage").click(position={"x":330,"y":140})
             page.locator("#selectWallTool").click()
-            page.locator("#previewImage").click(position={"x":115,"y":120})
+            page.locator("#previewImage").click(position={"x":315,"y":120})
             assert 1.0 <= float(page.locator("#wallLength").inner_text().split(" m", 1)[0]) <= 1.01
             assert "axis-corrected" in page.locator("#wallLength").inner_text()
 
