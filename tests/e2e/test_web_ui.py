@@ -19,6 +19,54 @@ class QuietHandler(SimpleHTTPRequestHandler):
         pass
 
 
+
+
+class OCRPollingHandler(OCRRaceHandler):
+    active_polls = 0
+    max_active_polls = 0
+    poll_count = 0
+    poll_lock = threading.Lock()
+
+    def do_GET(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/ocr/training-assets":
+            return self._json({
+                "ready": True,
+                "paddleocr_dir": "/assets/mobile",
+                "pretrained_model": "/models/mobile",
+                "source_version": "test",
+            })
+        if parsed.path == "/api/ocr/datasets/dataset-one":
+            return self._json({
+                "dataset_id": "dataset-one",
+                "summary": {
+                    "samples": 1, "sources": 1, "writers": 1,
+                    "independent_groups": 3, "splits_present": True, "valid": True,
+                },
+                "samples": [], "available_models": [],
+            })
+        if parsed.path == "/api/ocr/jobs/active":
+            return self._json({"job": {
+                "job_id": "slow-job", "status": "running", "logs": "Training started",
+            }})
+        if parsed.path == "/api/ocr/jobs/slow-job":
+            with self.poll_lock:
+                type(self).active_polls += 1
+                type(self).poll_count += 1
+                type(self).max_active_polls = max(type(self).max_active_polls, type(self).active_polls)
+            try:
+                time.sleep(2.4)
+                return self._json({
+                    "job_id": "slow-job", "status": "running", "logs": "Training in progress",
+                    "epoch": 1, "epochs": 10,
+                })
+            finally:
+                with self.poll_lock:
+                    type(self).active_polls -= 1
+        return super().do_GET()
+
+
+
 class OCRRaceHandler(QuietHandler):
     def _json(self, payload: dict) -> None:
         body = json.dumps(payload).encode("utf-8")
@@ -836,6 +884,32 @@ def test_ocr_studio_ignores_stale_training_asset_and_dataset_responses() -> None
             page.wait_for_timeout(1100)
             assert page.locator("#datasetSelect").input_value() == "dataset-two"
             assert page.locator("#datasetStats strong").first.inner_text() == "2"
+            browser.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_ocr_job_status_polling_never_overlaps_requests() -> None:
+    web_dir = Path(__file__).resolve().parents[2] / "web"
+    OCRPollingHandler.active_polls = 0
+    OCRPollingHandler.max_active_polls = 0
+    OCRPollingHandler.poll_count = 0
+    handler = partial(OCRPollingHandler, directory=str(web_dir))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            page = browser.new_page()
+            with page.expect_request(lambda request: request.url.endswith("/api/ocr/jobs/slow-job"), timeout=15000):
+                page.goto(f"http://127.0.0.1:{server.server_port}/ocr.html", wait_until="domcontentloaded")
+            page.wait_for_timeout(2600)
+            assert OCRPollingHandler.poll_count == 1
+            assert OCRPollingHandler.max_active_polls == 1
             browser.close()
     finally:
         server.shutdown()
