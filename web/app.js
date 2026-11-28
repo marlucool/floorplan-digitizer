@@ -39,6 +39,9 @@ function resetWorkspace() {
   if (state.resizeObserver) state.resizeObserver.disconnect();
   if (state.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
   state.file = null; state.objectUrl = null; state.result = null; state.previewUrl = null;
+  state.reconstruction = null;
+  $("#reconstructionStatus").textContent = "Analyse a drawing, verify horizontal and vertical dimensions, and confirm their wall pairs.";
+  $("#reconstructionStatus").dataset.state = "";
   state.detections = []; state.selectedId = null; state.activeFilter = "all";
   state.overlayVisible = true; state.resizeObserver = null; state.resizeHandler = null; state.zoom = 1;
   state.searchQuery = ""; state.sortMode = "original";
@@ -673,6 +676,8 @@ function renderGeometryControls() {
     $("#geometryStatus").textContent = "Selected " + geometry.selectedId + ". Delete it or draw another wall.";
   } else if (state.reconstruction) {
     $("#geometryStatus").textContent = "Measured wall-edge draft loaded. Inspect, delete or adjust every generated edge before using the drawing.";
+  } else if (manualCount > 0) {
+    $("#geometryStatus").textContent = "Manual wall linework is editable. Add more walls or generate a separate measured draft.";
   } else {
     $("#geometryStatus").textContent = "No wall geometry yet. Generate a measured draft from confirmed dimensions or draw walls manually.";
   }
@@ -1087,7 +1092,7 @@ async function exportManualGeometryDxf() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = ((state.file?.name || "drawing").replace(/.[^.]+$/, "") || "drawing") +
+    link.download = ((state.file?.name || "drawing").replace(/\\.[^.]+$/, "") || "drawing") +
       (hasReconstructionScale ? "-measured-wall-draft.dxf" : "-manual-geometry.dxf");
     document.body.append(link);
     link.click();
@@ -1120,9 +1125,11 @@ function exportManualGeometrySvg() {
     '" fill="rgba(36,132,100,0.12)" stroke="#248464" stroke-width="4" />'
   );
   const lines = state.geometry.segments.map((segment) =>
-    '<line id="' + segment.id + '" x1="' + segment.start_px.x + '" y1="' + segment.start_px.y +
+    '<line id="' + segment.id + '" data-source="' + (segment.created_by_reconstruction ? "detected-wall-draft" : "manual") +
+    '" x1="' + segment.start_px.x + '" y1="' + segment.start_px.y +
     '" x2="' + segment.end_px.x + '" y2="' + segment.end_px.y +
-    '" stroke="#172b4d" stroke-width="6" stroke-linecap="round" />'
+    '" stroke="' + (segment.created_by_reconstruction ? "#c47734" : "#172b4d") +
+    '" stroke-width="6" stroke-linecap="round" />'
   );
   const elements = [...polygons, ...lines].join("\n  ");
   const svg = '<?xml version="1.0" encoding="UTF-8"?>\n' +
@@ -2090,7 +2097,12 @@ function buildReviewObject() {
       bbox: detection.bbox,
       centre: detection.centre
     })),
-    manual_geometry: state.geometry.segments.map((segment) => ({ ...segment })),
+    manual_geometry: state.geometry.segments
+      .filter((segment) => segment.created_by_user === true)
+      .map((segment) => ({ ...segment })),
+    dimension_driven_wall_draft: state.geometry.segments
+      .filter((segment) => segment.created_by_reconstruction === true)
+      .map((segment) => ({ ...segment })),
     manual_rooms: state.geometry.rooms.map((room) => ({ ...room })),
     reconstruction: state.reconstruction ? { ...state.reconstruction } : null,
     manual_dimension_text_review: (result.dimension_regions || []).map((region, index) => {
@@ -2237,7 +2249,7 @@ async function saveProject() {
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1500);
-  showNotice("Project saved", "The source file, analysis, manual review and scale reference were packaged into a local .planline file. Nothing was uploaded.");
+  showNotice("Project saved", "The source drawing, review, manual linework and any dimension-driven wall draft with its X/Y scales were packaged into a local .planline file. Nothing was uploaded.");
 }
 
 function restoreProjectReview(review) {
@@ -2317,6 +2329,29 @@ function restoreProjectReview(review) {
   }
 }
 
+function isValidReconstructionState(reconstruction, segments, analysisResult) {
+  const generated = (Array.isArray(segments) ? segments : [])
+    .filter((segment) => segment?.created_by_reconstruction === true);
+  if (!generated.length) return reconstruction == null;
+  if (!reconstruction || reconstruction.status !== "draft" ||
+      !Number.isFinite(reconstruction.scale?.pixels_per_mm_x) ||
+      reconstruction.scale.pixels_per_mm_x <= 0 ||
+      !Number.isFinite(reconstruction.scale?.pixels_per_mm_y) ||
+      reconstruction.scale.pixels_per_mm_y <= 0 ||
+      !Array.isArray(reconstruction.measurements) ||
+      reconstruction.measurements.length < 2) return false;
+  const wallIds = new Set((analysisResult?.detections || [])
+    .filter((item) => item.class_name === "wall")
+    .map((item) => item.id));
+  return generated.every((segment) =>
+    wallIds.has(segment.source_detection_id) &&
+    reconstruction.measurements.some((measurement) =>
+      measurement.wall_ids?.includes(segment.source_detection_id) ||
+      measurement.wall_ids?.every((id) => wallIds.has(id))
+    )
+  );
+}
+
 function isValidProjectGeometry(project) {
   const segments = project.geometry ?? [];
   const rooms = project.rooms ?? [];
@@ -2372,6 +2407,7 @@ async function openProjectFile(file) {
         !project.analysis_result.preview_data_url || !project.review ||
         !Array.isArray(project.review.manual_dimension_text_review) ||
         !isValidProjectGeometry(project) ||
+        !isValidReconstructionState(project.reconstruction, project.geometry, project.analysis_result) ||
         !/\\.(png|jpe?g|webp|tiff?|pdf)$/i.test(project.source.filename) ||
         !Number.isInteger(project.source.size_bytes) || project.source.size_bytes < 1 || project.source.size_bytes > 25 * 1024 * 1024 ||
         !Number.isFinite(project.analysis_result.image.width) || project.analysis_result.image.width < 1 ||
