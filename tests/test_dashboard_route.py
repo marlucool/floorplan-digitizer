@@ -1,5 +1,5 @@
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 
 from planline.api import app
 from planline.documentation import discover_documents
@@ -69,8 +69,8 @@ def test_local_documentation_serves_images_and_rejects_traversal() -> None:
     assert image.headers["content-type"].startswith("image/png")
     assert image.content.startswith(bytes((137, 80, 78, 71, 13, 10, 26, 10)))
 
-    assert client.get("/documentation/../README.md").status_code in {404, 422}
-    assert client.get("/docs/../README.md").status_code in {404, 422}
+    assert client.get("/documentation/%252e%252e/README.md").status_code in {404, 422}
+    assert client.get("/docs/%252e%252e/README.md").status_code in {404, 422}
 
 
 def test_architecture_and_documentation_have_mobile_navigation_controls() -> None:
