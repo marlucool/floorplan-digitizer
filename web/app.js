@@ -769,6 +769,198 @@ function undoJunctionCandidate(index) {
   showNotice("Wall endpoint join undone", "The original endpoint coordinates have been restored.");
 }
 
+function getReviewableRoomLoops() {
+  const segments = (state.geometry.segments || []).filter((segment) =>
+    segment.created_by_reconstruction === true
+  );
+  const candidates = (state.reconstruction?.junction_candidates || [])
+    .filter((candidate) => candidate.review_status === "joined" &&
+      Array.isArray(candidate.endpoints) && candidate.endpoints.length === 2);
+  if (segments.length < 3 || candidates.length < 3) return [];
+
+  const parent = new Map();
+  const find = (key) => {
+    if (!parent.has(key)) parent.set(key, key);
+    const value = parent.get(key);
+    if (value !== key) parent.set(key, find(value));
+    return parent.get(key);
+  };
+  const union = (left, right) => {
+    const a = find(left);
+    const b = find(right);
+    if (a !== b) parent.set(b, a < b ? a : b);
+  };
+  for (const candidate of candidates) {
+    union(
+      junctionEndpointKey(candidate.endpoints[0]),
+      junctionEndpointKey(candidate.endpoints[1])
+    );
+  }
+
+  const edges = [];
+  const nodePoints = new Map();
+  const nodePointCounts = new Map();
+  for (const segment of segments) {
+    const startKey = junctionEndpointKey({ segment_id: segment.id, endpoint: "start_px" });
+    const endKey = junctionEndpointKey({ segment_id: segment.id, endpoint: "end_px" });
+    const startNode = find(startKey);
+    const endNode = find(endKey);
+    if (startNode === endNode) continue;
+    edges.push({ segmentId: segment.id, startNode, endNode });
+    for (const [node, point] of [[startNode, segment.start_px], [endNode, segment.end_px]]) {
+      const current = nodePoints.get(node) || { x: 0, y: 0 };
+      nodePoints.set(node, { x: current.x + point.x, y: current.y + point.y });
+      nodePointCounts.set(node, (nodePointCounts.get(node) || 0) + 1);
+    }
+  }
+  for (const [node, point] of nodePoints) {
+    const count = nodePointCounts.get(node) || 1;
+    nodePoints.set(node, { x: point.x / count, y: point.y / count });
+  }
+
+  const adjacency = new Map();
+  const addEdge = (node, edge) => {
+    if (!adjacency.has(node)) adjacency.set(node, []);
+    adjacency.get(node).push(edge);
+  };
+  for (const edge of edges) {
+    addEdge(edge.startNode, edge);
+    addEdge(edge.endNode, edge);
+  }
+  adjacency.forEach((items) => items.sort((a, b) => a.segmentId.localeCompare(b.segmentId)));
+
+  const visitedNodes = new Set();
+  const loops = [];
+  for (const startNode of adjacency.keys()) {
+    if (visitedNodes.has(startNode)) continue;
+    const stack = [startNode];
+    const componentNodes = new Set();
+    const componentEdges = new Map();
+    while (stack.length) {
+      const node = stack.pop();
+      if (componentNodes.has(node)) continue;
+      componentNodes.add(node);
+      visitedNodes.add(node);
+      for (const edge of adjacency.get(node) || []) {
+        componentEdges.set(edge.segmentId, edge);
+        const next = edge.startNode === node ? edge.endNode : edge.startNode;
+        if (!componentNodes.has(next)) stack.push(next);
+      }
+    }
+    const cycleEdges = [...componentEdges.values()];
+    if (cycleEdges.length < 3 || componentNodes.size !== cycleEdges.length ||
+        [...componentNodes].some((node) => (adjacency.get(node) || []).length !== 2)) continue;
+
+    const orderedPoints = [];
+    const usedEdges = new Set();
+    let currentNode = [...componentNodes].sort()[0];
+    let previousEdge = null;
+    for (let step = 0; step <= cycleEdges.length; step++) {
+      if (currentNode === [...componentNodes].sort()[0] && step > 0) break;
+      const point = nodePoints.get(currentNode);
+      if (!point) break;
+      orderedPoints.push({ x: Number(point.x.toFixed(2)), y: Number(point.y.toFixed(2)) });
+      const nextEdge = (adjacency.get(currentNode) || []).find((edge) =>
+        edge.segmentId !== previousEdge && !usedEdges.has(edge.segmentId)
+      );
+      if (!nextEdge) break;
+      usedEdges.add(nextEdge.segmentId);
+      previousEdge = nextEdge.segmentId;
+      currentNode = nextEdge.startNode === currentNode ? nextEdge.endNode : nextEdge.startNode;
+    }
+    if (currentNode !== [...componentNodes].sort()[0] ||
+        usedEdges.size !== cycleEdges.length || orderedPoints.length < 3 ||
+        !isSimplePolygon(orderedPoints) || polygonAreaPx2(orderedPoints) < 9) continue;
+    loops.push({
+      id: cycleEdges.map((edge) => edge.segmentId).sort().join("|"),
+      segment_ids: cycleEdges.map((edge) => edge.segmentId).sort(),
+      vertices_px: orderedPoints,
+      area_px2: polygonAreaPx2(orderedPoints)
+    });
+  }
+  return loops.sort((a, b) =>
+    a.vertices_px[0].y - b.vertices_px[0].y ||
+    a.vertices_px[0].x - b.vertices_px[0].x ||
+    a.id.localeCompare(b.id)
+  );
+}
+
+function roomLoopAlreadyAdded(candidate) {
+  const key = candidate.vertices_px
+    .map((point) => point.x.toFixed(2) + "," + point.y.toFixed(2))
+    .sort().join("|");
+  return state.geometry.rooms.some((room) =>
+    room.vertices_px.map((point) => point.x.toFixed(2) + "," + point.y.toFixed(2))
+      .sort().join("|") === key
+  );
+}
+
+function renderRoomLoopReview() {
+  const panel = $("#roomLoopReview");
+  if (!panel) return;
+  const loops = getReviewableRoomLoops();
+  panel.classList.toggle("hidden", loops.length === 0);
+  const addedCount = loops.filter(roomLoopAlreadyAdded).length;
+  $("#roomLoopReviewSummary").textContent = loops.length
+    ? loops.length + " closed loop" + (loops.length === 1 ? "" : "s") +
+      " found · " + addedCount + " already added"
+    : "No closed loops";
+  const list = $("#roomLoopCandidateList");
+  list.replaceChildren();
+  loops.forEach((candidate, index) => {
+    const card = document.createElement("article");
+    card.className = "junction-candidate";
+    const added = roomLoopAlreadyAdded(candidate);
+    card.dataset.state = added ? "joined" : "pending";
+    const copy = document.createElement("div");
+    copy.className = "junction-candidate-copy";
+    const title = document.createElement("strong");
+    title.textContent = "Closed outline " + (index + 1) + " · " +
+      candidate.segment_ids.length + " wall edges";
+    const detail = document.createElement("small");
+    const scaleX = state.reconstruction?.scale?.pixels_per_mm_x;
+    const scaleY = state.reconstruction?.scale?.pixels_per_mm_y;
+    const areaM2 = scaleX > 0 && scaleY > 0
+      ? candidate.area_px2 / (scaleX * scaleY) / 1000000
+      : null;
+    detail.textContent = areaM2 === null
+      ? Math.round(candidate.area_px2) + " px²"
+      : areaM2.toFixed(2) + " m² · dimension-scaled draft";
+    copy.append(title, detail);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "toolbar-button";
+    button.textContent = added ? "Already added" : "Add room outline";
+    button.disabled = PREVIEW_MODE || added;
+    button.addEventListener("click", () => addRoomLoopCandidate(candidate));
+    card.append(copy, button);
+    list.append(card);
+  });
+}
+
+function addRoomLoopCandidate(candidate) {
+  if (!candidate || roomLoopAlreadyAdded(candidate)) return;
+  let nextId = Math.max(1, state.geometry.nextRoomId || 1);
+  let id = "manual-room-" + String(nextId).padStart(3, "0");
+  while (state.geometry.rooms.some((room) => room.id === id)) {
+    nextId += 1;
+    id = "manual-room-" + String(nextId).padStart(3, "0");
+  }
+  state.geometry.rooms.push({
+    id,
+    type: "room_polygon",
+    source_page_index: state.result?.source?.page_index ?? 0,
+    created_by_user: true,
+    vertices_px: candidate.vertices_px.map((point) => ({ ...point }))
+  });
+  state.geometry.nextRoomId = nextId + 1;
+  state.geometry.selectedRoomId = id;
+  state.geometry.selectedId = null;
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+  showNotice("Room outline added", "The closed wall loop was added as an editable room polygon. Check its corners and area before exporting.");
+}
+
 function renderGeometryControls() {
   const geometry = state.geometry;
   const wallCount = geometry?.segments?.length || 0;
@@ -850,6 +1042,7 @@ function renderGeometryControls() {
     $("#roomArea").textContent = "Select a room to view its area.";
   }
   renderJunctionReview();
+  renderRoomLoopReview();
 }
 
 function setGeometryMode(mode) {
