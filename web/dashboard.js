@@ -7,8 +7,8 @@ async function refreshHealth() {
     $("#healthTitle").textContent = "Static preview";
     $("#healthDetails").textContent = "Backend services are disabled in this preview. Run Planline locally for live application health.";
     card.dataset.state = "preview";
-    dot.style.background = "#8b8b7d";
-    label.textContent = "Static UI preview";
+    if (dot) dot.style.background = "#8b8b7d";
+    if (label) label.textContent = "Static UI preview";
     $("#refreshHealth").hidden = true;
     return;
   }
@@ -26,14 +26,14 @@ async function refreshHealth() {
     $("#healthTitle").textContent = "Local API is online";
     $("#healthDetails").textContent = [health.version ? "Version " + health.version : "", detector, ocr, matching, geometry].filter(Boolean).join(" · ");
     card.dataset.state = health.detector_weights_present ? "ok" : "warning";
-    dot.style.background = health.detector_weights_present ? "#6d9a6e" : "#c08a38";
-    label.textContent = health.detector_weights_present ? "Local services online" : "Detector model missing";
+    if (dot) dot.style.background = health.detector_weights_present ? "#6d9a6e" : "#c08a38";
+    if (label) label.textContent = health.detector_weights_present ? "Local services online" : "Detector model missing";
   } catch (error) {
     $("#healthTitle").textContent = "Local API unavailable";
     $("#healthDetails").textContent = error.message + " · Start Planline again or check the installation.";
     card.dataset.state = "error";
-    dot.style.background = "var(--red)";
-    label.textContent = "API unavailable";
+    if (dot) dot.style.background = "var(--red)";
+    if (label) label.textContent = "API unavailable";
   }
 }
 $("#refreshHealth").addEventListener("click", refreshHealth);

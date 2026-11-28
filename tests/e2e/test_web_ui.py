@@ -678,3 +678,67 @@ def test_dimension_chain_offers_single_missing_value_as_unverified_candidate() -
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_dashboard_health_indicator_handles_online_and_unavailable_states() -> None:
+    web_dir = Path(__file__).resolve().parents[2] / "web"
+    handler = partial(QuietHandler, directory=str(web_dir))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    response_state = {
+        "status": 200,
+        "payload": {
+            "status": "ok",
+            "version": "0.12.0",
+            "detector_weights_present": True,
+            "ocr_available": True,
+            "dimension_association_available": True,
+            "manual_geometry_available": True,
+        },
+    }
+
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            page = browser.new_page()
+
+            def health_response(route) -> None:
+                route.fulfill(status=response_state["status"], json=response_state["payload"])
+
+            page.route("**/api/health", health_response)
+            page.goto(f"http://127.0.0.1:{server.server_port}/dashboard.html", wait_until="domcontentloaded")
+            page.wait_for_function("document.querySelector('#healthTitle')?.textContent === 'Local API is online'")
+            assert page.locator("#healthDot").is_visible()
+            assert page.locator("#healthLabel").inner_text() == "Local services online"
+            assert "detector ready" in page.locator("#healthDetails").inner_text()
+            assert page.locator(".health-mark").evaluate("el => getComputedStyle(el).color") == "rgb(109, 154, 110)"
+
+            response_state["payload"]["detector_weights_present"] = False
+            page.reload(wait_until="domcontentloaded")
+            page.wait_for_function("document.querySelector('#healthTitle')?.textContent === 'Local API is online'")
+            assert page.locator("#healthLabel").inner_text() == "Detector model missing"
+            assert page.locator(".health-mark").evaluate("el => getComputedStyle(el).color") == "rgb(192, 138, 56)"
+
+            response_state["status"] = 503
+            response_state["payload"] = {"detail": "Test API unavailable"}
+            page.reload(wait_until="domcontentloaded")
+            page.wait_for_function("document.querySelector('#healthTitle')?.textContent === 'Local API unavailable'")
+            assert page.locator("#healthLabel").inner_text() == "API unavailable"
+            assert page.locator("#healthDetails").inner_text().startswith("Local API returned HTTP 503")
+            actual_error_color = page.locator(".health-mark").evaluate("el => getComputedStyle(el).color")
+            expected_error_color = page.evaluate("""() => {
+              const probe = document.createElement("span");
+              probe.style.color = getComputedStyle(document.documentElement).getPropertyValue("--red").trim();
+              document.body.appendChild(probe);
+              const value = getComputedStyle(probe).color;
+              probe.remove();
+              return value;
+            }""")
+            assert actual_error_color == expected_error_color
+            browser.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
