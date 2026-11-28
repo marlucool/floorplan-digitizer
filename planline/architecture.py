@@ -32,6 +32,7 @@ def render_architecture_page(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#151c17">
   <meta name="description" content="Planline implementation status, technical architecture, research notes and engineering roadmap.">
   <title>Planline — Architecture &amp; roadmap</title>
   <link rel="stylesheet" href="{asset_prefix}styles.css">
