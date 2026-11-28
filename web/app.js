@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const PREVIEW_MODE = window.PLANLINE_PREVIEW === true;
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, ocrReady: false, ocrModels: [], ocrDatasets: [], ocrPredictions: {}, ocrRunning: false, ocrModelId: null, ocrDevice: null, ocrCapabilitiesLoaded: false, ocrCapabilitiesPromise: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, ocrReady: false, ocrModels: [], ocrDatasets: [], ocrPredictions: {}, ocrRunning: false, ocrModelId: null, ocrDevice: null, ocrCapabilitiesLoaded: false, ocrCapabilitiesPromise: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, reconstruction: null, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
 
 function updateWorkflow(stage) {
   const order = ["upload", "analyse", "review", "draw"];
@@ -39,6 +39,9 @@ function resetWorkspace() {
   if (state.resizeObserver) state.resizeObserver.disconnect();
   if (state.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
   state.file = null; state.objectUrl = null; state.result = null; state.previewUrl = null;
+  state.reconstruction = null;
+  $("#reconstructionStatus").textContent = "Analyse a drawing, verify horizontal and vertical dimensions, and confirm their wall pairs.";
+  $("#reconstructionStatus").dataset.state = "";
   state.detections = []; state.selectedId = null; state.activeFilter = "all";
   state.overlayVisible = true; state.resizeObserver = null; state.resizeHandler = null; state.zoom = 1;
   state.searchQuery = ""; state.sortMode = "original";
@@ -115,6 +118,9 @@ function setFile(file) {
   $("#previewImage").onload = null;
   $("#previewImage").onerror = null;
   state.file = file;
+  state.reconstruction = null;
+  $("#reconstructionStatus").textContent = "Analyse a drawing, verify horizontal and vertical dimensions, and confirm their wall pairs.";
+  $("#reconstructionStatus").dataset.state = "";
   updateWorkflow("analyse");
   if ($("#drawingSourceId")) $("#drawingSourceId").value = (file.name.replace(/\\.[^.]+$/, "") || "drawing").slice(0, 128);
   updateDatasetCaptureButtons();
@@ -342,38 +348,43 @@ const CALIBRATION_UNIT_TO_MM = { mm: 1, cm: 10, m: 1000, in: 25.4, ft: 304.8 };
 
 function clearCalibration() {
   state.calibration = { points: [], picking: false, applied: null };
-  const status = $("#calibrationState");
-  if (!status) return;
-  status.textContent = "Not set";
-  $("#calibrationPoints").textContent = "No scale reference selected.";
-  $("#calibrationResult").textContent = "No scale applied.";
-  $("#startCalibration").disabled = !state.result;
-  $("#startCalibration").textContent = "Pick two points";
-  $("#applyCalibration").disabled = true;
-  $("#clearCalibration").disabled = true;
+  if (!$("#calibrationState")) return;
   $("#previewImage").classList.remove("calibration-picking");
+  renderCalibrationStatus();
   if (state.result && state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
   if (state.geometry) renderGeometryControls();
 }
 
 function renderCalibrationStatus() {
   const points = state.calibration.points;
-  $("#calibrationPoints").textContent = state.calibration.applied?.method === "verified_dimension_association"
-    ? "Derived from a confirmed dimension-to-wall match."
-    : "Point 1: " +
-      (points[0] ? Math.round(points[0].x) + ", " + Math.round(points[0].y) + " px" : "not set") +
-      " · Point 2: " +
-      (points[1] ? Math.round(points[1].x) + ", " + Math.round(points[1].y) + " px" : "not set");
+  if (state.reconstruction?.scale?.pixels_per_mm_x && state.reconstruction?.scale?.pixels_per_mm_y) {
+    $("#calibrationPoints").textContent =
+      "Confirmed dimensions · X " + state.reconstruction.scale.pixels_per_mm_x.toFixed(6) +
+      " px/mm · Y " + state.reconstruction.scale.pixels_per_mm_y.toFixed(6) + " px/mm";
+    $("#calibrationResult").textContent =
+      "Separate horizontal and vertical scales derived from confirmed dimension-to-wall matches. Draft geometry only; inspect for scan distortion.";
+  } else {
+    $("#calibrationPoints").textContent = state.calibration.applied?.method === "verified_dimension_association"
+      ? "Derived from a confirmed dimension-to-wall match."
+      : "Point 1: " +
+        (points[0] ? Math.round(points[0].x) + ", " + Math.round(points[0].y) + " px" : "not set") +
+        " · Point 2: " +
+        (points[1] ? Math.round(points[1].x) + ", " + Math.round(points[1].y) + " px" : "not set");
+  }
   $("#startCalibration").disabled = !state.result;
   $("#startCalibration").textContent = state.calibration.picking ? "Click the drawing…" : "Pick two points";
   $("#applyCalibration").disabled = points.length !== 2;
-  $("#clearCalibration").disabled = points.length === 0 && !state.calibration.applied;
-  $("#calibrationState").textContent = state.calibration.applied ? "Applied" :
+  $("#clearCalibration").disabled = points.length === 0 && !state.calibration.applied && !state.reconstruction;
+  $("#calibrationState").textContent = state.reconstruction ? "X/Y scales" : state.calibration.applied ? "Applied" :
     state.calibration.picking ? "Picking points" : points.length ? "2 points ready" : "Not set";
   $("#previewImage").classList.toggle("calibration-picking", state.calibration.picking);
 }
 
 function applyAssociatedDimensionScale(reference) {
+  if (state.reconstruction && state.geometry.segments.some((segment) => segment.created_by_reconstruction)) {
+    $("#calibrationResult").textContent = "Clear the generated wall draft before applying a single-dimension scale.";
+    return;
+  }
   const distanceMm = Number(reference?.valueMm);
   const pixelDistance = Number(reference?.spanPx);
   if (!state.result || !(distanceMm > 0) || !(pixelDistance > 0) ||
@@ -383,6 +394,7 @@ function applyAssociatedDimensionScale(reference) {
     $("#calibrationResult").textContent = "The matched dimension cannot produce a valid scale.";
     return;
   }
+  state.reconstruction = null;
   state.calibration = {
     points: [],
     picking: false,
@@ -442,6 +454,10 @@ function addCalibrationPoint(event) {
 }
 
 function applyCalibration() {
+  if (state.reconstruction && state.geometry.segments.some((segment) => segment.created_by_reconstruction)) {
+    $("#calibrationResult").textContent = "Clear the generated wall draft before replacing its confirmed X/Y scales with one manual scale.";
+    return;
+  }
   const points = state.calibration.points;
   const distance = Number($("#calibrationDistance").value);
   const unit = $("#calibrationUnit").value;
@@ -461,6 +477,7 @@ function applyCalibration() {
     $("#calibrationResult").textContent = "That distance is outside the supported numeric range.";
     return;
   }
+  state.reconstruction = null;
   state.calibration.applied = {
     method: "user_two_point_reference",
     points_px: points.map((point) => ({ x: Number(point.x.toFixed(2)), y: Number(point.y.toFixed(2)) })),
@@ -529,10 +546,24 @@ function refreshWallDimensionOptions() {
   updateWallDimensionCheckControls();
 }
 
+function getSegmentLengthMm(segment) {
+  if (!segment) return null;
+  const dx = segment.end_px.x - segment.start_px.x;
+  const dy = segment.end_px.y - segment.start_px.y;
+  const scaleX = state.reconstruction?.scale?.pixels_per_mm_x;
+  const scaleY = state.reconstruction?.scale?.pixels_per_mm_y;
+  if (Number.isFinite(scaleX) && scaleX > 0 && Number.isFinite(scaleY) && scaleY > 0) {
+    // Apply the independent axis transforms before measuring diagonal geometry.
+    return Math.hypot(dx / scaleX, dy / scaleY);
+  }
+  const uniform = state.calibration.applied?.pixels_per_mm;
+  return Number.isFinite(uniform) && uniform > 0 ? Math.hypot(dx, dy) / uniform : null;
+}
+
 function updateWallDimensionCheckControls() {
   const select = $("#wallDimensionSelect");
   const selectedWall = state.geometry?.segments?.find((segment) => segment.id === state.geometry.selectedId);
-  const hasCalibration = Number(state.calibration.applied?.pixels_per_mm) > 0;
+  const hasCalibration = getSegmentLengthMm(selectedWall) > 0;
   const hasDimension = Boolean(select?.selectedOptions?.[0]?.dataset.valueMm);
   const toleranceText = $("#wallDimensionTolerance").value.trim();
   const tolerance = Number(toleranceText);
@@ -551,16 +582,12 @@ async function compareSelectedWallToDimension() {
   const selectedWall = state.geometry.segments.find((segment) => segment.id === state.geometry.selectedId);
   const option = $("#wallDimensionSelect").selectedOptions[0];
   const dimensionMm = option?.dataset.valueMm;
-  const pixelsPerMm = state.calibration.applied?.pixels_per_mm;
+  const lengthMm = getSegmentLengthMm(selectedWall);
   const tolerance = Number($("#wallDimensionTolerance").value);
-  if (!selectedWall || !dimensionMm || !(pixelsPerMm > 0)) {
+  if (!selectedWall || !dimensionMm || !(lengthMm > 0)) {
     updateWallDimensionCheckControls();
     return;
   }
-  const wallLengthPx = Math.hypot(
-    selectedWall.end_px.x - selectedWall.start_px.x,
-    selectedWall.end_px.y - selectedWall.start_px.y
-  );
   const button = $("#checkWallDimension");
   button.disabled = true;
   button.textContent = "Comparing…";
@@ -569,13 +596,17 @@ async function compareSelectedWallToDimension() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        wall_length_px: wallLengthPx,
-        pixels_per_mm: pixelsPerMm,
+        // Send the already axis-corrected physical length through the API's
+        // comparison contract using a neutral 1 px/mm scale.
+        wall_length_px: lengthMm,
+        pixels_per_mm: 1,
         dimension_mm: dimensionMm,
         tolerance_percent: tolerance,
-        calibration_method: state.calibration.applied?.method === "verified_dimension_association"
+        calibration_method: state.reconstruction
           ? "verified_dimension_association"
-          : "user_two_point_reference"
+          : state.calibration.applied?.method === "verified_dimension_association"
+            ? "verified_dimension_association"
+            : "user_two_point_reference"
       })
     });
     const result = await response.json().catch(() => ({}));
@@ -599,16 +630,23 @@ async function compareSelectedWallToDimension() {
 function renderGeometryControls() {
   const geometry = state.geometry;
   const wallCount = geometry?.segments?.length || 0;
+  const reconstructedCount = (geometry?.segments || []).filter((segment) => segment.created_by_reconstruction).length;
+  const manualCount = wallCount - reconstructedCount;
   const roomCount = geometry?.rooms?.length || 0;
   if (!$("#geometryCount")) return;
-  $("#geometryCount").textContent = wallCount + (wallCount === 1 ? " manual wall" : " manual walls");
+  $("#geometryCount").textContent = wallCount
+    ? (manualCount ? manualCount + " manual wall" + (manualCount === 1 ? "" : "s") : "") +
+      (manualCount && reconstructedCount ? " · " : "") +
+      (reconstructedCount ? reconstructedCount + " detected draft" : "")
+    : "No wall edges yet";
+  $("#reconstructWalls").disabled = !state.result || PREVIEW_MODE;
   $("#roomCount").textContent = roomCount + (roomCount === 1 ? " room" : " rooms");
   $("#drawWallTool").disabled = !state.result;
   $("#selectWallTool").disabled = !state.result;
   $("#drawRoomTool").disabled = !state.result;
   $("#finishRoom").disabled = geometry.pendingRoom.length < 3;
   $("#cancelRoom").disabled = geometry.pendingRoom.length === 0;
-  $("#undoWall").disabled = wallCount === 0;
+  $("#undoWall").disabled = manualCount === 0;
   $("#deleteWall").disabled = !geometry.selectedId;
   $("#clearWalls").disabled = wallCount === 0;
   $("#deleteRoom").disabled = !geometry.selectedRoomId;
@@ -630,15 +668,22 @@ function renderGeometryControls() {
     $("#geometryStatus").textContent = "Selected " + geometry.selectedRoomId + ". Area is shown below.";
   } else if (geometry.selectedId) {
     $("#geometryStatus").textContent = "Selected " + geometry.selectedId + ". Delete it or draw another wall.";
+  } else if (state.reconstruction) {
+    $("#geometryStatus").textContent = "Dimension-scaled wall-edge draft loaded. Inspect, delete or adjust every generated edge before exporting.";
+  } else if (manualCount > 0) {
+    $("#geometryStatus").textContent = "Manual wall linework is editable. Add more walls or generate a separate measured draft.";
   } else {
-    $("#geometryStatus").textContent = "Manual only: detector boxes are not converted into walls or rooms.";
+    $("#geometryStatus").textContent = "No wall geometry yet. Generate a measured draft from confirmed dimensions or draw walls manually.";
   }
   const selectedWall = geometry.segments.find((segment) => segment.id === geometry.selectedId);
   if (selectedWall) {
-    const lengthPx = Math.hypot(selectedWall.end_px.x - selectedWall.start_px.x, selectedWall.end_px.y - selectedWall.start_px.y);
-    const pixelsPerMm = state.calibration.applied?.pixels_per_mm;
-    $("#wallLength").textContent = pixelsPerMm
-      ? (lengthPx / pixelsPerMm / 1000).toFixed(3) + " m (user-supplied scale; not verified)"
+    const dx = selectedWall.end_px.x - selectedWall.start_px.x;
+    const dy = selectedWall.end_px.y - selectedWall.start_px.y;
+    const lengthPx = Math.hypot(dx, dy);
+    const lengthMm = getSegmentLengthMm(selectedWall);
+    $("#wallLength").textContent = Number.isFinite(lengthMm)
+      ? (lengthMm / 1000).toFixed(3) + " m (" +
+        (state.reconstruction ? "axis-corrected confirmed-dimension draft scale; review required" : "user-supplied scale; not verified") + ")"
       : lengthPx.toFixed(1) + " px · apply calibration for metric length";
   } else {
     $("#wallLength").textContent = "Select a wall to view its length.";
@@ -647,8 +692,13 @@ function renderGeometryControls() {
   const selectedRoom = geometry.rooms.find((room) => room.id === geometry.selectedRoomId);
   if (selectedRoom) {
     const areaPx = polygonAreaPx2(selectedRoom.vertices_px);
+    const scaleX = state.reconstruction?.scale?.pixels_per_mm_x;
+    const scaleY = state.reconstruction?.scale?.pixels_per_mm_y;
     const pixelsPerMm = state.calibration.applied?.pixels_per_mm;
-    if (pixelsPerMm) {
+    if (scaleX > 0 && scaleY > 0) {
+      const areaM2 = areaPx / (scaleX * scaleY) / 1000000;
+      $("#roomArea").textContent = areaM2.toFixed(3) + " m² (axis scales from confirmed dimensions; draft only)";
+    } else if (pixelsPerMm) {
       const areaM2 = areaPx / (pixelsPerMm * pixelsPerMm) / 1000000;
       $("#roomArea").textContent = areaM2.toFixed(3) + " m² (using user-supplied scale; not verified)";
     } else {
@@ -877,8 +927,15 @@ function handleDrawingClick(event) {
 }
 
 function undoManualWall() {
-  if (!state.geometry.segments.length) return;
-  const removed = state.geometry.segments.pop();
+  let lastManualIndex = -1;
+  for (let index = state.geometry.segments.length - 1; index >= 0; index -= 1) {
+    if (state.geometry.segments[index].created_by_user === true) {
+      lastManualIndex = index;
+      break;
+    }
+  }
+  if (lastManualIndex < 0) return;
+  const [removed] = state.geometry.segments.splice(lastManualIndex, 1);
   if (state.geometry.selectedId === removed.id) state.geometry.selectedId = null;
   renderGeometryControls();
   if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
@@ -887,6 +944,12 @@ function undoManualWall() {
 function deleteSelectedManualWall() {
   if (!state.geometry.selectedId) return;
   state.geometry.segments = state.geometry.segments.filter((segment) => segment.id !== state.geometry.selectedId);
+  if (!state.geometry.segments.some((segment) => segment.created_by_reconstruction)) {
+    state.reconstruction = null;
+    $("#reconstructionStatus").textContent = "No generated wall edges remain.";
+    $("#reconstructionStatus").dataset.state = "";
+    renderCalibrationStatus();
+  }
   state.geometry.selectedId = null;
   renderGeometryControls();
   if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
@@ -894,22 +957,109 @@ function deleteSelectedManualWall() {
 
 function clearManualWalls() {
   state.geometry.segments = [];
+  state.reconstruction = null;
+  $("#reconstructionStatus").textContent = "Wall geometry cleared. Generate a new draft or draw manually.";
+  $("#reconstructionStatus").dataset.state = "";
   state.geometry.pendingPoint = null;
   state.geometry.selectedId = null;
   renderGeometryControls();
   if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
 }
 
+async function reconstructWallDraft() {
+  if (!state.result || PREVIEW_MODE) return;
+  const button = $("#reconstructWalls");
+  const output = $("#reconstructionStatus");
+  const originalText = button.textContent;
+  const regions = state.result.dimension_regions || [];
+  const rows = [...document.querySelectorAll(".dimension-text-item")];
+  const dimensions = regions.map((region) => {
+    const row = rows.find((item) => item.dataset.detectionId === region.id);
+    const text = row?.querySelector(".dimension-text-value")?.value.trim() || "";
+    const selectedLineId = row?.querySelector(".dimension-line-select")?.value || null;
+    const spanSelect = row?.querySelector(".dimension-wall-span-select");
+    const associationConfirmed = Boolean(row?.querySelector(".dimension-association-verified-input")?.checked);
+    const association = region.association || {};
+    const selectedLine = (association.candidate_lines || []).find(
+      (candidate) => candidate.dimension_line_id === selectedLineId
+    );
+    const selectedSpan = spanSelect && spanSelect.value !== ""
+      ? selectedLine?.wall_spans?.[Number(spanSelect.value)]
+      : null;
+    return {
+      detection_id: region.id,
+      raw_text: text,
+      text_verified: Boolean(row?.querySelector(".dimension-text-verified-input")?.checked),
+      association_confirmed: associationConfirmed,
+      dimension_line_id: selectedLineId,
+      wall_ids: selectedSpan?.wall_ids || []
+    };
+  });
+
+  button.disabled = true;
+  button.textContent = "Generating wall-edge draft…";
+  output.dataset.state = "";
+  output.textContent = "Checking verified dimensions and rebuilding the candidate wall edges…";
+  try {
+    const response = await fetch("/api/reconstruct-wall-draft", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source_width: state.result.image.width,
+        source_height: state.result.image.height,
+        source_page_index: state.result.source?.page_index ?? 0,
+        detections: state.result.detections || [],
+        dimensions
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.detail || "The measured wall draft could not be built.");
+
+    const manualSegments = state.geometry.segments.filter((segment) => !segment.created_by_reconstruction);
+    state.geometry.segments = [...manualSegments, ...(result.segments || [])];
+    state.geometry.selectedId = null;
+    state.reconstruction = result;
+    state.calibration = { points: [], picking: false, applied: null };
+    renderCalibrationStatus();
+    renderGeometryControls();
+    $("#geometryDetails").open = true;
+    const skipped = result.skipped_walls?.length || 0;
+    const junctions = result.junction_candidates?.length || 0;
+    output.dataset.state = skipped ? "warning" : "success";
+    output.textContent =
+      "Created " + result.segments.length + " editable wall-face edges from " +
+      result.wall_regions_used + " detected wall regions. X scale " +
+      result.scale.pixels_per_mm_x.toFixed(6) + " px/mm; Y scale " +
+      result.scale.pixels_per_mm_y.toFixed(6) + " px/mm. " +
+      (skipped ? skipped + " ambiguous wall regions were skipped. " : "") +
+      (junctions ? junctions + " possible wall junctions found; inspect them manually. " :
+        "No endpoint junction candidates found; connections still need review. ") +
+      "No automatic snapping or topology repair has been applied.";
+    if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+    showNotice("Wall draft generated", result.warnings?.join(" ") || "Review all generated wall edges against the source.");
+  } catch (error) {
+    output.dataset.state = "error";
+    output.textContent = error.message || "The wall draft could not be generated.";
+  } finally {
+    button.textContent = originalText;
+    button.disabled = !state.result;
+  }
+}
+
 async function exportManualGeometryDxf() {
   if (!state.result || (!state.geometry.segments.length && !state.geometry.rooms.length)) return;
+  const hasReconstructionScale = Boolean(state.reconstruction?.scale?.pixels_per_mm_x && state.reconstruction?.scale?.pixels_per_mm_y);
   const payload = {
     source_width: state.result.image.width,
     source_height: state.result.image.height,
-    pixels_per_mm: state.calibration.applied?.pixels_per_mm ?? null,
+    pixels_per_mm: hasReconstructionScale ? null : state.calibration.applied?.pixels_per_mm ?? null,
+    pixels_per_mm_x: hasReconstructionScale ? state.reconstruction.scale.pixels_per_mm_x : null,
+    pixels_per_mm_y: hasReconstructionScale ? state.reconstruction.scale.pixels_per_mm_y : null,
     segments: state.geometry.segments.map((segment) => ({
       id: segment.id,
       start_px: segment.start_px,
-      end_px: segment.end_px
+      end_px: segment.end_px,
+      source_detection_id: segment.created_by_reconstruction ? segment.source_detection_id : null
     })),
     rooms: state.geometry.rooms.map((room) => ({
       id: room.id,
@@ -934,14 +1084,17 @@ async function exportManualGeometryDxf() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = ((state.file?.name || "drawing").replace(/\.[^.]+$/, "") || "drawing") + "-manual-geometry.dxf";
+    link.download = ((state.file?.name || "drawing").replace(/\.[^.]+$/, "") || "drawing") +
+      (hasReconstructionScale ? "-measured-wall-draft.dxf" : "-manual-geometry.dxf");
     document.body.append(link);
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    $("#geometryStatus").textContent = payload.pixels_per_mm
-      ? "DXF exported in millimetres using the user-supplied, unverified scale."
-      : "DXF exported with unitless source-pixel coordinates. Apply scale calibration for metric units.";
+    $("#geometryStatus").textContent = hasReconstructionScale
+      ? "DXF exported in millimetres using confirmed X/Y dimension scales. Detected wall edges are on DETECTED_WALL_DRAFT and still require review."
+      : payload.pixels_per_mm
+        ? "DXF exported in millimetres using the user-supplied, unverified scale."
+        : "DXF exported with unitless source-pixel coordinates. Apply scale calibration for metric units.";
   } catch (error) {
     $("#geometryStatus").textContent = "DXF export failed: " + (error.message || "API unavailable");
   } finally {
@@ -950,29 +1103,34 @@ async function exportManualGeometryDxf() {
   }
 }
 
+
 function exportManualGeometrySvg() {
   if (!state.result || (!state.geometry.segments.length && !state.geometry.rooms.length)) return;
   const width = state.result.image.width;
   const height = state.result.image.height;
-  const scale = state.calibration.applied?.pixels_per_mm;
-  const physicalWidth = scale ? (width / scale).toFixed(3) + "mm" : width + "px";
-  const physicalHeight = scale ? (height / scale).toFixed(3) + "mm" : height + "px";
+  const scaleX = state.reconstruction?.scale?.pixels_per_mm_x || state.calibration.applied?.pixels_per_mm;
+  const scaleY = state.reconstruction?.scale?.pixels_per_mm_y || state.calibration.applied?.pixels_per_mm;
+  const physicalWidth = scaleX ? (width / scaleX).toFixed(3) + "mm" : width + "px";
+  const physicalHeight = scaleY ? (height / scaleY).toFixed(3) + "mm" : height + "px";
   const polygons = state.geometry.rooms.map((room) =>
     '<polygon id="' + room.id + '" points="' + room.vertices_px.map((point) => point.x + "," + point.y).join(" ") +
     '" fill="rgba(36,132,100,0.12)" stroke="#248464" stroke-width="4" />'
   );
   const lines = state.geometry.segments.map((segment) =>
-    '<line id="' + segment.id + '" x1="' + segment.start_px.x + '" y1="' + segment.start_px.y +
+    '<line id="' + segment.id + '" data-source="' + (segment.created_by_reconstruction ? "detected-wall-draft" : "manual") +
+    '" x1="' + segment.start_px.x + '" y1="' + segment.start_px.y +
     '" x2="' + segment.end_px.x + '" y2="' + segment.end_px.y +
-    '" stroke="#172b4d" stroke-width="6" stroke-linecap="round" />'
+    '" stroke="' + (segment.created_by_reconstruction ? "#c47734" : "#172b4d") +
+    '" stroke-width="6" stroke-linecap="round" />'
   );
   const elements = [...polygons, ...lines].join("\n  ");
   const svg = '<?xml version="1.0" encoding="UTF-8"?>\n' +
     '<svg xmlns="http://www.w3.org/2000/svg" width="' + physicalWidth + '" height="' + physicalHeight +
-    '" viewBox="0 0 ' + width + ' ' + height + '">\n' +
-    '  <metadata>Planline manual linework: ' + state.geometry.segments.length + ' wall segments and ' +
+    '" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">\n' +
+    '  <metadata>Planline editable linework: ' + state.geometry.segments.length + ' wall edges and ' +
     state.geometry.rooms.length + ' room polygons. Coordinates are in original source-image pixels. ' +
-    (scale ? 'Physical scale uses a user-supplied two-point reference; it is not verified geometry.' : 'No physical scale is embedded.') +
+    (state.reconstruction ? 'Wall draft uses X/Y scales derived from confirmed dimensions and remains unverified.' :
+      scaleX && scaleY ? 'Physical scale uses an explicit user reference; it is not verified geometry.' : 'No physical scale is embedded.') +
     '</metadata>\n  ' + elements + '\n</svg>';
   const blob = new Blob([svg], { type: "image/svg+xml" });
   const url = URL.createObjectURL(blob);
@@ -994,9 +1152,13 @@ $("#clearRooms").addEventListener("click", clearManualRooms);
 $("#selectWallTool").addEventListener("click", () => setGeometryMode("select"));
 $("#undoWall").addEventListener("click", undoManualWall);
 $("#deleteWall").addEventListener("click", deleteSelectedManualWall);
-$("#clearWalls").addEventListener("click", clearManualWalls);
+$("#clearWalls").addEventListener("click", () => {
+  clearManualWalls();
+  $("#reconstructionStatus").textContent = "All wall edges cleared, including any generated draft.";
+});
 $("#exportGeometry").addEventListener("click", exportManualGeometrySvg);
 $("#exportDxf").addEventListener("click", exportManualGeometryDxf);
+$("#reconstructWalls").addEventListener("click", reconstructWallDraft);
 $("#wallDimensionSelect").addEventListener("change", updateWallDimensionCheckControls);
 $("#wallDimensionTolerance").addEventListener("input", updateWallDimensionCheckControls);
 $("#checkWallDimension").addEventListener("click", compareSelectedWallToDimension);
@@ -1007,23 +1169,28 @@ function beginWallEndpointDrag(event) {
   const point = getSourcePoint(event);
   if (!point) return;
 
-  if (state.geometry.selectedRoomId) {
-    const room = state.geometry.rooms.find((item) => item.id === state.geometry.selectedRoomId);
-    if (!room) return;
-    let nearestIndex = -1;
-    let nearestDistance = 14;
+  const selectedRoom = state.geometry.rooms.find((item) => item.id === state.geometry.selectedRoomId);
+  const roomCandidates = selectedRoom
+    ? [selectedRoom]
+    : [...state.geometry.rooms].reverse();
+  let nearestRoomVertex = null;
+  let nearestRoomDistance = 14;
+  roomCandidates.forEach((room) => {
     room.vertices_px.forEach((vertex, index) => {
       const distance = Math.hypot(point.x - vertex.x, point.y - vertex.y);
-      if (distance <= nearestDistance) {
-        nearestIndex = index;
-        nearestDistance = distance;
+      if (distance <= nearestRoomDistance) {
+        nearestRoomVertex = { room, index, vertex };
+        nearestRoomDistance = distance;
       }
     });
-    if (nearestIndex < 0) return;
+  });
+  if (nearestRoomVertex) {
+    state.geometry.selectedRoomId = nearestRoomVertex.room.id;
+    state.geometry.selectedId = null;
     state.geometry.drag = {
-      roomId: room.id,
-      vertexIndex: nearestIndex,
-      originalPoint: { ...room.vertices_px[nearestIndex] },
+      roomId: nearestRoomVertex.room.id,
+      vertexIndex: nearestRoomVertex.index,
+      originalPoint: { ...nearestRoomVertex.vertex },
       pointerId: event.pointerId
     };
   } else if (state.geometry.selectedId) {
@@ -1909,7 +2076,7 @@ function buildReviewObject() {
     analysis: {
       model: "yolo_floorplan.pt",
       confidence_threshold: result.confidence_threshold ?? 0.25,
-      status: "candidate_detection_only",
+      status: state.reconstruction ? "dimension_constrained_wall_edge_draft" : "candidate_detection_only",
       preprocessing: result.preprocessing || { brightness: 0, contrast: 1, method: "linear_intensity_only" },
       ocr_model_id: state.ocrModelId,
       ocr_device: state.ocrDevice,
@@ -1927,8 +2094,14 @@ function buildReviewObject() {
       bbox: detection.bbox,
       centre: detection.centre
     })),
-    manual_geometry: state.geometry.segments.map((segment) => ({ ...segment })),
+    manual_geometry: state.geometry.segments
+      .filter((segment) => segment.created_by_user === true)
+      .map((segment) => ({ ...segment })),
+    dimension_driven_wall_draft: state.geometry.segments
+      .filter((segment) => segment.created_by_reconstruction === true)
+      .map((segment) => ({ ...segment })),
     manual_rooms: state.geometry.rooms.map((room) => ({ ...room })),
+    reconstruction: state.reconstruction ? { ...state.reconstruction } : null,
     manual_dimension_text_review: (result.dimension_regions || []).map((region, index) => {
       const textInputs = document.querySelectorAll(".dimension-text-value");
       const verifiedInputs = document.querySelectorAll(".dimension-text-verified-input");
@@ -1995,7 +2168,9 @@ function buildReviewObject() {
         : "No pixel-to-unit scale or measured geometry has been inferred.",
       "Bounding boxes are detector candidates, not measured wall geometry.",
       "Manual wall segments are user-created linework and have not been independently validated or topologically connected.",
-      "No measured DXF geometry is included."
+      state.reconstruction
+        ? "Dimension-constrained detected wall-face edges are included as editable draft geometry. They are not topologically joined or certified, and no room, opening or diagonal-wall reconstruction is included."
+        : "No dimension-constrained CAD geometry has been generated."
     ]
   };
   return review;
@@ -2052,6 +2227,7 @@ async function saveProject() {
     },
     analysis_result: state.result,
     geometry: state.geometry.segments,
+    reconstruction: state.reconstruction,
     geometry_next_id: state.geometry.nextId,
     rooms: state.geometry.rooms,
     room_next_id: state.geometry.nextRoomId,
@@ -2070,7 +2246,7 @@ async function saveProject() {
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1500);
-  showNotice("Project saved", "The source file, analysis, manual review and scale reference were packaged into a local .planline file. Nothing was uploaded.");
+  showNotice("Project saved", "The source drawing, review, manual linework and any dimension-driven wall draft with its X/Y scales were packaged into a local .planline file. Nothing was uploaded.");
 }
 
 function restoreProjectReview(review) {
@@ -2150,6 +2326,34 @@ function restoreProjectReview(review) {
   }
 }
 
+function isValidReconstructionState(reconstruction, segments, analysisResult) {
+  const generated = (Array.isArray(segments) ? segments : [])
+    .filter((segment) => segment?.created_by_reconstruction === true);
+  if (!generated.length) return reconstruction == null;
+  if (!reconstruction || reconstruction.status !== "draft" ||
+      !Number.isFinite(reconstruction.scale?.pixels_per_mm_x) ||
+      reconstruction.scale.pixels_per_mm_x <= 0 ||
+      !Number.isFinite(reconstruction.scale?.pixels_per_mm_y) ||
+      reconstruction.scale.pixels_per_mm_y <= 0 ||
+      !Array.isArray(reconstruction.measurements) ||
+      reconstruction.measurements.length < 2 ||
+      !Array.isArray(reconstruction.segments)) return false;
+  const wallIds = new Set((analysisResult?.detections || [])
+    .filter((item) => item.class_name === "wall")
+    .map((item) => item.id));
+  const draftIds = new Set(reconstruction.segments.map((segment) => segment.id));
+  const validMeasurements = reconstruction.measurements.every((measurement) =>
+    ["x", "y"].includes(measurement.axis) &&
+    Number.isFinite(measurement.value_mm) && measurement.value_mm > 0 &&
+    Number.isFinite(measurement.pixels_per_mm) && measurement.pixels_per_mm > 0 &&
+    Array.isArray(measurement.wall_ids) && measurement.wall_ids.length === 2 &&
+    measurement.wall_ids.every((id) => wallIds.has(id))
+  );
+  return validMeasurements && generated.every((segment) =>
+    wallIds.has(segment.source_detection_id) && draftIds.has(segment.id)
+  );
+}
+
 function isValidProjectGeometry(project) {
   const segments = project.geometry ?? [];
   const rooms = project.rooms ?? [];
@@ -2165,10 +2369,16 @@ function isValidProjectGeometry(project) {
     point.x <= project.analysis_result.image.width &&
     point.y <= project.analysis_result.image.height;
   const validSegments = segments.every((segment) => {
-    if (!segment || typeof segment.id !== "string" || !/^manual-wall-[0-9]{3,}$/.test(segment.id) ||
+    const manual = segment?.created_by_user === true && /^manual-wall-[0-9]{3,}$/.test(segment.id || "");
+    const reconstructed = segment?.created_by_reconstruction === true &&
+      /^reconstructed-wall-[0-9]{4,}$/.test(segment.id || "") &&
+      typeof segment.source_detection_id === "string" &&
+      Number.isFinite(segment.detector_confidence) &&
+      segment.detector_confidence >= 0 && segment.detector_confidence <= 1 &&
+      ["horizontal", "vertical"].includes(segment.wall_orientation);
+    if (!segment || typeof segment.id !== "string" || (!manual && !reconstructed) ||
         ids.has(segment.id) || segment.type !== "wall_segment" ||
-        segment.created_by_user !== true || !Number.isInteger(segment.source_page_index) ||
-        segment.source_page_index !== pageIndex) return false;
+        !Number.isInteger(segment.source_page_index) || segment.source_page_index !== pageIndex) return false;
     ids.add(segment.id);
     return inBounds(segment.start_px) && inBounds(segment.end_px) &&
       Math.hypot(segment.end_px.x - segment.start_px.x, segment.end_px.y - segment.start_px.y) >= 3;
@@ -2193,17 +2403,22 @@ async function openProjectFile(file) {
   }
   try {
     const project = JSON.parse(await file.text());
-    if (project.format !== "planline-project" || project.format_version !== 1 ||
-        !project.source?.filename || !project.source?.data_base64 ||
-        !project.analysis_result?.image || !Array.isArray(project.analysis_result.detections) ||
-        !project.analysis_result.preview_data_url || !project.review ||
-        !Array.isArray(project.review.manual_dimension_text_review) ||
-        !isValidProjectGeometry(project) ||
-        !/\\.(png|jpe?g|webp|tiff?|pdf)$/i.test(project.source.filename) ||
-        !Number.isInteger(project.source.size_bytes) || project.source.size_bytes < 1 || project.source.size_bytes > 25 * 1024 * 1024 ||
-        !Number.isFinite(project.analysis_result.image.width) || project.analysis_result.image.width < 1 ||
-        !Number.isFinite(project.analysis_result.image.height) || project.analysis_result.image.height < 1) {
-      throw new Error("This is not a supported Planline project file.");
+    const validationFailures = [];
+    if (project.format !== "planline-project" || project.format_version !== 1) validationFailures.push("unsupported format/version");
+    if (!project.source?.filename || !project.source?.data_base64) validationFailures.push("missing embedded source drawing");
+    if (!project.analysis_result?.image || !Array.isArray(project.analysis_result.detections) ||
+        !project.analysis_result.preview_data_url) validationFailures.push("missing analysis image, detections or preview");
+    if (!project.review || !Array.isArray(project.review.manual_dimension_text_review)) validationFailures.push("invalid review data");
+    if (project.analysis_result?.image && !isValidProjectGeometry(project)) validationFailures.push("invalid editable geometry");
+    if (project.analysis_result?.image &&
+        !isValidReconstructionState(project.reconstruction, project.geometry, project.analysis_result)) validationFailures.push("invalid reconstruction metadata");
+    if (!/\.(png|jpe?g|webp|tiff?|pdf)$/i.test(project.source?.filename || "")) validationFailures.push("unsupported source filename");
+    if (!Number.isInteger(project.source?.size_bytes) || project.source.size_bytes < 1 ||
+        project.source.size_bytes > 25 * 1024 * 1024) validationFailures.push("invalid source file size");
+    if (!Number.isFinite(project.analysis_result?.image?.width) || project.analysis_result.image.width < 1 ||
+        !Number.isFinite(project.analysis_result?.image?.height) || project.analysis_result.image.height < 1) validationFailures.push("invalid image dimensions");
+    if (validationFailures.length) {
+      throw new Error("Unsupported Planline project file: " + validationFailures.join(", ") + ".");
     }
     const bytes = decodeFileBase64(project.source.data_base64);
     if (project.source.size_bytes && bytes.byteLength !== project.source.size_bytes) {
@@ -2216,6 +2431,13 @@ async function openProjectFile(file) {
     setFile(sourceFile);
     state.result = project.analysis_result;
     state.geometry.segments = Array.isArray(project.geometry) ? project.geometry : [];
+    state.reconstruction = project.reconstruction && typeof project.reconstruction === "object"
+      ? project.reconstruction : null;
+    $("#reconstructionStatus").textContent = state.reconstruction
+      ? "Restored " + (state.reconstruction.segments?.length || 0) +
+        " generated wall-face edges. Inspect them before exporting."
+      : "Analyse a drawing, verify horizontal and vertical dimensions, and confirm their wall pairs.";
+    $("#reconstructionStatus").dataset.state = state.reconstruction ? "warning" : "";
     state.geometry.nextId = Number.isInteger(project.geometry_next_id) ? project.geometry_next_id : state.geometry.segments.length + 1;
     state.geometry.rooms = Array.isArray(project.rooms) ? project.rooms : [];
     state.geometry.nextRoomId = Number.isInteger(project.room_next_id) ? project.room_next_id : state.geometry.rooms.length + 1;

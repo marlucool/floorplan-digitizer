@@ -42,6 +42,7 @@ from .documentation import (
     safe_document_path,
 )
 from .ocr_studio_api import router as ocr_studio_router
+from .reconstruction import WallReconstructionRequest, reconstruct_wall_edges
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 WEB_DIR = ROOT_DIR / "web"
@@ -396,6 +397,7 @@ def health() -> dict[str, Any]:
         "dimension_association_available": True,
         "manual_geometry_available": True,
         "automatic_geometry_available": False,
+        "dimension_driven_wall_draft_available": True,
         "geometry_available": False,
     }
 
@@ -442,11 +444,20 @@ def validate_dimension_chain_endpoint(
     return validate_dimension_chain(request)
 
 
+@app.post("/api/reconstruct-wall-draft")
+def reconstruct_wall_draft_endpoint(request: WallReconstructionRequest) -> dict[str, Any]:
+    """Build reviewable wall-face edges from verified dimensions and associations."""
+    try:
+        return reconstruct_wall_edges(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @app.post("/api/export-dxf")
 def export_manual_geometry_dxf_endpoint(
     request: ManualGeometryDXFRequest,
 ) -> Response:
-    """Export only user-authored wall segments and room outlines as DXF."""
+    """Export manual geometry and separately layered detected wall-edge drafts."""
     try:
         content = export_manual_geometry_dxf(request)
     except ValueError as exc:
