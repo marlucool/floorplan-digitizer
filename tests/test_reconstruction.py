@@ -338,3 +338,76 @@ def test_junction_candidates_do_not_merge_transitive_endpoint_chains() -> None:
         ["wall-b", "wall-c"],
     ]
     assert all(item["endpoint_count"] == 2 for item in candidates)
+
+
+def test_opening_candidates_report_aligned_wall_gaps_without_classifying_them() -> None:
+    walls = [
+        reconstruction.ReconstructionDetection(
+            id="det-001", class_name="wall", confidence=0.95,
+            bbox={"x1": 10, "y1": 50, "x2": 100, "y2": 60},
+        ),
+        reconstruction.ReconstructionDetection(
+            id="det-002", class_name="wall", confidence=0.93,
+            bbox={"x1": 160, "y1": 50, "x2": 250, "y2": 60},
+        ),
+    ]
+
+    candidates = reconstruction._opening_candidates(
+        walls, pixels_per_mm_x=0.05, pixels_per_mm_y=0.05
+    )
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate["wall_ids"] == ["det-001", "det-002"]
+    assert candidate["axis"] == "x"
+    assert candidate["start_px"] == {"x": 100.0, "y": 55.0}
+    assert candidate["end_px"] == {"x": 160.0, "y": 55.0}
+    assert candidate["width_mm"] == 1200.0
+    assert candidate["status"] == "candidate_requires_review"
+    assert candidate["review_status"] == "pending"
+
+
+def test_opening_candidates_ignore_gaps_blocked_by_an_intervening_wall() -> None:
+    walls = [
+        reconstruction.ReconstructionDetection(
+            id="det-001", class_name="wall", confidence=0.95,
+            bbox={"x1": 10, "y1": 50, "x2": 100, "y2": 60},
+        ),
+        reconstruction.ReconstructionDetection(
+            id="det-002", class_name="wall", confidence=0.90,
+            bbox={"x1": 120, "y1": 50, "x2": 140, "y2": 60},
+        ),
+        reconstruction.ReconstructionDetection(
+            id="det-003", class_name="wall", confidence=0.93,
+            bbox={"x1": 160, "y1": 50, "x2": 250, "y2": 60},
+        ),
+    ]
+
+    candidates = reconstruction._opening_candidates(
+        walls, pixels_per_mm_x=0.05, pixels_per_mm_y=0.05
+    )
+
+    assert candidates == []
+
+
+def test_opening_candidates_support_vertical_wall_gaps() -> None:
+    walls = [
+        reconstruction.ReconstructionDetection(
+            id="det-001", class_name="wall", confidence=0.95,
+            bbox={"x1": 50, "y1": 10, "x2": 60, "y2": 100},
+        ),
+        reconstruction.ReconstructionDetection(
+            id="det-002", class_name="wall", confidence=0.93,
+            bbox={"x1": 50, "y1": 160, "x2": 60, "y2": 250},
+        ),
+    ]
+
+    candidates = reconstruction._opening_candidates(
+        walls, pixels_per_mm_x=0.05, pixels_per_mm_y=0.05
+    )
+
+    assert len(candidates) == 1
+    assert candidates[0]["axis"] == "y"
+    assert candidates[0]["start_px"] == {"x": 55.0, "y": 100.0}
+    assert candidates[0]["end_px"] == {"x": 55.0, "y": 160.0}
+    assert candidates[0]["width_mm"] == 1200.0
