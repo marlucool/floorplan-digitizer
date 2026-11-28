@@ -570,7 +570,7 @@ function getSegmentLengthMm(segment) {
 function updateWallDimensionCheckControls() {
   const select = $("#wallDimensionSelect");
   const selectedWall = state.geometry?.segments?.find((segment) => segment.id === state.geometry.selectedId);
-  const hasCalibration = Number.isFinite(getSegmentLengthMm(selectedWall));
+  const hasCalibration = getSegmentLengthMm(selectedWall) > 0;
   const hasDimension = Boolean(select?.selectedOptions?.[0]?.dataset.valueMm);
   const toleranceText = $("#wallDimensionTolerance").value.trim();
   const tolerance = Number(toleranceText);
@@ -653,7 +653,7 @@ function renderGeometryControls() {
   $("#drawRoomTool").disabled = !state.result;
   $("#finishRoom").disabled = geometry.pendingRoom.length < 3;
   $("#cancelRoom").disabled = geometry.pendingRoom.length === 0;
-  $("#undoWall").disabled = wallCount === 0;
+  $("#undoWall").disabled = manualCount === 0;
   $("#deleteWall").disabled = !geometry.selectedId;
   $("#clearWalls").disabled = wallCount === 0;
   $("#deleteRoom").disabled = !geometry.selectedRoomId;
