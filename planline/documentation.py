@@ -203,6 +203,7 @@ def _file_symbol(kind: str) -> str:
 
 def _navigation(
     *,
+    asset_prefix: str,
     home_href: str,
     drawing_href: str,
     ocr_href: str,
@@ -210,10 +211,12 @@ def _navigation(
     documentation_href: str,
 ) -> str:
     return f"""
+  <a class="skip-link" href="#mainContent">Skip to content</a>
   <header class="topbar">
-    <a class="brand" href="{home_href}" aria-label="Planline dashboard"><span class="brand-mark">P</span><span>planline<span class="brand-dot">.</span></span></a>
+    <a class="brand" href="{home_href}" aria-label="Planline dashboard"><img class="brand-mark" src="{asset_prefix}icon.svg" alt=""><span>planline<span class="brand-dot">.</span></span></a>
     <div class="top-meta"><span class="local-dot"></span><span>DOCUMENTATION</span></div>
-    <nav class="top-links" aria-label="Main navigation">
+    <button class="nav-menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="primaryNavigation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <nav class="top-links" id="primaryNavigation" aria-label="Primary navigation">
       <a class="repo-link" href="{home_href}">Dashboard</a>
       <a class="repo-link" href="{drawing_href}">Drawing</a>
       <a class="repo-link" href="{ocr_href}">OCR Studio</a>
@@ -277,7 +280,7 @@ def _page_shell(
   </script>
 </head>
 <body class="documentation-page">
-{_navigation(home_href=home_href, drawing_href=drawing_href, ocr_href=ocr_href, settings_href=settings_href, documentation_href=documentation_href)}
+{_navigation(asset_prefix=asset_prefix, home_href=home_href, drawing_href=drawing_href, ocr_href=ocr_href, settings_href=settings_href, documentation_href=documentation_href)}
 {body}
 </body>
 </html>
@@ -302,7 +305,7 @@ def render_documentation_index(
         current_output_path=current_output_path,
     )
     body = f"""
-  <main class="documentation-hub">
+  <main class="documentation-hub" id="mainContent">
     <section class="documentation-hero">
       <p class="eyebrow">PLANLINE / KNOWLEDGE BASE</p>
       <h1>Documentation<span>.</span></h1>
@@ -487,7 +490,7 @@ def render_document_page(
     )
 
     body = f"""
-  <main class="documentation-layout">
+  <main class="documentation-layout" id="mainContent">
     <aside class="documentation-sidebar">
       <a class="documentation-back" href="{documentation_href}">← All documentation</a>
       <p class="eyebrow">FILES</p>
