@@ -21,52 +21,6 @@ class QuietHandler(SimpleHTTPRequestHandler):
 
 
 
-class OCRPollingHandler(OCRRaceHandler):
-    active_polls = 0
-    max_active_polls = 0
-    poll_count = 0
-    poll_lock = threading.Lock()
-
-    def do_GET(self) -> None:
-        parsed = urlparse(self.path)
-        if parsed.path == "/api/ocr/training-assets":
-            return self._json({
-                "ready": True,
-                "paddleocr_dir": "/assets/mobile",
-                "pretrained_model": "/models/mobile",
-                "source_version": "test",
-            })
-        if parsed.path == "/api/ocr/datasets/dataset-one":
-            return self._json({
-                "dataset_id": "dataset-one",
-                "summary": {
-                    "samples": 1, "sources": 1, "writers": 1,
-                    "independent_groups": 3, "splits_present": True, "valid": True,
-                },
-                "samples": [], "available_models": [],
-            })
-        if parsed.path == "/api/ocr/jobs/active":
-            return self._json({"job": {
-                "job_id": "slow-job", "status": "running", "logs": "Training started",
-            }})
-        if parsed.path == "/api/ocr/jobs/slow-job":
-            with self.poll_lock:
-                type(self).active_polls += 1
-                type(self).poll_count += 1
-                type(self).max_active_polls = max(type(self).max_active_polls, type(self).active_polls)
-            try:
-                time.sleep(2.4)
-                return self._json({
-                    "job_id": "slow-job", "status": "running", "logs": "Training in progress",
-                    "epoch": 1, "epochs": 10,
-                })
-            finally:
-                with self.poll_lock:
-                    type(self).active_polls -= 1
-        return super().do_GET()
-
-
-
 class OCRRaceHandler(QuietHandler):
     def _json(self, payload: dict) -> None:
         body = json.dumps(payload).encode("utf-8")
@@ -129,6 +83,51 @@ class OCRRaceHandler(QuietHandler):
             return self._json({"jobs": []})
         self.send_error(404)
 
+
+
+class OCRPollingHandler(OCRRaceHandler):
+    active_polls = 0
+    max_active_polls = 0
+    poll_count = 0
+    poll_lock = threading.Lock()
+
+    def do_GET(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/ocr/training-assets":
+            return self._json({
+                "ready": True,
+                "paddleocr_dir": "/assets/mobile",
+                "pretrained_model": "/models/mobile",
+                "source_version": "test",
+            })
+        if parsed.path == "/api/ocr/datasets/dataset-one":
+            return self._json({
+                "dataset_id": "dataset-one",
+                "summary": {
+                    "samples": 1, "sources": 1, "writers": 1,
+                    "independent_groups": 3, "splits_present": True, "valid": True,
+                },
+                "samples": [], "available_models": [],
+            })
+        if parsed.path == "/api/ocr/jobs/active":
+            return self._json({"job": {
+                "job_id": "slow-job", "status": "running", "logs": "Training started",
+            }})
+        if parsed.path == "/api/ocr/jobs/slow-job":
+            with self.poll_lock:
+                type(self).active_polls += 1
+                type(self).poll_count += 1
+                type(self).max_active_polls = max(type(self).max_active_polls, type(self).active_polls)
+            try:
+                time.sleep(2.4)
+                return self._json({
+                    "job_id": "slow-job", "status": "running", "logs": "Training in progress",
+                    "epoch": 1, "epochs": 10,
+                })
+            finally:
+                with self.poll_lock:
+                    type(self).active_polls -= 1
+        return super().do_GET()
 
 def make_png(width: int = 2, height: int = 2) -> bytes:
     def chunk(kind: bytes, data: bytes) -> bytes:
