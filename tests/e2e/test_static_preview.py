@@ -106,12 +106,12 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     expect(page.locator("#updateTitle")).to_have_text("Updates disabled in static preview")
                     expect(page.locator("#currentVersion")).to_have_text("Unavailable in preview")
 
-                    # The docs index contains several document formats and the archive.
-                    # The dashboard shell must fit common phone, tablet and desktop widths.
+                    # Settings content, including release badges and update controls,
+                    # must remain inside the viewport on narrow phones and tablets.
                     for width in (320, 360, 390, 520, 760, 900, 1024, 1280):
                         page.set_viewport_size({"width": width, "height": 900})
                         page.wait_for_timeout(60)
-                        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), f"Dashboard overflows at {width}px"
+                        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), f"Settings overflows at {width}px"
                     page.set_viewport_size({"width": 1440, "height": 1000})
 
                     page.goto(url + "documentation/", wait_until="domcontentloaded")
