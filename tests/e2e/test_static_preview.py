@@ -102,6 +102,8 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     expect(page.locator("#saveProject")).to_be_disabled()
                     expect(page.locator("#exportReview")).to_be_disabled()
                     expect(page.locator("#checkChain")).to_be_disabled()
+                    expect(page.locator("#reconstructWalls")).to_be_disabled()
+                    expect(page.locator("#reconstructionStatus")).to_contain_text("verify horizontal and vertical dimensions")
                     page.wait_for_function(
                         "() => { const image = document.querySelector('#previewImage'); return image && image.complete && image.naturalWidth === 1200; }",
                         timeout=10000,
