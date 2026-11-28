@@ -1729,3 +1729,57 @@ textarea:focus-visible,summary:focus-visible {
   .settings-meta-grid { grid-template-columns:1fr; }
   .top-meta { display:none; }
 }
+
+
+/* Override legacy theme-specific surfaces with the current drafting tokens. */
+body::before { content:none !important;display:none !important;background:none !important; }
+html[data-theme="dark"] body::before,html[data-theme="light"] body::before { display:none !important; }
+html[data-theme="dark"] .topbar,html[data-theme="light"] .topbar {
+  background:var(--app-panel) !important;border-color:var(--app-border) !important;
+  border-radius:0 !important;box-shadow:none !important;backdrop-filter:none !important;
+}
+html[data-theme="dark"] .top-links .repo-link.active,
+html[data-theme="light"] .top-links .repo-link.active {
+  background:transparent !important;border-color:transparent !important;
+  color:var(--app-accent) !important;
+}
+html[data-theme="dark"] .canvas-wrap,html[data-theme="light"] .canvas-wrap {
+  background-color:var(--canvas) !important;
+  background-image:linear-gradient(var(--app-grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--app-grid-line) 1px,transparent 1px) !important;
+}
+html[data-theme="dark"] .dashboard-health,html[data-theme="light"] .dashboard-health {
+  background:transparent !important;border-color:var(--app-border-strong) !important;box-shadow:none !important;
+}
+html[data-theme="dark"] .workspace-card.drawing-card,html[data-theme="light"] .workspace-card.drawing-card {
+  background:var(--app-panel) !important;border-color:var(--app-border-strong) !important;box-shadow:none !important;
+}
+html[data-theme="dark"] .dashboard-info,html[data-theme="light"] .dashboard-info {
+  background:transparent !important;box-shadow:none !important;
+}
+html[data-theme="dark"] .settings-card,html[data-theme="light"] .settings-card {
+  background:transparent !important;box-shadow:none !important;
+}
+html[data-theme="dark"] .studio-card,html[data-theme="light"] .studio-card {
+  background:var(--app-panel) !important;border-color:var(--app-border) !important;box-shadow:none !important;
+}
+html[data-theme="dark"] .sidebar,html[data-theme="light"] .sidebar {
+  background:var(--app-panel) !important;
+}
+html[data-theme="dark"] .studio-sidebar,html[data-theme="light"] .studio-sidebar {
+  background:transparent !important;
+}
+html[data-theme="dark"] .toolbar-button,html[data-theme="dark"] .theme-toggle {
+  background:var(--app-panel-raised) !important;border-color:var(--app-border-strong) !important;color:var(--ink) !important;
+}
+html[data-theme="light"] .toolbar-button,html[data-theme="light"] .theme-toggle {
+  background:var(--app-panel-raised) !important;border-color:var(--app-border-strong) !important;color:var(--ink) !important;
+}
+html[data-theme="dark"] .dropzone,html[data-theme="light"] .dropzone {
+  background:var(--app-panel-soft) !important;border-color:var(--app-border-strong) !important;
+}
+html[data-theme="dark"] .studio-upload,html[data-theme="light"] .studio-upload {
+  background:var(--app-panel-soft) !important;border-color:var(--app-border-strong) !important;
+}
+html[data-theme="dark"] .top-links,html[data-theme="light"] .top-links {
+  backdrop-filter:none !important;-webkit-backdrop-filter:none !important;box-shadow:none !important;
+}
