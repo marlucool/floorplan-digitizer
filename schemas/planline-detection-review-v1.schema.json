@@ -1199,9 +1199,7 @@
                   "source_detection_ids",
                   "segment_ids",
                   "endpoint_count",
-                  "status",
-                  "endpoints",
-                  "review_status"
+                  "status"
                 ],
                 "properties": {
                   "point_px": {
