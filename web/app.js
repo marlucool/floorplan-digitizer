@@ -1134,7 +1134,7 @@ function exportManualGeometrySvg() {
   const elements = [...polygons, ...lines].join("\n  ");
   const svg = '<?xml version="1.0" encoding="UTF-8"?>\n' +
     '<svg xmlns="http://www.w3.org/2000/svg" width="' + physicalWidth + '" height="' + physicalHeight +
-    '" viewBox="0 0 ' + width + ' ' + height + '">\n' +
+    '" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">\n' +
     '  <metadata>Planline editable linework: ' + state.geometry.segments.length + ' wall edges and ' +
     state.geometry.rooms.length + ' room polygons. Coordinates are in original source-image pixels. ' +
     (state.reconstruction ? 'Wall draft uses X/Y scales derived from confirmed dimensions and remains unverified.' :
