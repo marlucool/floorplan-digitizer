@@ -48,6 +48,18 @@ class WallReconstructionRequest(BaseModel):
         ids = [item.id for item in self.detections]
         if len(ids) != len(set(ids)):
             raise ValueError("Detection IDs must be unique.")
+        by_id = {item.id: item for item in self.detections}
+        dimension_ids = [item.detection_id for item in self.dimensions]
+        if len(dimension_ids) != len(set(dimension_ids)):
+            raise ValueError(
+                "Each detected dimension value can only be used once in a reconstruction."
+            )
+        for dimension_id in dimension_ids:
+            detection = by_id.get(dimension_id)
+            if detection is None or detection.class_name != "dimension_value":
+                raise ValueError(
+                    f"Dimension {dimension_id} must reference an existing dimension-value detection."
+                )
         for item in self.detections:
             box = item.bbox
             try:
