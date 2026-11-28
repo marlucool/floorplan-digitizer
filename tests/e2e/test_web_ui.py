@@ -713,6 +713,13 @@ def test_dashboard_health_indicator_handles_online_and_unavailable_states() -> N
             assert page.locator("#healthDot").is_visible()
             assert page.locator("#healthLabel").inner_text() == "Local services online"
             assert "detector ready" in page.locator("#healthDetails").inner_text()
+            assert page.locator(".health-mark").evaluate("el => getComputedStyle(el).color") == "rgb(109, 154, 110)"
+
+            response_state["payload"]["detector_weights_present"] = False
+            page.reload(wait_until="domcontentloaded")
+            page.wait_for_function("document.querySelector('#healthTitle')?.textContent === 'Local API is online'")
+            assert page.locator("#healthLabel").inner_text() == "Detector model missing"
+            assert page.locator(".health-mark").evaluate("el => getComputedStyle(el).color") == "rgb(192, 138, 56)"
 
             response_state["status"] = 503
             response_state["payload"] = {"detail": "Test API unavailable"}
@@ -720,6 +727,7 @@ def test_dashboard_health_indicator_handles_online_and_unavailable_states() -> N
             page.wait_for_function("document.querySelector('#healthTitle')?.textContent === 'Local API unavailable'")
             assert page.locator("#healthLabel").inner_text() == "API unavailable"
             assert page.locator("#healthDetails").inner_text().startswith("Local API returned HTTP 503")
+            assert page.locator(".health-mark").evaluate("el => getComputedStyle(el).color") == "rgb(237, 141, 131)"
             browser.close()
     finally:
         server.shutdown()
