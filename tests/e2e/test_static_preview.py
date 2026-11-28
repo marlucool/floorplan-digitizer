@@ -77,6 +77,7 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     expect(page.locator('.workspace-card.drawing-card[href="drawing.html"]')).to_be_visible()
                     expect(page.locator('.utility-link[href="ocr.html"]')).to_be_visible()
                     expect(page.locator('.utility-link[href="settings.html"]')).to_be_visible()
+                    expect(page.locator('.utility-link[href="documentation/index.html"]')).to_be_visible()
                     expect(page.locator('.top-links a[href="drawing.html"]')).to_be_visible()
 
                     page.goto(url + "drawing.html", wait_until="domcontentloaded")
