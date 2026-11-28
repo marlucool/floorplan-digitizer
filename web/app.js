@@ -348,16 +348,9 @@ const CALIBRATION_UNIT_TO_MM = { mm: 1, cm: 10, m: 1000, in: 25.4, ft: 304.8 };
 
 function clearCalibration() {
   state.calibration = { points: [], picking: false, applied: null };
-  const status = $("#calibrationState");
-  if (!status) return;
-  status.textContent = "Not set";
-  $("#calibrationPoints").textContent = "No scale reference selected.";
-  $("#calibrationResult").textContent = "No scale applied.";
-  $("#startCalibration").disabled = !state.result;
-  $("#startCalibration").textContent = "Pick two points";
-  $("#applyCalibration").disabled = true;
-  $("#clearCalibration").disabled = true;
+  if (!$("#calibrationState")) return;
   $("#previewImage").classList.remove("calibration-picking");
+  renderCalibrationStatus();
   if (state.result && state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
   if (state.geometry) renderGeometryControls();
 }
