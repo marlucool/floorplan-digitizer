@@ -530,6 +530,7 @@ def render_document_page(
         ocr_href=ocr_href,
         settings_href=settings_href,
         documentation_href=documentation_href,
+        architecture_href=architecture_href,
         body=body,
         description=f"Planline documentation: {path}",
     )
