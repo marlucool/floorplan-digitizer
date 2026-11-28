@@ -1175,9 +1175,9 @@ async function reconstructWallDraft() {
       result.scale.pixels_per_mm_x.toFixed(6) + " px/mm; Y scale " +
       result.scale.pixels_per_mm_y.toFixed(6) + " px/mm. " +
       (skipped ? skipped + " ambiguous wall regions were skipped. " : "") +
-      (junctions ? junctions + " possible wall junctions found; inspect them manually. " :
+      (junctions ? junctions + " possible wall junctions need review in the panel below. " :
         "No endpoint junction candidates found; connections still need review. ") +
-      "No automatic snapping or topology repair has been applied.";
+      "No junctions have been joined automatically.";
     if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
     showNotice("Wall draft generated", result.warnings?.join(" ") || "Review all generated wall edges against the source.");
   } catch (error) {
@@ -2500,15 +2500,34 @@ function isValidReconstructionState(reconstruction, segments, analysisResult) {
     // Endpoint metadata was added without changing the v1 project format;
     // older saved projects remain readable but their candidates stay review-only.
     if (candidate.endpoints === undefined) return true;
-    return Array.isArray(candidate.endpoints) && candidate.endpoints.length === 2 &&
+    const validReferences = Array.isArray(candidate.endpoints) && candidate.endpoints.length === 2 &&
       ["pending", "joined"].includes(candidate.review_status) &&
       Number.isFinite(candidate.point_px?.x) && Number.isFinite(candidate.point_px?.y) &&
+      candidate.point_px.x >= 0 && candidate.point_px.y >= 0 &&
+      candidate.point_px.x <= analysisResult.image.width &&
+      candidate.point_px.y <= analysisResult.image.height &&
       candidate.endpoints.every((reference) =>
         draftIds.has(reference.segment_id) &&
+        candidate.segment_ids.includes(reference.segment_id) &&
         ["start_px", "end_px"].includes(reference.endpoint) &&
         Number.isFinite(reference.original_point_px?.x) &&
-        Number.isFinite(reference.original_point_px?.y)
+        Number.isFinite(reference.original_point_px?.y) &&
+        reference.original_point_px.x >= 0 && reference.original_point_px.y >= 0 &&
+        reference.original_point_px.x <= analysisResult.image.width &&
+        reference.original_point_px.y <= analysisResult.image.height
       );
+    if (!validReferences) return false;
+    if (candidate.review_status === "joined") {
+      return candidate.endpoints.every((reference) => {
+        const segment = generated.find((item) => item.id === reference.segment_id);
+        const point = segment?.[reference.endpoint];
+        return point && Math.hypot(
+          point.x - candidate.point_px.x,
+          point.y - candidate.point_px.y
+        ) <= 0.05;
+      });
+    }
+    return true;
   });
   return validMeasurements && validJunctions && generated.every((segment) =>
     wallIds.has(segment.source_detection_id) && draftIds.has(segment.id)
