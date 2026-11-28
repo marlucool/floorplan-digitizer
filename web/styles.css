@@ -2180,3 +2180,49 @@ body{overflow-x:clip}
   .update-actions > * { max-width: 100%; }
   .settings-main footer { flex-wrap: wrap; gap: 10px; line-height: 1.6; }
 }
+
+
+/* Dimension-driven reconstruction is a draft-building action, separate from manual tracing. */
+.reconstruction-panel {
+  display:grid;
+  gap:9px;
+  padding:12px;
+  border:1px solid var(--app-border);
+  border-radius:10px;
+  background:var(--app-panel-soft);
+}
+.reconstruction-panel-heading {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:6px 12px;
+}
+.reconstruction-panel-heading strong {
+  color:var(--app-text);
+  font-size:13px;
+}
+.reconstruction-panel-heading span {
+  color:var(--app-accent);
+  font-size:11px;
+  font-weight:650;
+}
+.reconstruction-panel p,
+.reconstruction-panel output {
+  margin:0;
+  color:var(--app-muted);
+  font-size:12px;
+  line-height:1.55;
+  overflow-wrap:anywhere;
+}
+.reconstruction-panel #reconstructWalls {
+  justify-self:start;
+  min-height:38px;
+}
+.reconstruction-panel #reconstructWalls:disabled {
+  opacity:.55;
+  cursor:not-allowed;
+}
+.reconstruction-panel output[data-state="success"] { color:var(--app-accent); }
+.reconstruction-panel output[data-state="error"] { color:var(--red); }
+.reconstruction-panel output[data-state="warning"] { color:var(--amber); }
