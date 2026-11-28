@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from planline.api import app
+from planline import reconstruction
 from planline.reconstruction import WallReconstructionRequest, reconstruct_wall_edges
 
 
@@ -142,16 +143,15 @@ def test_rejects_dimension_association_that_does_not_match_candidate_geometry() 
         reconstruct_wall_edges(request)
 
 
-def test_conflicting_confirmed_dimensions_on_same_axis_block_reconstruction() -> None:
-    detections = sample_request().detections
-    detections.extend([
-        detection("value-x2", "dimension_value", (70, 31, 120, 49)),
-        detection("line-x2", "dimension_line", (20, 54, 180, 58)),
-        detection("wall-left-2", "wall", (10, 60, 20, 180)),
-        detection("wall-right-2", "wall", (180, 60, 190, 180)),
-    ])
+def test_conflicting_confirmed_dimensions_on_same_axis_block_reconstruction(monkeypatch) -> None:
     request = sample_request(
-        detections=[item.model_dump() if hasattr(item, "model_dump") else item for item in detections],
+        detections=[
+            *[item.model_dump() for item in sample_request().detections],
+            detection("value-x2", "dimension_value", (70, 31, 120, 49)),
+            detection("line-x2", "dimension_line", (20, 54, 180, 58)),
+            detection("wall-inner-left", "wall", (60, 60, 70, 180)),
+            detection("wall-inner-right", "wall", (130, 60, 140, 180)),
+        ],
         dimensions=[
             {
                 "detection_id": "value-x",
@@ -167,7 +167,7 @@ def test_conflicting_confirmed_dimensions_on_same_axis_block_reconstruction() ->
                 "text_verified": True,
                 "association_confirmed": True,
                 "dimension_line_id": "line-x2",
-                "wall_ids": ["wall-left-2", "wall-right-2"],
+                "wall_ids": ["wall-inner-left", "wall-inner-right"],
             },
             {
                 "detection_id": "value-y",
@@ -179,6 +179,36 @@ def test_conflicting_confirmed_dimensions_on_same_axis_block_reconstruction() ->
             },
         ],
     )
+
+    # Isolate the scale-consistency gate with two valid candidate spans whose
+    # independently confirmed labels imply incompatible X-axis scales.
+    monkeypatch.setattr(reconstruction, "associate_dimensions", lambda _detections: [
+        {
+            "dimension_value_id": "value-x",
+            "candidate_lines": [{
+                "dimension_line_id": "line-x",
+                "orientation": "horizontal",
+                "wall_spans": [{"wall_ids": ["wall-left", "wall-right"], "span_px": 160, "assignment_score": 0.9}],
+            }],
+        },
+        {
+            "dimension_value_id": "value-x2",
+            "candidate_lines": [{
+                "dimension_line_id": "line-x2",
+                "orientation": "horizontal",
+                "wall_spans": [{"wall_ids": ["wall-inner-left", "wall-inner-right"], "span_px": 70, "assignment_score": 0.8}],
+            }],
+        },
+        {
+            "dimension_value_id": "value-y",
+            "candidate_lines": [{
+                "dimension_line_id": "line-y",
+                "orientation": "vertical",
+                "wall_spans": [{"wall_ids": ["wall-top", "wall-bottom"], "span_px": 160, "assignment_score": 0.9}],
+            }],
+        },
+    ])
+
     with pytest.raises(ValueError, match="dimensions disagree"):
         reconstruct_wall_edges(request)
 
