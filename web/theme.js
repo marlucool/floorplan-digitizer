@@ -2,6 +2,37 @@
 (() => {
   const root = document.documentElement;
   const button = document.querySelector("#themeToggle");
+  const header = document.querySelector(".topbar");
+  const links = document.querySelector(".top-links");
+  const menu = header?.querySelector(".nav-menu-toggle");
+  if (header && links && menu) {
+    const isMobile = () => window.matchMedia("(max-width: 760px)").matches;
+    const closeMenu = ({ restoreFocus = false } = {}) => {
+      const wasOpen = header.classList.contains("menu-open");
+      header.classList.remove("menu-open");
+      menu.setAttribute("aria-expanded", "false");
+      menu.setAttribute("aria-label", "Open navigation");
+      if (restoreFocus && wasOpen && isMobile()) menu.focus();
+    };
+    menu.addEventListener("click", () => {
+      const open = !header.classList.contains("menu-open");
+      header.classList.toggle("menu-open", open);
+      menu.setAttribute("aria-expanded", String(open));
+      menu.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
+      if (open && isMobile()) links.querySelector("a")?.focus();
+    });
+    links.addEventListener("click", (event) => {
+      if (event.target.closest("a")) closeMenu();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeMenu({ restoreFocus: true });
+    });
+    document.addEventListener("click", (event) => {
+      if (!header.contains(event.target)) closeMenu();
+    });
+    const mobileQuery = window.matchMedia("(max-width: 760px)");
+    mobileQuery.addEventListener?.("change", () => closeMenu());
+  }
   const meta = document.querySelector('meta[name="theme-color"]');
   const key = "planline-theme-v2";
   const moon = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.2 15.1A8.5 8.5 0 0 1 8.9 3.8 8.7 8.7 0 1 0 20.2 15.1Z"/></svg>';
@@ -11,7 +42,7 @@
     const dark = theme !== "light";
     const value = dark ? "dark" : "light";
     root.dataset.theme = value;
-    if (meta) meta.content = dark ? "#171b18" : "#fbfaf6";
+    if (meta) meta.content = dark ? "#151c17" : "#f4f3ec";
     if (button) {
       button.innerHTML = dark ? sun : moon;
       button.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");

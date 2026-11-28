@@ -1,0 +1,54 @@
+name: UI/UX suggestions
+
+on:
+  pull_request:
+    paths:
+      - "web/**"
+      - "planline/documentation.py"
+      - "docs/**"
+      - "tests/e2e/**"
+      - ".agents/skills/**"
+      - "scripts/setup_ui_ux_skill.*"
+      - ".github/workflows/ui-ux-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: planline-uiux-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  design-guidance:
+    name: Generate UI/UX design suggestions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install the pinned UI/UX Pro Max skill
+        run: npm exec --yes --package=ui-ux-pro-max-cli@2.15.0 -- uipro init --ai universal --force
+      - name: Generate Planline design-system recommendations
+        run: |
+          python .agents/skills/ui-ux-pro-max/scripts/search.py "desktop floorplan drafting application" --design-system -p "Planline" > /tmp/planline-design-system.md
+          python .agents/skills/ui-ux-pro-max/scripts/search.py "responsive navigation no horizontal overflow mobile menu" --domain ux > /tmp/planline-responsive-ux.md
+          python .agents/skills/ui-ux-pro-max/scripts/search.py "readable technical dashboard typography" --domain typography > /tmp/planline-typography.md
+      - name: Publish recommendations to the job summary
+        run: |
+          {
+            echo "## Planline design-system recommendations"
+            cat /tmp/planline-design-system.md
+            echo
+            echo "## Responsive navigation and overflow guidance"
+            cat /tmp/planline-responsive-ux.md
+            echo
+            echo "## Typography guidance"
+            cat /tmp/planline-typography.md
+            echo
+            echo "> These are advisory design recommendations. Playwright browser tests remain the regression gate."
+          } >> "$GITHUB_STEP_SUMMARY"

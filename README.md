@@ -10,7 +10,7 @@ Planline is a local-first project for turning scanned or hand-drawn 2D floor pla
 
 The important problem is not tracing pixels. Survey drawings can be skewed, faded, low-resolution, or drawn approximately rather than to scale. Planline is being developed to read written dimensions, relate them to the correct parts of the drawing, detect contradictions, and keep uncertain results in a human review workflow.
 
-> **Current status: drawing review plus OCR Studio workbench.** The local app now includes a crop editor, verified-label library, source/writer-safe dataset splits, background PP-OCRv5 fine-tuning jobs and held-out benchmark reporting. The desktop app opens the workspace dashboard first. Drawing, OCR Studio and application settings are available from the global navigation at `/`, `/ocr` and `/settings`. The dashboard is served locally at `/dashboard`; the static preview exposes it as `dashboard.html`. The drawing-analysis workflow ranks geometric candidates linking dimension-value regions to dimension lines and wall spans, with explicit human confirmation. The Windows installer provisions PaddlePaddle and PaddleOCR in Planline's private Python runtime; local recognition remains optional and every suggestion remains unverified until reviewed. Manual two-point scale calibration and user-authored wall/room geometry are available, including SVG and DXF export. Automatic dimension-driven measured reconstruction and verified CAD export are not implemented.
+> **Current status: drawing review plus OCR Studio workbench.** The local app now includes a crop editor, verified-label library, source/writer-safe dataset splits, background PP-OCRv5 fine-tuning jobs and held-out benchmark reporting. The desktop app opens the workspace dashboard first. Drawing, OCR Studio and application settings are available from the global navigation at `/`, `/ocr` and `/settings`. The dashboard is served locally at `/dashboard`; the static preview exposes it as `dashboard.html`. The drawing-analysis workflow ranks geometric candidates linking dimension-value regions to dimension lines and wall spans, with explicit human confirmation. The Windows installer provisions PaddlePaddle and PaddleOCR in Planline's private Python runtime; local recognition remains optional and every suggestion remains unverified until reviewed. A confirmed dimension-to-wall association can derive a candidate pixel scale; manual two-point calibration remains available as a fallback. User-authored wall/room geometry can be exported to SVG and DXF. Automatic dimension-driven measured reconstruction and verified CAD export are not implemented.
 
 ![Example survey drawing](docs/rysunek.png)
 
@@ -24,7 +24,7 @@ The important problem is not tracing pixels. Survey drawings can be skewed, fade
 | Scale calibration | Manual two-point reference in mm, cm, m, inches or feet; exported with provenance and explicitly not treated as geometry validation |
 | Projects | Save/open portable `.planline` files with the source drawing, analysis, manual review and calibration; saving is explicit and local |
 | Room boundaries | Draw and edit closed room polygons; calculate area in px² or calibrated m² using a user-supplied reference |
-| OCR assist | Run local PaddleOCR on dimension candidates; choose base or fine-tuned models and explicitly review every suggestion |
+| OCR assist | Automatically run local PaddleOCR on detected dimension crops when the runtime is available; choose base or fine-tuned models and review every suggestion |
 | Manual geometry | Draw, snap, select, reshape endpoints, measure and export user-created walls and room outlines as SVG or DXF; calibrated DXF uses millimetres, uncalibrated DXF is unitless; detector boxes are never auto-converted into geometry |
 | Image preparation | Bounded brightness/contrast adjustments before detection and crop generation; source coordinates remain unchanged |
 | Detection | Bundled YOLO model proposes wall, dimension_line and dimension_value regions |
@@ -35,7 +35,7 @@ The important problem is not tracing pixels. Survey drawings can be skewed, fade
 | Dimension chain | Dimension-chain checker validates explicit values and can propose the remainder for exactly one missing segment when all other inputs are verified; the proposed value remains unverified until the user confirms it |
 | Optional OCR | Standalone PaddleOCR recognition runner for saved dimension crops; raw results remain unverified |
 | OCR evaluation | Compare predictions against verified review labels or curated crop datasets using exact-match rate, coverage and character error rate |
-| Crop dataset curation | Export verified full-string crops or import manual crops; validate manifests and create source/writer-safe splits |
+| Crop dataset curation | Bulk-import verified crops from Drawing reviews, import CSV + image ZIP archives, export verified datasets and create source/writer-safe splits |
 | OCR dataset quality | Read-only audit of label quality, character coverage, duplicate crops, source/writer counts and split leakage |
 | OCR Studio | Crop editor, verified label library, dataset management, split creation and training-job monitor |
 | Fine-tuning | Local PaddleOCR PP-OCRv5 mobile/server training from a matching `.pdparams` checkpoint |
@@ -57,7 +57,7 @@ Open OCR Studio from Planline's desktop window to create a dataset, add one or m
 
 For new drawings, crop the **whole dimension string** as one image (for example, “4,200 mm”), not individual digits. Transcribe exactly what is visible, preserve decimals and units, and only mark a label verified after checking it against the drawing. Keep crops from one plan under the same source ID. Use the same pseudonymous writer ID for samples written by the same person.
 
-The dataset is local and excluded from Git. Detailed commands and the CSV format are in [the crop-data guide](web/README.md#handwritten-dimension-crop-dataset).
+The dataset is local and excluded from Git. OCR Studio supports bulk import from a review JSON plus its source raster, CSV + crop ZIP import, and verified dataset ZIP export. Detailed commands and the CSV format are in [the crop-data guide](web/README.md#handwritten-dimension-crop-dataset).
 
 A detector score is **not** OCR confidence or a probability that a measurement is correct. A bounding box is a candidate region, not a wall centreline or a measurement. Pixel distances are not millimetres.
 
@@ -103,9 +103,9 @@ Planline does not intentionally save uploaded drawings as project files. However
 
 ## What is not implemented yet
 
-- Automatic, unattended OCR of the entire drawing. Drawing supports optional local PaddleOCR suggestions on selected dimension candidates; every suggestion remains unverified until a person checks it.
+- Automatic, unattended OCR of the entire drawing. The Drawing workspace now runs PaddleOCR on detected dimension crops (up to 30 per analysis) when the local runtime is available; every suggestion remains unverified until a person checks it.
 - Fully automatic, verified dimension association. Current box-based candidates require human confirmation and do not handle arbitrary rotated/diagonal geometry. The global assignment is a recommendation, not a verified measurement.
-- Automatic scale inference from written dimensions or multiple references; current two-point calibration is explicitly user-supplied.
+- Multi-dimension scale reconciliation and robust scale inference. One verified dimension plus a reviewer-confirmed wall-span association can derive a candidate scale; manual two-point calibration remains an explicitly user-supplied fallback.
 - Automatic dimension-chain solving across a floor plan. The manual checker can calculate one missing segment from verified known values and a verified overall dimension, but the candidate still requires explicit confirmation.
 - Automatic wall/opening reconstruction from detector and OCR results. Manual wall segments and room polygons can be drawn and edited, but they are not inferred or constrained by dimension readings.
 - DXF/SVG export generated from verified, dimension-constrained uploaded-plan geometry. Current DXF/SVG export contains only user-authored geometry.
@@ -141,7 +141,7 @@ The repository retains an earlier Python pipeline separate from the Planline web
 - detection.py, ocr.py, model.py, dxf_export.py — legacy pipeline modules
 - yolo_floorplan.pt and digit_ocr_resnet18.pth — tracked experimental weights
 
-That pipeline can produce a DXF from its test input, but its heuristic dimension matching and geometry are not validated for arbitrary scanned or non-scale plans. It is not called by the web API and should be treated as a research baseline, not the production reconstruction engine.
+That pipeline can produce a DXF from its test input, but its heuristic dimension matching and geometry are not validated for arbitrary scanned or non-scale plans. It is not called by the web API and should be treated as a research baseline, not the production reconstruction engine. The Windows installer intentionally excludes these retired scripts and the digit-only checkpoint from its source archive; they remain available in Git for research.
 
 To run the separate experiment, install the root ML dependencies and use the repository's test.jpg input:
 

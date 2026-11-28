@@ -8,7 +8,7 @@
     pythonCompatible: false, paddleGpuAvailable: false, trainingAssets: null
   };
 
-  const terminalStatuses = new Set(["completed", "completed_no_export", "failed", "cancelled"]);
+  const terminalStatuses = new Set(["completed", "completed_no_export", "failed", "cancelled", "interrupted"]);
 
   function message(text, kind = "info") {
     const node = $("#annotationMessage");
@@ -31,7 +31,32 @@
   function setView() {
     const studio = $("#ocrStudio");
     if (studio) studio.classList.remove("hidden");
-    loadDatasets().catch((error) => message(error.message, "error"));
+    loadDatasets().then(restoreActiveJob).catch((error) => message(error.message, "error"));
+  }
+
+  async function restoreActiveJob() {
+    if (window.PLANLINE_PREVIEW === true) return;
+    try {
+      const payload = await api("/api/ocr/jobs");
+      const jobs = Array.isArray(payload.jobs) ? payload.jobs : [];
+      const active = jobs.find((job) => ["queued", "running"].includes(job.status));
+      if (active) {
+        beginJob(active, active.kind === "benchmark" ? "OCR benchmark" : "Fine-tuning dimension recogniser");
+        message("Restored the running OCR job after reloading the workspace.", "success");
+        return;
+      }
+      const interrupted = jobs.find((job) => job.status === "interrupted");
+      if (interrupted) {
+        $("#jobPanel").classList.remove("hidden");
+        $("#jobTitle").textContent = interrupted.kind === "benchmark" ? "OCR benchmark" : "Fine-tuning dimension recogniser";
+        $("#jobStatus").textContent = "INTERRUPTED";
+        $("#jobLog").textContent = (interrupted.logs || "") + "\n" + (interrupted.error || "The application restarted before this job finished.");
+        $("#jobProgressBar").style.width = "0%";
+        $("#cancelJobButton").classList.add("hidden");
+      }
+    } catch (error) {
+      message("Could not restore previous OCR job status: " + error.message, "error");
+    }
   }
 
   function setBusy(busy) {
@@ -175,6 +200,8 @@
       $("#datasetHint").textContent = `${summary.independent_groups || 0} independent source/writer groups. Need at least three to make leak-resistant train, validation and test splits.`;
     }
     $("#datasetState").textContent = summary.valid === false ? "CHECK DATA" : "LOCAL";
+    $("#exportDatasetButton").disabled = !state.datasetId || summary.valid === false;
+    updateReviewImportButton();
     renderSamples();
     renderAvailableModels();
     refreshTrainingButtons();
@@ -232,6 +259,93 @@
     state.editingId = null; clearEditMode();
     try { await loadDataset(); message("Dataset loaded."); }
     catch (error) { message(error.message, "error"); }
+  });
+  $("#exportDatasetButton").addEventListener("click", async () => {
+    if (!state.datasetId) return;
+    const button = $("#exportDatasetButton");
+    button.disabled = true;
+    $("#datasetTransferStatus").textContent = "Preparing a ZIP with verified labels, crop images and split metadata…";
+    try {
+      const response = await fetch("/api/ocr/datasets/" + encodeURIComponent(state.datasetId) + "/export");
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.detail || "Dataset export failed.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "planline-" + state.datasetId + "-dataset.zip";
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      $("#datasetTransferStatus").textContent = "Dataset ZIP exported. Model checkpoints and training logs are intentionally excluded.";
+    } catch (error) {
+      $("#datasetTransferStatus").textContent = "Export failed: " + error.message;
+    } finally {
+      button.disabled = !state.datasetId || state.dataset?.summary?.valid === false;
+    }
+  });
+
+  $("#importDatasetButton").addEventListener("click", () => {
+    $("#datasetArchiveFile").click();
+  });
+
+  $("#datasetArchiveFile").addEventListener("change", async () => {
+    const file = $("#datasetArchiveFile").files?.[0];
+    if (!file || !state.datasetId) return;
+    const button = $("#importDatasetButton");
+    button.disabled = true;
+    $("#datasetTransferStatus").textContent = "Checking the archive and importing verified crop labels…";
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("text_style", $("#datasetImportStyle").value);
+      const payload = await api("/api/ocr/datasets/" + encodeURIComponent(state.datasetId) + "/import-archive", {
+        method: "POST",
+        body: form
+      });
+      await loadDataset();
+      $("#datasetTransferStatus").textContent = "Imported " + payload.added + " verified crops. Skipped " + (payload.skipped_unverified || 0) + " unverified, " + (payload.skipped_style || 0) + " other-style and " + (payload.skipped_blank || 0) + " blank rows.";
+      message("Dataset archive imported. Rebuild splits before training.", "success");
+    } catch (error) {
+      $("#datasetTransferStatus").textContent = "Import failed: " + error.message;
+    } finally {
+      $("#datasetArchiveFile").value = "";
+      button.disabled = false;
+    }
+  });
+  function updateReviewImportButton() {
+    $("#importReviewButton").disabled = !state.datasetId || !$("#reviewJsonFile").files?.length || !$("#reviewImageFile").files?.length;
+  }
+  $("#reviewJsonFile").addEventListener("change", updateReviewImportButton);
+  $("#reviewImageFile").addEventListener("change", updateReviewImportButton);
+  $("#importReviewButton").addEventListener("click", async () => {
+    const reviewFile = $("#reviewJsonFile").files?.[0];
+    const imageFile = $("#reviewImageFile").files?.[0];
+    if (!state.datasetId || !reviewFile || !imageFile) return;
+    const button = $("#importReviewButton");
+    button.disabled = true;
+    $("#datasetTransferStatus").textContent = "Reading the review export and importing only verified crops…";
+    try {
+      const form = new FormData();
+      form.append("file", imageFile);
+      form.append("review_json", await reviewFile.text());
+      form.append("text_style", $("#datasetImportStyle").value);
+      form.append("writer_id", $("#reviewWriterId").value.trim());
+      const payload = await api("/api/ocr/datasets/" + encodeURIComponent(state.datasetId) + "/import-review", {
+        method: "POST",
+        body: form
+      });
+      await loadDataset();
+      $("#datasetTransferStatus").textContent = "Imported " + payload.added + " verified review crops. Skipped " + (payload.skipped_unverified || 0) + " unverified, " + (payload.skipped_style || 0) + " other-style, " + (payload.skipped_blank || 0) + " blank and " + (payload.skipped_no_crop || 0) + " crops without bounds.";
+      message("Verified crops imported from the drawing review. Rebuild splits before training.", "success");
+    } catch (error) {
+      $("#datasetTransferStatus").textContent = "Review import failed: " + error.message;
+    } finally {
+      updateReviewImportButton();
+    }
   });
   $("#sampleFilter").addEventListener("change", renderSamples);
   $("#newDatasetButton").addEventListener("click", () => $("#newDatasetForm").classList.toggle("hidden"));

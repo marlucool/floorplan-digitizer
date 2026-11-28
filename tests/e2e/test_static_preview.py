@@ -63,7 +63,7 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     )
                     page.add_init_script("localStorage.setItem('planline-theme', 'light');")
                     page.goto(url, wait_until="domcontentloaded")
-                    expect(page.locator("h1").first).to_contain_text("Your floor-plan")
+                    expect(page.locator("h1").first).to_contain_text("Turn a scanned plan")
                     expect(page.locator("html")).to_have_attribute("data-theme", "dark")
                     theme_toggle = page.locator("#themeToggle")
                     expect(theme_toggle).to_be_visible()
@@ -75,8 +75,8 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     expect(page.locator("#healthDetails")).to_contain_text("Backend services are disabled")
                     expect(page.locator("#refreshHealth")).to_be_hidden()
                     expect(page.locator('.workspace-card.drawing-card[href="drawing.html"]')).to_be_visible()
-                    expect(page.locator('.workspace-card.ocr-card[href="ocr.html"]')).to_be_visible()
-                    expect(page.locator('.workspace-card.settings-card[href="settings.html"]')).to_be_visible()
+                    expect(page.locator('.utility-link[href="ocr.html"]')).to_be_visible()
+                    expect(page.locator('.utility-link[href="settings.html"]')).to_be_visible()
                     expect(page.locator('.top-links a[href="drawing.html"]')).to_be_visible()
 
                     page.goto(url + "drawing.html", wait_until="domcontentloaded")
@@ -106,7 +106,14 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     expect(page.locator("#updateTitle")).to_have_text("Updates disabled in static preview")
                     expect(page.locator("#currentVersion")).to_have_text("Unavailable in preview")
 
-                    # The docs index contains several document formats and the archive.
+                    # Settings content, including release badges and update controls,
+                    # must remain inside the viewport on narrow phones and tablets.
+                    for width in (320, 360, 390, 520, 760, 900, 1024, 1280):
+                        page.set_viewport_size({"width": width, "height": 900})
+                        page.wait_for_timeout(60)
+                        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), f"Settings overflows at {width}px"
+                    page.set_viewport_size({"width": 1440, "height": 1000})
+
                     page.goto(url + "documentation/", wait_until="domcontentloaded")
                     expect(page.locator("h1").first).to_have_text("Documentation.")
                     assert page.locator(".documentation-file").count() > 10
@@ -120,6 +127,17 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     expect(architecture_link).to_be_visible()
                     architecture_link.click()
                     expect(page).to_have_url(url + "documentation/PLANLINE_ARCHITECTURE.md.html")
+
+                    # Documentation must use the same responsive navigation as the other pages.
+                    page.set_viewport_size({"width": 390, "height": 844})
+                    expect(page.locator(".nav-menu-toggle")).to_be_visible()
+                    expect(page.locator("#primaryNavigation")).to_be_hidden()
+                    page.locator(".nav-menu-toggle").click()
+                    expect(page.locator("#primaryNavigation")).to_be_visible()
+                    expect(page.locator('#primaryNavigation a[aria-current="page"]')).to_have_text("Documentation")
+                    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), "Documentation overflows at 390px"
+                    page.locator(".nav-menu-toggle").click()
+                    expect(page.locator("#primaryNavigation")).to_be_hidden()
 
                     # Disable smooth motion in the smoke test so the anchor
                     # position is measured after the browser completes the jump.

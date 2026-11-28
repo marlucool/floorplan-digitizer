@@ -19,12 +19,15 @@ async function refreshHealth() {
     if (!response.ok) throw new Error("Local API returned HTTP " + response.status);
     const health = await response.json();
     if (health.status !== "ok") throw new Error("Local API is not ready");
-    const detector = health.detector_weights_present ? "Detector weights available" : "Detector weights missing";
+    const detector = health.detector_weights_present ? "detector ready" : "detector missing";
+    const ocr = health.ocr_available ? "OCR ready" : "OCR runtime missing";
+    const matching = health.dimension_association_available ? "dimension matching ready" : "dimension matching unavailable";
+    const geometry = health.manual_geometry_available ? "manual geometry ready" : "manual geometry unavailable";
     $("#healthTitle").textContent = "Local API is online";
-    $("#healthDetails").textContent = (health.version ? "Version " + health.version + " · " : "") + detector;
-    card.dataset.state = "ok";
-    dot.style.background = "#6d9a6e";
-    label.textContent = "Local services online";
+    $("#healthDetails").textContent = [health.version ? "Version " + health.version : "", detector, ocr, matching, geometry].filter(Boolean).join(" · ");
+    card.dataset.state = health.detector_weights_present ? "ok" : "warning";
+    dot.style.background = health.detector_weights_present ? "#6d9a6e" : "#c08a38";
+    label.textContent = health.detector_weights_present ? "Local services online" : "Detector model missing";
   } catch (error) {
     $("#healthTitle").textContent = "Local API unavailable";
     $("#healthDetails").textContent = error.message + " · Start Planline again or check the installation.";

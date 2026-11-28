@@ -561,6 +561,23 @@
                 "maximum": 1
               }
             }
+          },
+          "parsed_value_mm": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9]+(?:\\.[0-9]+)?$"
+          },
+          "dimension_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "linear",
+              null
+            ]
           }
         }
       }
@@ -587,11 +604,15 @@
           ],
           "properties": {
             "method": {
-              "const": "user_two_point_reference"
+              "enum": [
+                "user_two_point_reference",
+                "verified_dimension_two_point_reference",
+                "verified_dimension_association"
+              ]
             },
             "points_px": {
               "type": "array",
-              "minItems": 2,
+              "minItems": 0,
               "maxItems": 2,
               "items": {
                 "type": "object",
@@ -649,7 +670,35 @@
               "minimum": 0
             },
             "status": {
-              "const": "user_supplied_reference_not_geometry_validation"
+              "enum": [
+                "user_supplied_reference_not_geometry_validation",
+                "user_verified_dimension_reference_not_geometry_validation",
+                "user_verified_association_reference_not_geometry_validation"
+              ]
+            },
+            "reference_dimension_text": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reference_dimension_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reference_dimension_line_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reference_wall_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           }
         }

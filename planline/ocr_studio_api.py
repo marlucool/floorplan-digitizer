@@ -1,17 +1,23 @@
 """Local-only API routes for the OCR dataset and training workbench."""
 from __future__ import annotations
 
+import csv
 import importlib.util
+import io
 import json
 import os
+import shutil
+import stat
 import sys
 import re
 import threading
+import tempfile
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from starlette.background import BackgroundTask
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -23,10 +29,12 @@ from .dataset import (
     add_crop_sample,
     create_grouped_splits,
     delete_crop_sample,
+    export_review_crops,
+    import_crop_csv,
     validate_dataset,
     update_crop_sample,
 )
-from .ocr_training import cancel_job, get_job, start_benchmark_job, start_training_job
+from .ocr_training import cancel_job, get_job, list_jobs, start_benchmark_job, start_training_job
 from .ocr_training_assets import ensure_training_assets, training_assets_status
 from .ocr_quality import audit_dataset
 
@@ -456,6 +464,178 @@ def get_ocr_dataset(dataset_id: str) -> dict[str, Any]:
     dataset_dir = _dataset_dir(dataset_id)
     return _dataset_payload(dataset_id, dataset_dir)
 
+@router.get("/datasets/{dataset_id}/export")
+def export_ocr_dataset(dataset_id: str) -> FileResponse:
+    """Download verified labels, crop images and split metadata without model checkpoints."""
+    dataset_dir = _dataset_dir(dataset_id)
+    try:
+        validate_dataset(dataset_dir)
+        entries = _read_manifest(dataset_dir)
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    descriptor, archive_name = tempfile.mkstemp(prefix=f"planline-{dataset_id}-", suffix=".zip")
+    os.close(descriptor)
+    archive_path = Path(archive_name)
+    try:
+        with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.write(dataset_dir / MANIFEST_NAME, arcname=MANIFEST_NAME)
+            split_path = dataset_dir / SPLITS_NAME
+            if split_path.is_file():
+                archive.write(split_path, arcname=SPLITS_NAME)
+            for entry in entries:
+                relative = entry.get("image_path")
+                if not isinstance(relative, str):
+                    raise ValueError("Dataset contains an invalid crop image path.")
+                image_path = (dataset_dir / relative).resolve()
+                if not image_path.is_relative_to(dataset_dir.resolve()) or not image_path.is_file():
+                    raise ValueError("Dataset contains a missing or unsafe crop image path.")
+                archive.write(image_path, arcname=relative)
+    except (OSError, ValueError, zipfile.BadZipFile) as exc:
+        archive_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return FileResponse(
+        archive_path,
+        media_type="application/zip",
+        filename=f"planline-{dataset_id}-dataset.zip",
+        background=BackgroundTask(archive_path.unlink, missing_ok=True),
+    )
+
+
+@router.post("/datasets/{dataset_id}/import-archive", status_code=201)
+async def import_ocr_dataset_archive(
+    dataset_id: str,
+    file: UploadFile = File(...),
+    text_style: str = Form("handwritten"),
+) -> dict[str, Any]:
+    """Import verified pre-cropped samples from a ZIP containing one annotation CSV."""
+    dataset_dir = _dataset_dir(dataset_id)
+    if file.size is not None and file.size > 100 * 1024 * 1024:
+        await file.close()
+        raise HTTPException(status_code=413, detail="Dataset archive upload limit is 100 MB.")
+    try:
+        archive_bytes = await file.read(100 * 1024 * 1024 + 1)
+    finally:
+        await file.close()
+    if len(archive_bytes) > 100 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Dataset archive upload limit is 100 MB.")
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="planline-ocr-import-") as temporary:
+            extract_root = Path(temporary).resolve()
+            with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
+                all_members = archive.infolist()
+                if not all_members or len(all_members) > 5000:
+                    raise ValueError("The archive must contain no more than 5,000 entries.")
+                members = [item for item in all_members if not item.is_dir()]
+                if not members:
+                    raise ValueError("The archive must contain at least one file.")
+                if sum(item.file_size for item in members) > 250 * 1024 * 1024:
+                    raise ValueError("The expanded dataset archive exceeds 250 MB.")
+                if any(item.file_size > 10 * 1024 * 1024 for item in members if item.filename.lower().endswith(".csv")):
+                    raise ValueError("The annotation CSV must be 10 MB or smaller.")
+                csv_members = [item for item in members if item.filename.lower().endswith(".csv")]
+                if len(csv_members) != 1:
+                    raise ValueError("Include exactly one annotation CSV in the dataset archive.")
+
+                extracted: dict[str, Path] = {}
+                seen: set[str] = set()
+                for member in members:
+                    name = member.filename
+                    relative = PurePosixPath(name)
+                    if (
+                        relative.is_absolute()
+                        or "\\" in name
+                        or any(part in {"", ".", ".."} for part in relative.parts)
+                        or (relative.parts and ":" in relative.parts[0])
+                    ):
+                        raise ValueError("The archive contains an unsafe file path.")
+                    normalized = relative.as_posix()
+                    if normalized in seen:
+                        raise ValueError("The archive contains duplicate file paths.")
+                    seen.add(normalized)
+                    if stat.S_ISLNK(member.external_attr >> 16):
+                        raise ValueError("Symbolic links are not allowed in dataset archives.")
+                    if member.flag_bits & 0x1:
+                        raise ValueError("Encrypted dataset archives are not supported.")
+                    if member.file_size > 25 * 1024 * 1024 and not normalized.lower().endswith(".csv"):
+                        raise ValueError("Each crop image must be 25 MB or smaller.")
+                    target = (extract_root / Path(*relative.parts)).resolve()
+                    if not target.is_relative_to(extract_root):
+                        raise ValueError("The archive contains a file outside its extraction folder.")
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    with archive.open(member) as source, target.open("wb") as destination:
+                        shutil.copyfileobj(source, destination)
+                    extracted[normalized] = target
+
+            csv_path = extracted[csv_members[0].filename]
+            with csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
+                reader = csv.DictReader(handle)
+                if "image" not in (reader.fieldnames or []):
+                    raise ValueError("The annotation CSV must include an image column.")
+                for row_number, row in enumerate(reader, start=2):
+                    raw_image = (row.get("image") or "").strip()
+                    image_path = Path(raw_image)
+                    if not raw_image or image_path.is_absolute():
+                        raise ValueError(f"CSV image path must be relative on row {row_number}.")
+                    resolved_image = (csv_path.parent / image_path).resolve()
+                    if not resolved_image.is_relative_to(extract_root) or not resolved_image.is_file():
+                        raise ValueError(f"CSV image on row {row_number} is missing or outside the archive.")
+            result = import_crop_csv(csv_path, dataset_dir, text_style=text_style)
+    except (OSError, ValueError, zipfile.BadZipFile, csv.Error) as exc:
+        raise HTTPException(status_code=422, detail=f"Dataset archive could not be imported: {exc}") from exc
+
+    return {**result, "dataset": _dataset_payload(dataset_id, dataset_dir)}
+
+
+@router.post("/datasets/{dataset_id}/import-review", status_code=201)
+async def import_verified_review_crops(
+    dataset_id: str,
+    file: UploadFile = File(...),
+    review_json: str = Form(...),
+    text_style: str = Form("handwritten"),
+    writer_id: str = Form(""),
+) -> dict[str, Any]:
+    """Bulk-import only verified dimension crops from a Drawing review export."""
+    dataset_dir = _dataset_dir(dataset_id)
+    if len(review_json.encode("utf-8")) > 2 * 1024 * 1024:
+        await file.close()
+        raise HTTPException(status_code=413, detail="Review JSON limit is 2 MB.")
+    suffix = Path(file.filename or "source.png").suffix.lower()
+    if suffix not in {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff"}:
+        await file.close()
+        raise HTTPException(status_code=415, detail="Use a PNG, JPG, WEBP or TIFF source image.")
+    if file.size is not None and file.size > MAX_CROP_BYTES:
+        await file.close()
+        raise HTTPException(status_code=413, detail="Source drawing limit is 25 MB.")
+    try:
+        image_bytes = await file.read(MAX_CROP_BYTES + 1)
+    finally:
+        await file.close()
+    if len(image_bytes) > MAX_CROP_BYTES:
+        raise HTTPException(status_code=413, detail="Source drawing limit is 25 MB.")
+    if len(writer_id) > 128:
+        raise HTTPException(status_code=422, detail="Writer ID must be 128 characters or fewer.")
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="planline-review-import-") as temporary:
+            temporary_dir = Path(temporary)
+            image_path = temporary_dir / ("source" + suffix)
+            review_path = temporary_dir / "review.json"
+            image_path.write_bytes(image_bytes)
+            review_path.write_text(review_json, encoding="utf-8")
+            result = export_review_crops(
+                review_path,
+                image_path,
+                dataset_dir,
+                text_style=text_style,
+                writer_id=writer_id.strip() or None,
+            )
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=f"Review crops could not be imported: {exc}") from exc
+
+    return {**result, "dataset": _dataset_payload(dataset_id, dataset_dir)}
+
 
 @router.get("/datasets/{dataset_id}/samples/{crop_id}/image")
 def get_ocr_crop_image(dataset_id: str, crop_id: str) -> FileResponse:
@@ -609,6 +789,11 @@ def start_ocr_benchmark(dataset_id: str, request: StartBenchmarkRequest) -> dict
         )
     except (OSError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/jobs")
+def list_ocr_jobs() -> dict[str, Any]:
+    return {"jobs": list_jobs()}
 
 
 @router.get("/jobs/{job_id}")

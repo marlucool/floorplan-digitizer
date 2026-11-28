@@ -139,7 +139,7 @@ def test_analyse_returns_regions_without_fabricating_ocr(monkeypatch) -> None:
     assert "value" not in payload["dimension_regions"][0]
     assert payload["export_ready"] is False
     assert payload["preview_data_url"].startswith("data:image/jpeg;base64,")
-    assert any("OCR has not run" in note for note in payload["notes"])
+    assert any("Drawing UI runs local OCR automatically" in note for note in payload["notes"])
 
 
 def make_pdf_bytes() -> bytes:
@@ -381,6 +381,9 @@ def test_health_does_not_load_models() -> None:
     payload = response.json()
     assert payload["ocr_available"] is False
     assert payload["dimension_chain_validation_available"] is True
+    assert payload["dimension_association_available"] is True
+    assert payload["manual_geometry_available"] is True
+    assert payload["automatic_geometry_available"] is False
     assert payload["geometry_available"] is False
 
 

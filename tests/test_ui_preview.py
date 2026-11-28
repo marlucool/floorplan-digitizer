@@ -61,6 +61,22 @@ def test_preview_contains_every_workspace_and_uses_one_stylesheet(tmp_path: Path
 
     architecture_notes = (output / "documentation" / "ARCHITECTURE.md.html").read_text(encoding="utf-8")
     assert 'href="PLANLINE_ARCHITECTURE.md.html"' in architecture_notes
+    assert 'class="nav-menu-toggle"' in architecture_notes
+    assert 'id="primaryNavigation"' in architecture_notes
+    assert 'class="skip-link" href="#mainContent"' in architecture_notes
+    assert 'class="brand-mark"' in architecture_notes
+    assert 'class="documentation-file is-active"' in architecture_notes
+    stylesheet = (output / "styles.css").read_text(encoding="utf-8")
+    assert "minmax(320px,350px)" in stylesheet
+    assert ".documentation-toc{font-size:13px" in stylesheet
+    assert ".documentation-file-name strong{font-size:13px" in stylesheet
+    assert "--app-accent:#557b58" in stylesheet
+    assert ".dashboard-workspaces{display:grid" in stylesheet
+    assert ".documentation-layout{grid-template-columns:minmax(340px,380px)" in stylesheet
+    assert ".documentation-prose{font-size:16px" in stylesheet
+    assert "grid-template-columns:minmax(260px,340px) minmax(0,1fr)" in stylesheet
+    assert ".documentation-page .topbar.menu-open .top-links" in stylesheet
+    assert "body{overflow-x:clip}" in stylesheet
 
     for page in (output / "documentation").rglob("*.html"):
         page_html = page.read_text(encoding="utf-8")

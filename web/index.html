@@ -1,10 +1,15 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#171b18">
+  <meta name="theme-color" content="#151c17">
+  <meta name="description" content="Planline drawing workspace: inspect floor-plan scans, review candidate detections, verify dimensions and create manual 2D geometry.">
+  <meta name="color-scheme" content="dark light">
   <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <title>Planline — Floor-plan digitiser</title>
 <script>
   try {
@@ -17,17 +22,29 @@
   <script src="/theme.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
-<body>
+<body data-page="drawing">
+  <a class="skip-link" href="#mainContent">Skip to content</a>
   <header class="topbar">
     <a class="brand" href="/" aria-label="Planline dashboard"><img class="brand-mark" src="/icon.svg" alt=""><span>planline<span class="brand-dot">.</span></span></a>
     <div class="top-meta"><span class="local-dot" id="apiDot"></span><span id="apiStatus">Checking local API…</span><span class="divider">/</span> 2D workspace</div>
-    <div class="top-links"><a class="repo-link" href="/">Dashboard</a><a class="repo-link active" href="/drawing" aria-current="page">Drawing</a><a class="repo-link" href="#chainChecker">Dimension checks ↓</a><a class="repo-link" href="/ocr">OCR Studio ↗</a><a class="repo-link" href="/settings">Settings</a><a class="repo-link" href="https://github.com/marlucool/floorplan-digitizer" target="_blank" rel="noreferrer">Source repository ↗</a><button id="themeToggle" class="toolbar-button theme-toggle" type="button" aria-label="Switch to dark theme" title="Switch to dark theme" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.2 15.1A8.5 8.5 0 0 1 8.9 3.8 8.7 8.7 0 1 0 20.2 15.1Z"/></svg></button></div>
+    <button class="nav-menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="primaryNavigation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <nav class="top-links" id="primaryNavigation" aria-label="Primary navigation"><a class="repo-link" href="/dashboard">Dashboard</a><a class="repo-link active" href="/drawing" aria-current="page">Drawing workspace</a><a class="repo-link" href="/ocr">OCR Studio</a><a class="repo-link" href="/settings">Settings</a><a class="repo-link" href="/architecture">Architecture</a><button id="themeToggle" class="toolbar-button theme-toggle" type="button" aria-label="Switch theme" title="Switch theme" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.2 15.1A8.5 8.5 0 0 1 8.9 3.8 8.7 8.7 0 1 0 20.2 15.1Z"/></svg></button></nav>
   </header>
-  <main>
-    <nav class="workspace-nav" aria-label="Workspace sections"><a class="workspace-nav-item active" href="#sourceDrawing"><span>01</span> Drawing</a><a class="workspace-nav-item" href="#candidateReview"><span>02</span> Review detections</a><a class="workspace-nav-item" href="#chainChecker"><span>03</span> Dimension checks</a><span class="workspace-nav-hint">Shortcuts <kbd>Ctrl</kbd> + <kbd>O</kbd> open · <kbd>Ctrl</kbd> + <kbd>Enter</kbd> analyse</span></nav>
+  <main id="mainContent">
+    <nav class="workspace-nav" aria-label="Workspace sections"><a class="workspace-nav-item active" href="#sourceDrawing"><span>01</span> Drawing</a><a class="workspace-nav-item" href="#candidateReview"><span>02</span> Review</a><a class="workspace-nav-item" href="#manualGeometry"><span>03</span> Draw walls &amp; rooms</a><a class="workspace-nav-item" href="#chainChecker"><span>04</span> Dimension checks</a><span class="workspace-nav-hint">Ctrl + O · Ctrl + Enter</span></nav>
     <section class="intro">
       <div><p class="eyebrow">SCAN TO CAD · EARLY INTEGRATION</p><h1>Turn a scanned plan<br><em>into editable geometry.</em></h1></div>
-      <p class="intro-copy">Import a drawing to detect candidate walls and dimension annotations. Measurements are never guessed from pixel proportions: written dimensions must be read and verified first.</p>
+      <p class="intro-copy">Upload a scan or PDF. Planline finds candidate walls and written dimensions for you to review; you then trace your own walls and rooms. Measurements are never inferred from pixels.</p>
+    </section>
+
+    <section class="workflow-guide" aria-label="Drawing workflow">
+      <ol class="workflow-steps">
+        <li><a class="workflow-step is-active" data-step="upload" href="#sourceDrawing" aria-current="step"><span class="workflow-step-number">1</span><span class="workflow-step-copy"><strong>Upload</strong><small>Choose a scan or PDF</small></span><span class="workflow-step-state">Current</span></a></li>
+        <li><a class="workflow-step" data-step="analyse" href="#analyzeButton"><span class="workflow-step-number">2</span><span class="workflow-step-copy"><strong>Analyse</strong><small>Find candidate regions</small></span><span class="workflow-step-state">Next</span></a></li>
+        <li><a class="workflow-step" data-step="review" href="#candidateReview"><span class="workflow-step-number">3</span><span class="workflow-step-copy"><strong>Review</strong><small>Check detections and dimensions</small></span><span class="workflow-step-state">Later</span></a></li>
+        <li><a class="workflow-step" data-step="draw" href="#manualGeometry"><span class="workflow-step-number">4</span><span class="workflow-step-copy"><strong>Draw</strong><small>Trace walls and rooms, then export</small></span><span class="workflow-step-state">Later</span></a></li>
+      </ol>
+      <p class="workflow-next" id="workflowNext" aria-live="polite">Next: upload a floor-plan image or PDF.</p>
     </section>
 
     <section class="workspace">
@@ -52,6 +69,8 @@
           <small>Choose any page in the PDF. You can analyse other pages without uploading the file again.</small>
         </div>
         <button id="analyzeButton" class="primary-button" type="button" disabled>Analyse drawing <span>→</span></button>
+        <details class="advanced-options">
+          <summary>Advanced image options <span>Threshold · brightness · contrast</span></summary>
         <div class="confidence-control">
           <label for="confidenceThreshold">Detector threshold <output id="confidenceValue">0.25</output></label>
           <input id="confidenceThreshold" type="range" min="0.05" max="0.80" step="0.05" value="0.25">
@@ -65,27 +84,33 @@
           <input id="contrastControl" type="range" min="0.5" max="2" step="0.05" value="1">
           <small>Adjusts pixel intensity before detection and crop generation. It does not rotate, crop or move any coordinates.</small>
         </section>
+        </details>
         <section class="calibration-panel" aria-labelledby="calibrationHeading">
-          <div class="calibration-heading"><strong id="calibrationHeading">Scale calibration</strong><span class="calibration-state" id="calibrationState">Not set</span></div>
-          <p>Pick two points on a known dimension line. This records a user-supplied pixel scale; it does not verify walls or measurements.</p>
-          <button id="startCalibration" class="toolbar-button" type="button" disabled>Pick two points</button>
-          <div class="calibration-points" id="calibrationPoints" aria-live="polite">Point 1: not set · Point 2: not set</div>
-          <div class="calibration-inputs">
-            <label for="calibrationDistance">Known distance</label>
-            <input id="calibrationDistance" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 4200">
-            <select id="calibrationUnit" aria-label="Calibration distance unit">
-              <option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option><option value="in">in</option><option value="ft">ft</option>
-            </select>
-          </div>
-          <div class="calibration-actions">
-            <button id="applyCalibration" class="toolbar-button" type="button" disabled>Apply scale</button>
-            <button id="clearCalibration" class="toolbar-button" type="button" disabled>Clear</button>
-          </div>
-          <output id="calibrationResult" aria-live="polite">No scale applied.</output>
+          <div class="calibration-heading"><strong id="calibrationHeading">Drawing scale</strong><span class="calibration-state" id="calibrationState">Not set</span></div>
+          <output id="calibrationResult" aria-live="polite">Confirm a dimension's text and wall-span match below to derive scale.</output>
+          <div class="calibration-points" id="calibrationPoints" aria-live="polite">No scale reference selected.</div>
+          <button id="clearCalibration" class="toolbar-button" type="button" disabled>Clear scale</button>
+          <details class="manual-calibration">
+            <summary>Set scale manually</summary>
+            <p>Use this only when no readable written dimension or reliable wall-span match is available.</p>
+            <button id="startCalibration" class="toolbar-button" type="button" disabled>Pick two points</button>
+            <div class="calibration-inputs">
+              <label for="calibrationDistance">Known distance</label>
+              <input id="calibrationDistance" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 4200">
+              <select id="calibrationUnit" aria-label="Calibration distance unit">
+                <option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option><option value="in">in</option><option value="ft">ft</option>
+              </select>
+            </div>
+            <div class="calibration-actions">
+              <button id="applyCalibration" class="toolbar-button" type="button" disabled>Apply manual scale</button>
+            </div>
+          </details>
         </section>
-        <section class="geometry-panel" aria-labelledby="geometryHeading">
+        <section class="geometry-panel" id="manualGeometry" aria-labelledby="geometryHeading">
           <div class="geometry-heading"><strong id="geometryHeading">Manual wall geometry</strong><span id="geometryCount">0 manual walls</span></div>
           <p>Draw your own wall segments over the source image. These are user-created lines, not automatic wall detections or verified CAD geometry.</p>
+          <details id="geometryDetails" class="geometry-tools-details">
+            <summary><span>Open drawing tools</span><small>Walls · rooms · export</small></summary>
           <label class="geometry-snap"><input id="geometrySnap" type="checkbox" checked> Snap to existing manual endpoints and room corners (10 px)</label>
           <div class="geometry-tools">
             <button id="drawWallTool" class="toolbar-button" type="button" disabled>Draw wall</button>
@@ -126,16 +151,19 @@
             <button id="clearRooms" class="toolbar-button" type="button" disabled>Clear rooms</button>
           </div>
           <output id="roomArea" aria-live="polite">Select a room to view its area.</output>
+          </details>
         </section>
         <div class="privacy-note"><span class="lock">▣</span><span><strong>Local-first processing</strong><br>Nothing is saved automatically. Use Save project to create a local .planline file containing the source drawing and review state. Multipart uploads may use temporary storage during receipt; request files are closed after processing.</span></div>
-        <div class="panel-heading section-gap"><span>02 / PIPELINE STATUS</span></div>
+        <details class="pipeline-details">
+          <summary class="panel-heading section-gap"><span>Pipeline status</span><span class="disclosure-mark" aria-hidden="true">+</span></summary>
         <ol class="pipeline">
           <li class="complete"><span class="pipeline-num">01</span><span><b>Image import</b><small>Ready when a file is selected</small></span><i>●</i></li>
           <li id="detectStep"><span class="pipeline-num">02</span><span><b>Object detection</b><small>YOLO candidate regions</small></span><i>○</i></li>
-          <li><span class="pipeline-num">03</span><span><b>Dimension OCR</b><small>Optional local PaddleOCR suggestions · manual verification required</small></span><i>◇</i></li>
+          <li><span class="pipeline-num">03</span><span><b>Dimension OCR</b><small>Automatic local OCR when available · manual verification required</small></span><i>◇</i></li>
           <li><span class="pipeline-num">04</span><span><b>Dimension association</b><small>Ranked line and wall-span candidates · review required</small></span><i>◇</i></li>
           <li><span class="pipeline-num">05</span><span><b>Manual geometry export</b><small>User-drawn walls and rooms to SVG/DXF; no automatic measured reconstruction</small></span><i>◇</i></li>
         </ol>
+        </details>
       </aside>
 
       <section class="drawing-panel">
@@ -156,28 +184,34 @@
       <div class="summary hidden" id="summary"></div>
       <div class="review-toolbar"><div class="review-filter"><label for="classFilter">Class</label><select id="classFilter"><option value="all">All detections</option><option value="wall">Walls</option><option value="dimension_line">Dimension lines</option><option value="dimension_value">Dimension values</option></select></div><div class="review-search"><label class="sr-only" for="detectionSearch">Search detections</label><input id="detectionSearch" type="search" placeholder="Search ID or class…" autocomplete="off"></div><div class="review-sort"><label for="detectionSort">Sort</label><select id="detectionSort"><option value="original">Original order</option><option value="confidence">Highest score</option><option value="size">Largest region</option></select></div><span class="review-hint">Select a row to locate it on the drawing.</span><button id="saveProject" class="toolbar-button" type="button" disabled>Save project ↓</button><button id="exportReview" class="toolbar-button" type="button" disabled>Export review ↗</button></div><div class="detection-list" id="detectionList"></div><p id="noDetectionMatches" class="no-detection-matches hidden">No candidate regions match these filters. Clear the search or choose another class.</p><aside id="selectedDetection" class="selected-detection hidden" aria-live="polite"><div><span class="eyebrow">SELECTED CANDIDATE</span><strong id="selectedDetectionName">—</strong></div><div class="selected-detection-metrics"><span><small>DETECTOR SCORE</small><b id="selectedDetectionScore">—</b></span><span><small>POSITION</small><b id="selectedDetectionPosition">—</b></span><span><small>BOX SIZE</small><b id="selectedDetectionSize">—</b></span></div></aside>
       <details class="text-review hidden" id="dimensionTextReview">
-        <summary><span class="eyebrow">03 / DIMENSION TEXT</span><strong>Manual transcription <span class="summary-hint">Optional local OCR · dimension interpretation</span></strong></summary>
+        <summary><span class="eyebrow">03 / DIMENSIONS</span><strong>Read and verify dimensions <span class="summary-hint">OCR suggestions · line and wall matching</span></strong></summary>
         <div class="ocr-assist-controls">
-          <label for="ocrModelSelect">Recognition model</label>
-          <select id="ocrModelSelect"><option value="base:PP-OCRv5_mobile_rec">PP-OCRv5 mobile · base</option></select>
-          <label for="ocrDeviceSelect">Device</label>
-          <select id="ocrDeviceSelect">
-            <option value="cpu">CPU</option>
-            <option value="gpu:0">GPU (requires a compatible Paddle GPU runtime)</option>
-          </select>
-          <button id="runOcrButton" class="toolbar-button" type="button" disabled>Run OCR on candidates</button>
+          <button id="runOcrButton" class="toolbar-button" type="button" disabled>Run OCR again</button>
           <output id="ocrAssistStatus" aria-live="polite">Checking optional OCR runtime…</output>
+          <details class="ocr-options">
+            <summary>Recognition settings</summary>
+            <label for="ocrModelSelect">Recognition model</label>
+            <select id="ocrModelSelect"><option value="base:PP-OCRv5_mobile_rec">PP-OCRv5 mobile · base</option></select>
+            <label for="ocrDeviceSelect">Device</label>
+            <select id="ocrDeviceSelect">
+              <option value="cpu">CPU</option>
+              <option value="gpu:0">GPU (requires a compatible Paddle GPU runtime)</option>
+            </select>
+          </details>
         </div>
-        <section class="dataset-capture-panel" aria-label="Save reviewed dimension crops to OCR training data">
-          <div class="dataset-capture-heading"><strong>Save verified crops to training data</strong><a href="/ocr">Manage datasets ↗</a></div>
-          <div class="dataset-capture-fields">
-            <label for="drawingDatasetSelect">OCR dataset<select id="drawingDatasetSelect"><option value="">Loading local datasets…</option></select></label>
-            <label for="drawingSourceId">Source drawing ID<input id="drawingSourceId" type="text" maxlength="128" placeholder="Drawing filename"></label>
-            <label for="drawingWriterId">Writer ID (optional)<input id="drawingWriterId" type="text" maxlength="128" placeholder="Reuse for the same handwriting author"></label>
-          </div>
-          <output id="datasetCaptureStatus" aria-live="polite">Only individually verified crops are saved. The full drawing stays in the current workspace.</output>
-        </section>
-        <p class="dimension-interpreter-note">Interpret explicitly written units such as mm, cm, m, inches and feet. Bare numbers keep an unknown unit; ambiguous separators are not guessed. Interpretation is not a verified measurement.</p>
+        <details class="dataset-capture-details">
+          <summary>Save verified crops for OCR training</summary>
+          <section class="dataset-capture-panel" aria-label="Save reviewed dimension crops to OCR training data">
+            <div class="dataset-capture-heading"><strong>Training dataset</strong><a href="/ocr">Manage datasets ↗</a></div>
+            <div class="dataset-capture-fields">
+              <label for="drawingDatasetSelect">OCR dataset<select id="drawingDatasetSelect"><option value="">Loading local datasets…</option></select></label>
+              <label for="drawingSourceId">Source drawing ID<input id="drawingSourceId" type="text" maxlength="128" placeholder="Drawing filename"></label>
+              <label for="drawingWriterId">Writer ID (optional)<input id="drawingWriterId" type="text" maxlength="128" placeholder="Reuse for the same handwriting author"></label>
+            </div>
+            <output id="datasetCaptureStatus" aria-live="polite">Only individually verified crops are saved. The full drawing stays in the current workspace.</output>
+          </section>
+        </details>
+        <p class="dimension-interpreter-note">OCR reads each detected dimension and proposes its line and wall span. Check the text and match, then confirm them.</p>
         <div id="dimensionTextItems" class="dimension-text-items"></div>
       </details>
       <div class="limitations"><div class="limitation-mark">i</div><div><strong>Important: detection is not measurement.</strong><p>This workflow ranks dimension-value boxes against dimension-line boxes, then proposes wall pairs whose facing edges bracket each line. These are axis-aligned geometric hypotheses, not verified measurements or CAD geometry. OCR suggestions are optional and unverified; every character, selected line and wall pair must be checked against the source drawing.</p></div></div>

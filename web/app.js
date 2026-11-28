@@ -1,6 +1,30 @@
 const $ = (selector) => document.querySelector(selector);
 const PREVIEW_MODE = window.PLANLINE_PREVIEW === true;
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, ocrReady: false, ocrModels: [], ocrDatasets: [], ocrPredictions: {}, ocrRunning: false, ocrModelId: null, ocrDevice: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, ocrReady: false, ocrModels: [], ocrDatasets: [], ocrPredictions: {}, ocrRunning: false, ocrModelId: null, ocrDevice: null, ocrCapabilitiesLoaded: false, ocrCapabilitiesPromise: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
+
+function updateWorkflow(stage) {
+  const order = ["upload", "analyse", "review", "draw"];
+  const activeIndex = Math.max(0, order.indexOf(stage));
+  const labels = {
+    upload: "Next: upload a floor-plan image or PDF.",
+    analyse: "Next: analyse the drawing to find candidate walls and dimensions.",
+    review: "Next: review the detected regions. Verify written dimensions before using them as a scale reference.",
+    draw: "Next: trace the walls and room boundaries you need, then export your own geometry."
+  };
+  document.querySelectorAll(".workflow-step").forEach((step) => {
+    const index = order.indexOf(step.dataset.step);
+    const complete = index < activeIndex;
+    const active = index === activeIndex;
+    step.classList.toggle("is-complete", complete);
+    step.classList.toggle("is-active", active);
+    if (active) step.setAttribute("aria-current", "step");
+    else step.removeAttribute("aria-current");
+    const stateLabel = step.querySelector(".workflow-step-state");
+    if (stateLabel) stateLabel.textContent = complete ? "Done" : active ? "Current" : "Later";
+  });
+  const next = $("#workflowNext");
+  if (next) next.textContent = labels[stage] || labels.upload;
+}
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -9,6 +33,7 @@ function formatBytes(bytes) {
 }
 
 function resetWorkspace() {
+  updateWorkflow("upload");
   if (state.controller) { state.controller.abort(); state.controller = null; }
   if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
   if (state.resizeObserver) state.resizeObserver.disconnect();
@@ -90,6 +115,7 @@ function setFile(file) {
   $("#previewImage").onload = null;
   $("#previewImage").onerror = null;
   state.file = file;
+  updateWorkflow("analyse");
   if ($("#drawingSourceId")) $("#drawingSourceId").value = (file.name.replace(/\\.[^.]+$/, "") || "drawing").slice(0, 128);
   updateDatasetCaptureButtons();
   $("#brightnessControl").value = "0";
@@ -319,7 +345,7 @@ function clearCalibration() {
   const status = $("#calibrationState");
   if (!status) return;
   status.textContent = "Not set";
-  $("#calibrationPoints").textContent = "Point 1: not set · Point 2: not set";
+  $("#calibrationPoints").textContent = "No scale reference selected.";
   $("#calibrationResult").textContent = "No scale applied.";
   $("#startCalibration").disabled = !state.result;
   $("#startCalibration").textContent = "Pick two points";
@@ -332,10 +358,12 @@ function clearCalibration() {
 
 function renderCalibrationStatus() {
   const points = state.calibration.points;
-  $("#calibrationPoints").textContent = "Point 1: " +
-    (points[0] ? Math.round(points[0].x) + ", " + Math.round(points[0].y) + " px" : "not set") +
-    " · Point 2: " +
-    (points[1] ? Math.round(points[1].x) + ", " + Math.round(points[1].y) + " px" : "not set");
+  $("#calibrationPoints").textContent = state.calibration.applied?.method === "verified_dimension_association"
+    ? "Derived from a confirmed dimension-to-wall match."
+    : "Point 1: " +
+      (points[0] ? Math.round(points[0].x) + ", " + Math.round(points[0].y) + " px" : "not set") +
+      " · Point 2: " +
+      (points[1] ? Math.round(points[1].x) + ", " + Math.round(points[1].y) + " px" : "not set");
   $("#startCalibration").disabled = !state.result;
   $("#startCalibration").textContent = state.calibration.picking ? "Click the drawing…" : "Pick two points";
   $("#applyCalibration").disabled = points.length !== 2;
@@ -343,6 +371,44 @@ function renderCalibrationStatus() {
   $("#calibrationState").textContent = state.calibration.applied ? "Applied" :
     state.calibration.picking ? "Picking points" : points.length ? "2 points ready" : "Not set";
   $("#previewImage").classList.toggle("calibration-picking", state.calibration.picking);
+}
+
+function applyAssociatedDimensionScale(reference) {
+  const distanceMm = Number(reference?.valueMm);
+  const pixelDistance = Number(reference?.spanPx);
+  if (!state.result || !(distanceMm > 0) || !(pixelDistance > 0) ||
+      !Number.isFinite(distanceMm) || !Number.isFinite(pixelDistance)) return;
+  const pixelsPerMm = pixelDistance / distanceMm;
+  if (!Number.isFinite(pixelsPerMm) || pixelsPerMm <= 0) {
+    $("#calibrationResult").textContent = "The matched dimension cannot produce a valid scale.";
+    return;
+  }
+  state.calibration = {
+    points: [],
+    picking: false,
+    applied: {
+      method: "verified_dimension_association",
+      points_px: [],
+      pixel_distance: Number(pixelDistance.toFixed(3)),
+      known_distance: distanceMm,
+      input_unit: "mm",
+      known_distance_mm: Number(distanceMm.toFixed(6)),
+      reference_dimension_text: reference.text || null,
+      reference_dimension_id: reference.id || null,
+      reference_dimension_line_id: reference.lineId || null,
+      reference_wall_ids: Array.isArray(reference.wallIds) ? reference.wallIds : [],
+      pixels_per_mm: Number(pixelsPerMm.toFixed(9)),
+      source_filename: state.file?.name || null,
+      source_page_index: state.result?.source?.page_index ?? 0,
+      status: "user_verified_association_reference_not_geometry_validation"
+    }
+  };
+  $("#calibrationResult").textContent = "Scale derived from confirmed match: " +
+    reference.text + " · " + pixelDistance.toFixed(1) + " px / " +
+    distanceMm.toLocaleString(undefined, { maximumFractionDigits: 3 }) +
+    " mm = " + pixelsPerMm.toFixed(6) + " px/mm. Check against other dimensions.";
+  renderCalibrationStatus();
+  renderGeometryControls();
 }
 
 function startCalibration() {
@@ -370,8 +436,9 @@ function addCalibrationPoint(event) {
   if (state.calibration.points.length >= 2) state.calibration.picking = false;
   renderCalibrationStatus();
   if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
-  if (state.calibration.points.length === 2) $("#calibrationResult").textContent =
-    "Two points selected. Enter their known distance and apply the scale.";
+  if (state.calibration.points.length === 2) {
+    $("#calibrationResult").textContent = "Two points selected. Enter their known distance and apply the scale.";
+  }
 }
 
 function applyCalibration() {
@@ -384,9 +451,7 @@ function applyCalibration() {
     $("#calibrationDistance").focus();
     return;
   }
-  const dx = points[1].x - points[0].x;
-  const dy = points[1].y - points[0].y;
-  const pixelDistance = Math.hypot(dx, dy);
+  const pixelDistance = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
   if (!Number.isFinite(pixelDistance) || pixelDistance < 1) {
     $("#calibrationResult").textContent = "The selected points are too close together. Pick two distinct points.";
     return;
@@ -403,6 +468,8 @@ function applyCalibration() {
     known_distance: distance,
     input_unit: unit,
     known_distance_mm: Number(distanceMm.toFixed(6)),
+    reference_dimension_text: null,
+    reference_dimension_id: null,
     pixels_per_mm: Number((pixelDistance / distanceMm).toFixed(9)),
     source_filename: state.file?.name || null,
     source_page_index: state.result?.source?.page_index ?? 0,
@@ -411,13 +478,12 @@ function applyCalibration() {
   $("#calibrationResult").textContent = pixelDistance.toFixed(1) + " px / " +
     distanceMm.toLocaleString(undefined, { maximumFractionDigits: 3 }) +
     " mm = " + state.calibration.applied.pixels_per_mm.toFixed(6) +
-    " px/mm. User-supplied reference only.";
+    " px/mm. Manual reference.";
   renderCalibrationStatus();
   renderGeometryControls();
 }
-
 $("#startCalibration").addEventListener("click", startCalibration);
-$("#applyCalibration").addEventListener("click", applyCalibration);
+$("#applyCalibration").addEventListener("click", () => applyCalibration());
 $("#clearCalibration").addEventListener("click", clearCalibration);
 function getSourcePoint(event) {
   if (!state.result) return null;
@@ -506,7 +572,10 @@ async function compareSelectedWallToDimension() {
         wall_length_px: wallLengthPx,
         pixels_per_mm: pixelsPerMm,
         dimension_mm: dimensionMm,
-        tolerance_percent: tolerance
+        tolerance_percent: tolerance,
+        calibration_method: state.calibration.applied?.method === "verified_dimension_association"
+          ? "verified_dimension_association"
+          : "user_two_point_reference"
       })
     });
     const result = await response.json().catch(() => ({}));
@@ -916,8 +985,8 @@ function exportManualGeometrySvg() {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-$("#drawWallTool").addEventListener("click", () => setGeometryMode("draw_wall"));
-$("#drawRoomTool").addEventListener("click", () => setGeometryMode("draw_room"));
+$("#drawWallTool").addEventListener("click", () => { setGeometryMode("draw_wall"); updateWorkflow("draw"); });
+$("#drawRoomTool").addEventListener("click", () => { setGeometryMode("draw_room"); updateWorkflow("draw"); });
 $("#finishRoom").addEventListener("click", finishManualRoom);
 $("#cancelRoom").addEventListener("click", cancelManualRoom);
 $("#deleteRoom").addEventListener("click", deleteSelectedManualRoom);
@@ -1101,7 +1170,7 @@ function renderResults(payload) {
   renderDetectionRows(detections);
   renderDimensionTextReview(payload.dimension_regions || []);
   const notes = (payload.notes || []).join(" ");
-  showNotice(detections.length ? "Detection finished — OCR has not run" : "No candidate regions detected", detections.length ? notes : "The model returned no boxes at its current confidence threshold. This does not prove that the drawing contains no walls or dimensions. " + notes);
+  showNotice(detections.length ? "Detection finished — preparing dimension review" : "No candidate regions detected", detections.length ? notes : "The model returned no boxes at its current confidence threshold. This does not prove that the drawing contains no walls or dimensions. " + notes);
   if (payload.source?.source_type === "pdf") {
     const pageNumber = Number(payload.source.page_index || 0) + 1;
     const pageCount = Number(payload.source.page_count || 1);
@@ -1179,6 +1248,7 @@ function renderDimensionTextReview(regions) {
       verifiedInput.checked = false;
       refreshWallDimensionOptions();
       updateDatasetCaptureButtons();
+      updateUseScaleButton();
     });
     interpretButton.addEventListener("click", () => interpretDimensionForRow(textInput, interpretation, interpretButton));
 
@@ -1206,7 +1276,20 @@ function renderDimensionTextReview(regions) {
     verifiedInput.type = "checkbox";
     verifiedLabel.append(verifiedInput, document.createTextNode(" I checked this transcription"));
 
+    const useScaleButton = document.createElement("button");
+    useScaleButton.type = "button";
+    useScaleButton.className = "toolbar-button use-dimension-scale";
+    useScaleButton.textContent = "Use confirmed match for scale";
+    useScaleButton.disabled = true;
+
     const association = region.association || { status: "unmatched", candidate_lines: [] };
+    const associationDetails = document.createElement("details");
+    associationDetails.className = "dimension-association-details";
+    const associationSummary = document.createElement("summary");
+    associationSummary.textContent = association.candidate_lines?.length
+      ? "Review suggested line and wall match"
+      : "Line and wall match unavailable";
+    associationDetails.append(associationSummary);
     const associationPanel = document.createElement("section");
     associationPanel.className = "dimension-association";
     const associationHeading = document.createElement("strong");
@@ -1227,8 +1310,8 @@ function renderDimensionTextReview(regions) {
     (association.candidate_lines || []).forEach((candidate) => {
       const option = document.createElement("option");
       option.value = candidate.dimension_line_id;
-      option.textContent = candidate.dimension_line_id + " · " + candidate.orientation +
-        " · rank " + Math.round((candidate.assignment_score ?? candidate.score) * 100);
+      option.textContent = (candidate.orientation === "horizontal" ? "Horizontal" : "Vertical") +
+        (candidate === association.candidate_lines[0] ? " · best match" : " · alternative");
       lineSelect.append(option);
     });
     lineLabel.append(lineSelect);
@@ -1272,9 +1355,8 @@ function renderDimensionTextReview(regions) {
           : span.globally_assigned_to
             ? " · gap suggested for " + span.globally_assigned_to
             : "";
-        option.textContent = span.wall_ids.join(" ↔ ") + " · " +
-          Math.round(span.span_px) + " px · rank " +
-          Math.round((span.assignment_score ?? span.score) * 100) + globalHint;
+        option.textContent = "Wall pair " + (spanIndex + 1) +
+          (span.globally_assigned ? " · suggested" : globalHint ? " · alternate" : "");
         spanSelect.append(option);
       });
       spanSelect.disabled = !selectedLine || !(selectedLine.wall_spans || []).length;
@@ -1284,12 +1366,16 @@ function renderDimensionTextReview(regions) {
         ? "Choose a dimension-line candidate. One detected line may serve multiple labels in a chained dimension."
         : !(selectedLine.wall_spans || []).length
           ? "This line has no viable wall-gap candidate. Leave the association unresolved."
-          : "Choose the wall gap that this dimension measures. The global recommendation is advisory and does not select anything automatically.";
+          : "Choose the wall gap that this dimension measures. The best global suggestion is preselected when available; check it against the drawing.";
     }
-    lineSelect.addEventListener("change", updateWallSpanOptions);
+    lineSelect.addEventListener("change", () => {
+      updateWallSpanOptions();
+      updateUseScaleButton();
+    });
     spanSelect.addEventListener("change", () => {
       associationVerified.checked = false;
       associationVerified.disabled = !lineSelect.value || !spanSelect.value;
+      updateUseScaleButton();
       const selectedLine = (association.candidate_lines || []).find(
         (candidate) => candidate.dimension_line_id === lineSelect.value
       );
@@ -1297,13 +1383,61 @@ function renderDimensionTextReview(regions) {
       associationHelp.textContent = !selectedSpan
         ? "Choose a wall gap. A dimension-line detection may be shared by several labels in a chain."
         : selectedSpan.globally_assigned
-          ? "This is the globally preferred one-to-one wall-gap match. Check the drawing and explicitly confirm."
+          ? "This is the strongest geometric suggestion. Check the drawing, then confirm it."
           : selectedSpan.globally_assigned_to
-            ? "This wall gap is globally preferred for another dimension label. Selecting it here is an override; verify carefully."
-            : "Check that this wall pair describes the written dimension, then explicitly confirm.";
+            ? "This wall gap is suggested for another dimension label. Check carefully before overriding."
+            : "Check that this wall pair describes the written dimension, then confirm.";
     });
 
+    const recommendedMatch = (association.candidate_lines || [])
+      .flatMap((candidate) => (candidate.wall_spans || []).map((span, spanIndex) => ({
+        candidate, span, spanIndex
+      })))
+      .filter(({ span }) => span.globally_assigned && span.globally_assigned_to === region.id)
+      .sort((a, b) => (b.span.assignment_score || 0) - (a.span.assignment_score || 0))[0];
+    const defaultCandidate = recommendedMatch?.candidate || association.candidate_lines?.[0];
+    if (defaultCandidate) {
+      lineSelect.value = defaultCandidate.dimension_line_id;
+      updateWallSpanOptions();
+      if (recommendedMatch) {
+        spanSelect.value = String(recommendedMatch.spanIndex);
+        associationVerified.disabled = false;
+        associationHelp.textContent = "Best global match preselected. Check the drawing, then confirm if correct.";
+        associationSummary.textContent = "Suggested match preselected · review before confirming";
+      }
+    }
+    function updateUseScaleButton() {
+      const selectedLine = (association.candidate_lines || []).find(
+        (candidate) => candidate.dimension_line_id === lineSelect.value
+      );
+      const selectedSpan = spanSelect.value !== ""
+        ? selectedLine?.wall_spans?.[Number(spanSelect.value)]
+        : null;
+      useScaleButton.disabled = !verifiedInput.checked ||
+        !associationVerified.checked ||
+        row.dataset.dimensionType !== "linear" ||
+        !(Number(row.dataset.parsedValueMm) > 0) ||
+        !(Number(selectedSpan?.span_px) > 0);
+    }
+    useScaleButton.addEventListener("click", () => {
+      if (useScaleButton.disabled) return;
+      const selectedLine = (association.candidate_lines || []).find(
+        (candidate) => candidate.dimension_line_id === lineSelect.value
+      );
+      const selectedSpan = selectedLine?.wall_spans?.[Number(spanSelect.value)];
+      applyAssociatedDimensionScale({
+        valueMm: row.dataset.parsedValueMm,
+        text: textInput.value.trim(),
+        id: region.id,
+        lineId: selectedLine?.dimension_line_id,
+        wallIds: selectedSpan?.wall_ids,
+        spanPx: selectedSpan?.span_px
+      });
+    });
+    associationVerified.addEventListener("change", updateUseScaleButton);
+    updateUseScaleButton();
     associationPanel.append(associationHeading, associationHelp, lineLabel, spanLabel, associationVerifiedLabel);
+    associationDetails.append(associationPanel);
 
     const saveCropButton = document.createElement("button");
     saveCropButton.type = "button";
@@ -1315,9 +1449,10 @@ function renderDimensionTextReview(regions) {
     verifiedInput.addEventListener("change", () => {
       refreshWallDimensionOptions();
       updateDatasetCaptureButtons();
+      updateUseScaleButton();
     });
 
-    fields.append(meta, textLabel, interpretButton, interpretation, styleLabel, verifiedLabel, associationPanel, saveCropButton);
+    fields.append(meta, textLabel, interpretButton, interpretation, styleLabel, verifiedLabel, useScaleButton, associationDetails, saveCropButton);
     row.append(fields);
     container.append(row);
   });
@@ -1329,26 +1464,38 @@ function showOcrSuggestion(row, prediction) {
   const fields = row.querySelector(".dimension-text-fields");
   if (!fields) return;
   fields.querySelector(".ocr-suggestion")?.remove();
+  const input = row.querySelector(".dimension-text-value");
+  const output = row.querySelector(".dimension-interpretation");
+  const interpretButton = row.querySelector(".interpret-dimension-button");
+  const verifiedInput = row.querySelector(".dimension-text-verified-input");
   const wrapper = document.createElement("div");
   wrapper.className = "ocr-suggestion";
   const text = document.createElement("span");
   const confidence = Number.isFinite(prediction.confidence)
     ? " · " + Math.round(prediction.confidence * 100) + "% recogniser score"
     : " · confidence unavailable";
-  text.textContent = "OCR suggestion: " + (prediction.text || "(no text recognised)") + confidence + " · unverified";
+  text.textContent = "OCR draft: " + (prediction.text || "(no text recognised)") + confidence + " · check against drawing";
+  if (prediction.text && input && !input.value.trim()) {
+    input.value = prediction.text;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    if (verifiedInput) verifiedInput.checked = false;
+    if (interpretButton && output) void interpretDimensionForRow(input, output, interpretButton);
+  }
   const useButton = document.createElement("button");
   useButton.type = "button";
   useButton.className = "toolbar-button";
-  useButton.textContent = "Use suggestion";
-  useButton.disabled = !prediction.text;
+  useButton.textContent = "Replace with OCR reading";
+  useButton.hidden = !prediction.text || input?.value.trim() === prediction.text;
   useButton.addEventListener("click", () => {
-    row.querySelector(".dimension-text-value").value = prediction.text;
-    row.querySelector(".dimension-text-value").dispatchEvent(new Event("input", { bubbles: true }));
-    row.querySelector(".dimension-text-verified-input").checked = false;
-    showNotice("OCR suggestion inserted", "It is still unverified. Check every character against the original crop before marking it verified.");
+    if (!input) return;
+    input.value = prediction.text;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    if (verifiedInput) verifiedInput.checked = false;
+    if (interpretButton && output) void interpretDimensionForRow(input, output, interpretButton);
+    showNotice("OCR draft inserted", "The reading has been interpreted but remains unverified. Check it against the original drawing.");
   });
   wrapper.append(text, useButton);
-  const association = fields.querySelector(".dimension-association");
+  const association = fields.querySelector(".dimension-association-details");
   fields.insertBefore(wrapper, association || null);
 }
 
@@ -1394,6 +1541,7 @@ async function interpretDimensionForRow(input, output, button) {
   } finally {
     button.textContent = originalText;
     button.disabled = !input.value.trim();
+
   }
 }
 
@@ -1503,7 +1651,7 @@ function updateOcrControls() {
   } else if (!hasCandidates) {
     $("#ocrAssistStatus").textContent = "Analyse a drawing with dimension candidates to run OCR.";
   } else {
-    $("#ocrAssistStatus").textContent = "OCR suggestions are unverified. Review each result before accepting it.";
+    $("#ocrAssistStatus").textContent = "OCR runs automatically after analysis. Check each reading before verifying it.";
   }
 }
 
@@ -1512,6 +1660,7 @@ async function loadOcrCapabilities() {
     state.ocrReady = false;
     state.ocrModels = [];
     state.ocrDatasets = [];
+    state.ocrCapabilitiesLoaded = true;
     updateOcrControls();
     return;
   }
@@ -1556,6 +1705,7 @@ async function loadOcrCapabilities() {
     state.ocrReady = false;
     $("#ocrAssistStatus").textContent = error.message || "OCR status unavailable.";
   }
+  state.ocrCapabilitiesLoaded = true;
   updateOcrControls();
 }
 
@@ -1686,6 +1836,7 @@ async function analyse() {
     return;
   }
   const controller = new AbortController();
+  updateWorkflow("analyse");
   state.controller = controller;
   const button = $("#analyzeButton");
   button.disabled = true;
@@ -1720,6 +1871,12 @@ async function analyse() {
     state.result = payload;
     $("#detectStep").classList.add("complete");
     renderResults(payload);
+    updateWorkflow("review");
+    $("#geometryDetails").open = true;
+    if (state.ocrCapabilitiesPromise) await state.ocrCapabilitiesPromise;
+    if (state.result === payload && state.ocrReady && payload.dimension_regions?.length) {
+      void runOcrOnCandidates();
+    }
   } catch (error) {
     if (error.name !== "AbortError" && state.controller === controller) {
       $("#detectStep").classList.remove("complete");
@@ -1788,6 +1945,8 @@ function buildReviewObject() {
       return {
         detection_id: region.id,
         raw_text: textInputs[index]?.value || "",
+        parsed_value_mm: textInputs[index]?.closest(".dimension-text-item")?.dataset.parsedValueMm || null,
+        dimension_type: textInputs[index]?.closest(".dimension-text-item")?.dataset.dimensionType || null,
         text_style: document.querySelectorAll(".dimension-text-style")[index]?.value || "unknown",
         verified: verifiedInputs[index]?.checked || false,
         detector_confidence: region.confidence,
@@ -1934,6 +2093,13 @@ function restoreProjectReview(review) {
     if (textInput) textInput.value = entry.raw_text || "";
     if (styleInput) styleInput.value = entry.text_style || "unknown";
     if (verifiedInput) verifiedInput.checked = Boolean(entry.verified);
+    if (textInput && entry.parsed_value_mm && entry.dimension_type === "linear") {
+      const row = textInput.closest(".dimension-text-item");
+      row.dataset.parsedValueMm = entry.parsed_value_mm;
+      row.dataset.dimensionType = "linear";
+      const scaleButton = row.querySelector(".use-dimension-scale");
+      if (scaleButton) scaleButton.disabled = !verifiedInput?.checked;
+    }
     if (entry.ocr_suggestion && typeof entry.ocr_suggestion === "object") {
       state.ocrPredictions[entry.detection_id] = entry.ocr_suggestion;
       const row = [...document.querySelectorAll(".dimension-text-item")]
@@ -1954,7 +2120,10 @@ function restoreProjectReview(review) {
       if (spanSelect && spanIndex >= 0) {
         spanSelect.value = String(spanIndex);
         spanSelect.dispatchEvent(new Event("change", { bubbles: true }));
-        if (associationVerified) associationVerified.checked = Boolean(association.confirmed);
+        if (associationVerified) {
+          associationVerified.checked = Boolean(association.confirmed);
+          associationVerified.dispatchEvent(new Event("change", { bubbles: true }));
+        }
       }
     }
   });
@@ -1966,11 +2135,14 @@ function restoreProjectReview(review) {
     };
     $("#calibrationDistance").value = String(review.calibration.known_distance);
     $("#calibrationUnit").value = review.calibration.input_unit;
-    $("#calibrationResult").textContent =
-      Number(review.calibration.pixel_distance).toFixed(1) + " px / " +
-      Number(review.calibration.known_distance_mm).toLocaleString(undefined, { maximumFractionDigits: 3 }) +
-      " mm = " + Number(review.calibration.pixels_per_mm).toFixed(6) +
-      " px/mm. Restored user-supplied reference.";
+    $("#calibrationResult").textContent = review.calibration.method === "verified_dimension_association"
+      ? "Restored scale from confirmed match " + (review.calibration.reference_dimension_text || review.calibration.known_distance_mm + " mm") + "."
+      : review.calibration.method === "verified_dimension_two_point_reference"
+        ? "Restored scale from verified dimension " + (review.calibration.reference_dimension_text || review.calibration.known_distance_mm + " mm") + "."
+        : Number(review.calibration.pixel_distance).toFixed(1) + " px / " +
+          Number(review.calibration.known_distance_mm).toLocaleString(undefined, { maximumFractionDigits: 3 }) +
+          " mm = " + Number(review.calibration.pixels_per_mm).toFixed(6) +
+          " px/mm. Restored manual reference.";
     renderCalibrationStatus();
     drawDetections(state.previewUrl, state.detections, state.result.image);
   } else {
@@ -2052,6 +2224,8 @@ async function openProjectFile(file) {
     state.previewUrl = project.analysis_result.preview_data_url;
     state.detections = project.analysis_result.detections || [];
     renderResults(state.result);
+    updateWorkflow("review");
+    $("#geometryDetails").open = true;
     renderGeometryControls();
     restoreProjectReview(project.review);
     $("#saveProject").disabled = false;
@@ -2279,7 +2453,7 @@ if (PREVIEW_MODE) {
   fetch("/api/health").then((r) => r.json()).then((health) => {
     const meta = $(".top-meta");
     if (health.status === "ok") {
-      $("#apiStatus").textContent = health.detector_weights_present ? "API ready · detector weights found" : "API ready · detector missing";
+      $("#apiStatus").textContent = (health.detector_weights_present ? "Detector ready" : "Detector missing") + " · " + (health.ocr_available ? "OCR ready" : "OCR runtime missing") + " · " + (health.dimension_association_available ? "dimension matching ready" : "dimension matching unavailable");
       if (!health.detector_weights_present) showNotice("Detector model missing", "The UI and API are available, but yolo_floorplan.pt must be present in the repository root before analysis can run.");
     } else {
       meta.classList.add("api-error");
@@ -2294,4 +2468,4 @@ if (PREVIEW_MODE) {
 
 $("#drawingDatasetSelect").addEventListener("change", updateDatasetCaptureButtons);
 $("#drawingSourceId").addEventListener("input", updateDatasetCaptureButtons);
-loadOcrCapabilities();
+state.ocrCapabilitiesPromise = loadOcrCapabilities();

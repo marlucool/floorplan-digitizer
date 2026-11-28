@@ -142,3 +142,46 @@ def test_exported_inference_model_requires_nonempty_parameter_file(tmp_path: Pat
 
     weights.write_bytes(b"model-weights")
     assert _has_exported_inference_weights(inference_dir)
+
+def test_persisted_running_job_is_restored_as_interrupted_after_restart(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import json
+    import threading
+
+    from planline import ocr_training
+
+    data_root = tmp_path / "user-data"
+    monkeypatch.setenv("PLANLINE_DATA_DIR", str(data_root))
+    job_id = "0123456789ab"
+    state_dir = data_root / "ocr" / "handwriting" / "training_runs" / job_id
+    state_dir.mkdir(parents=True)
+    state_path = state_dir / "job.json"
+    job = {
+        "job_id": job_id,
+        "kind": "training",
+        "status": "running",
+        "created_at": "2026-11-27T00:00:00+00:00",
+        "current_step": "fine-tuning",
+        "output_dir": str(state_dir),
+        "_state_path": str(state_path),
+        "_log_lines": ["training started", "epoch 1/10"],
+        "cancel_event": threading.Event(),
+    }
+
+    with ocr_training._JOB_LOCK:
+        ocr_training._JOBS[job_id] = job
+        ocr_training._persist_job_locked(job)
+        ocr_training._JOBS.pop(job_id)
+
+    persisted = json.loads(state_path.read_text(encoding="utf-8"))
+    assert persisted["status"] == "running"
+    assert persisted["logs"].splitlines() == ["training started", "epoch 1/10"]
+
+    restored = ocr_training.get_job(job_id)
+    assert restored is not None
+    assert restored["status"] == "interrupted"
+    assert restored["current_step"] == "interrupted"
+    assert "application restarted" in restored["error"]
+    assert restored["logs"].splitlines() == ["training started", "epoch 1/10"]
+    assert json.loads(state_path.read_text(encoding="utf-8"))["status"] == "interrupted"

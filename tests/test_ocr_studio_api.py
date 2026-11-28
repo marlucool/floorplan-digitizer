@@ -5,6 +5,7 @@ import json
 import re
 import sys
 import types
+import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -63,6 +64,108 @@ def test_local_ocr_studio_dataset_and_annotation_routes(tmp_path: Path, monkeypa
     deleted = client.delete(f"/api/ocr/datasets/{dataset_id}/samples/{crop_id}")
     assert deleted.status_code == 200
     assert deleted.json()["dataset"]["summary"]["samples"] == 2
+
+
+def test_dataset_archive_import_and_export_round_trip(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(ocr_studio_api, "OCR_DATASET_ROOT", tmp_path / "ocr")
+    app = FastAPI()
+    app.include_router(ocr_studio_api.router)
+    client = TestClient(app)
+    created = client.post("/api/ocr/datasets", json={"name": "archive round trip"})
+    assert created.status_code == 201
+    dataset_id = created.json()["dataset_id"]
+
+    archive_buffer = io.BytesIO()
+    with zipfile.ZipFile(archive_buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "annotations.csv",
+            "image,text,source_id,writer_id,text_style,verified\ncrop.png,4200 mm,plan-a,writer-a,handwritten,true\n",
+        )
+        archive.writestr("crop.png", _png())
+
+    imported = client.post(
+        f"/api/ocr/datasets/{dataset_id}/import-archive",
+        files={"file": ("dataset.zip", archive_buffer.getvalue(), "application/zip")},
+    )
+    assert imported.status_code == 201, imported.text
+    assert imported.json()["added"] == 1
+    assert imported.json()["dataset"]["summary"]["samples"] == 1
+
+    exported = client.get(f"/api/ocr/datasets/{dataset_id}/export")
+    assert exported.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(exported.content)) as archive:
+        names = set(archive.namelist())
+    assert ocr_studio_api.MANIFEST_NAME in names
+    assert any(name.startswith("images/") and name.endswith(".png") for name in names)
+    assert not any("training_runs" in name or "benchmarks" in name for name in names)
+
+
+def test_dataset_archive_import_rejects_csv_path_traversal(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(ocr_studio_api, "OCR_DATASET_ROOT", tmp_path / "ocr")
+    app = FastAPI()
+    app.include_router(ocr_studio_api.router)
+    client = TestClient(app)
+    dataset_id = client.post("/api/ocr/datasets", json={"name": "unsafe archive"}).json()["dataset_id"]
+
+    archive_buffer = io.BytesIO()
+    with zipfile.ZipFile(archive_buffer, "w") as archive:
+        archive.writestr(
+            "annotations.csv",
+            "image,text,source_id,text_style,verified\n../outside.png,4200,plan-a,handwritten,true\n",
+        )
+        archive.writestr("outside.png", _png())
+
+    response = client.post(
+        f"/api/ocr/datasets/{dataset_id}/import-archive",
+        files={"file": ("dataset.zip", archive_buffer.getvalue(), "application/zip")},
+    )
+    assert response.status_code == 422
+    assert "outside the archive" in response.json()["detail"]
+
+
+def test_import_review_bulk_saves_only_verified_dimension_crops(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(ocr_studio_api, "OCR_DATASET_ROOT", tmp_path / "ocr")
+    app = FastAPI()
+    app.include_router(ocr_studio_api.router)
+    client = TestClient(app)
+    dataset_id = client.post("/api/ocr/datasets", json={"name": "review import"}).json()["dataset_id"]
+    review = {
+        "schema_version": "planline-detection-review/v1",
+        "source": {
+            "filename": "plan.png",
+            "page_index": 0,
+            "image_width_px": 28,
+            "image_height_px": 16,
+        },
+        "manual_dimension_text_review": [
+            {
+                "detection_id": "det-verified",
+                "raw_text": "4,200 mm",
+                "text_style": "handwritten",
+                "verified": True,
+                "crop_bbox": {"x1": 2, "y1": 2, "x2": 24, "y2": 14},
+            },
+            {
+                "detection_id": "det-unverified",
+                "raw_text": "2500",
+                "text_style": "handwritten",
+                "verified": False,
+                "crop_bbox": {"x1": 2, "y1": 2, "x2": 24, "y2": 14},
+            },
+        ],
+    }
+    response = client.post(
+        f"/api/ocr/datasets/{dataset_id}/import-review",
+        data={"review_json": json.dumps(review), "text_style": "all", "writer_id": "writer-a"},
+        files={"file": ("plan.png", _png(), "image/png")},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["added"] == 1
+    assert response.json()["skipped_unverified"] == 1
+    sample = response.json()["dataset"]["samples"][0]
+    assert sample["text"] == "4,200 mm"
+    assert sample["writer_id"] == "writer-a"
+    assert sample["verified"] is True
 
 
 def test_malformed_split_metadata_does_not_break_dataset_views(

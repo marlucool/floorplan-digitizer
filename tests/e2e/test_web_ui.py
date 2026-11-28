@@ -56,6 +56,9 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
                         "detector_loaded": False,
                         "ocr_available": False,
                         "dimension_chain_validation_available": True,
+                        "dimension_association_available": True,
+                        "manual_geometry_available": True,
+                        "automatic_geometry_available": False,
                         "geometry_available": False,
                     }
                 ),
@@ -78,14 +81,15 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             )
             def interpret_dimension(route) -> None:
                 text = json.loads(route.request.post_data or "{}").get("text", "")
-                if text == "2685 mm":
+                if text in {"2685 mm", "4,200 mm"}:
+                    value = "2685" if text == "2685 mm" else "4200"
                     route.fulfill(json={
                         "raw_text": text,
                         "status": "parsed",
                         "dimension_type": "linear",
-                        "value": "2685",
+                        "value": value,
                         "unit": "mm",
-                        "value_mm": "2685",
+                        "value_mm": value,
                         "reason": None,
                         "requires_review": True,
                     })
@@ -257,6 +261,8 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             )
             page.locator("#zoomIn").click()
             assert page.locator("#zoomLevel").inner_text() == "125%"
+            page.locator("details.advanced-options > summary").click()
+            assert page.locator("#confidenceValue").inner_text() == "0.25"
             page.locator("#brightnessControl").evaluate("(element) => { element.value = String(20); element.dispatchEvent(new Event('input', { bubbles: true })); }")
             page.locator("#contrastControl").evaluate("(element) => { element.value = String(1.25); element.dispatchEvent(new Event('input', { bubbles: true })); }")
             page.locator("#confidenceThreshold").evaluate(
@@ -270,16 +276,16 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.wait_for_function(
                 "!document.querySelector('#overlay').classList.contains('hidden')"
             )
-            page.wait_for_function("!document.querySelector('#runOcrButton').disabled")
-            page.locator("#runOcrButton").click()
             page.wait_for_selector(".ocr-suggestion")
             assert "4,200 mm" in page.locator(".ocr-suggestion").inner_text()
             assert "93%" in page.locator(".ocr-suggestion").inner_text()
-            assert "unverified" in page.locator(".ocr-suggestion").inner_text()
-            page.locator(".ocr-suggestion .toolbar-button").click()
+            assert "check against drawing" in page.locator(".ocr-suggestion").inner_text()
             assert page.locator(".dimension-text-value").input_value() == "4,200 mm"
+            page.wait_for_function("document.querySelector('.dimension-text-item').dataset.parsedValueMm === \"4200\"")
+            assert page.locator(".dimension-text-item").get_attribute("data-parsed-value-mm") == "4200"
             assert not page.locator(".dimension-text-verified-input").is_checked()
             page.locator("#fitView").click()
+            page.locator(".manual-calibration > summary").click()
             page.locator("#startCalibration").click()
             page.locator("#previewImage").click(position={"x": 50, "y": 100})
             page.locator("#previewImage").click(position={"x": 350, "y": 100})
@@ -414,6 +420,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert wall_check_request["pixels_per_mm"] > 0
             assert abs(wall_check_request["wall_length_px"] - 230.217) < 1
             assert wall_check_request["tolerance_percent"] == 1
+            page.locator(".dataset-capture-details > summary").click()
             page.locator("#drawingDatasetSelect").select_option("handwritten-dimensions")
             page.locator("#drawingSourceId").fill("plan-01")
             page.locator("#drawingWriterId").fill("writer-a")
@@ -425,6 +432,9 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert "handwritten" in crop_saved["body"]
             assert "plan-01" in crop_saved["body"]
             assert "writer-a" in crop_saved["body"]
+            assert page.locator(".dimension-line-select").input_value() == "det-002"
+            assert page.locator(".dimension-wall-span-select").input_value() == "0"
+            page.locator(".dimension-association-details > summary").click()
             page.locator(".dimension-line-select").select_option("det-002")
             page.locator(".dimension-wall-span-select").select_option("0")
             page.locator(".dimension-association-verified-input").check()
@@ -447,6 +457,11 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert submitted["overall_value"] == "7500"
             assert "Chain matches" in page.locator("#chainResult").inner_text()
 
+            page.locator(".use-dimension-scale").click()
+            assert "Scale derived from confirmed match: 2685 mm" in page.locator("#calibrationResult").inner_text()
+            assert "0.067039" in page.locator("#calibrationResult").inner_text()
+            assert page.locator("#calibrationState").inner_text() == "Applied"
+
             with page.expect_download() as download_info:
                 page.locator("#exportReview").click()
             download = download_info.value
@@ -462,11 +477,13 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert exported["analysis"]["confidence_threshold"] == 0.4
             assert exported["analysis"]["preprocessing"]["brightness"] == 20
             assert exported["analysis"]["preprocessing"]["contrast"] == 1.25
-            assert exported["calibration"]["method"] == "user_two_point_reference"
-            assert exported["calibration"]["input_unit"] == "m"
-            assert exported["calibration"]["known_distance_mm"] == 3500
+            assert exported["calibration"]["method"] == "verified_dimension_association"
+            assert exported["calibration"]["input_unit"] == "mm"
+            assert exported["calibration"]["known_distance_mm"] == 2685
+            assert exported["calibration"]["reference_dimension_text"] == "2685 mm"
+            assert exported["calibration"]["reference_dimension_id"] == "det-004"
             assert exported["calibration"]["pixels_per_mm"] > 0
-            assert exported["calibration"]["status"] == "user_supplied_reference_not_geometry_validation"
+            assert exported["calibration"]["status"] == "user_verified_association_reference_not_geometry_validation"
             assert exported["detections"][0]["bbox"]["x1"] == 100
             assert exported["manual_dimension_text_review"][0]["detection_id"] == "det-004"
             assert exported["manual_dimension_text_review"][0]["raw_text"] == "2685 mm"
@@ -512,6 +529,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert page.locator(".dimension-text-style").input_value() == "handwritten"
             assert page.locator(".dimension-text-verified-input").is_checked()
             assert page.locator(".dimension-association-verified-input").is_checked()
+            assert page.locator(".use-dimension-scale").is_enabled()
             assert page.locator("#calibrationState").inner_text() == "Applied"
             assert page.locator("#fileName").inner_text() == "plan.png"
             assert page.locator("#brightnessControl").input_value() == "20"

@@ -2,6 +2,16 @@
 
 The browser UI and local FastAPI service are one application. Start the server from the repository root; do not open the HTML file directly.
 
+## Documentation publishing
+
+The files in the repository's `docs/` directory are the source of truth for the documentation library. The static-site builder discovers the directory recursively and regenerates the documentation index and rendered reader pages during every GitHub Pages build; do not edit generated HTML in the published site.
+
+- A push to `main` rebuilds the public documentation library from the current `main/docs/` contents.
+- A pull request labelled `preview` gets a separate preview built from that PR's `docs/` contents. The preview is not the public site, and its changes are not public until the PR is merged.
+- Markdown links between files in `docs/` are rewritten to their rendered documentation pages. Images, PDFs, source files and other attachments remain available as supporting assets.
+
+If a documentation change is missing from the public site, first check whether the source file was committed under `docs/`, then check the latest **Desktop UI preview** GitHub Actions run and the Pages deployment. The builder does not maintain a separate hand-edited copy of the rendered pages.
+
 ## Start locally
 
 ```bash
@@ -17,7 +27,7 @@ Open http://127.0.0.1:8000. The default bind address is loopback-only. To make t
 2. The browser uploads the source to `POST /api/analyze`.
 3. The API decodes the image or rasterises the explicitly selected PDF page in memory, then runs the repository's `yolo_floorplan.pt` detector.
 4. The API returns source pixel dimensions, class counts, candidate bounding boxes, detector scores and a reduced preview.
-5. The UI draws the returned boxes over the preview. Use the zoom controls to inspect small annotations, Fit to return to the fitted view, the detector-threshold slider to trade off candidate recall against false positives, the class filter to narrow the list, and a detection row to highlight its box. The overlay can be hidden or shown independently of the detection list. The review toolbar also supports text search by candidate ID/class and sorting by detector score or region area. The workspace has section navigation, a persistent light/dark theme preference, and keyboard shortcuts (`Ctrl/Cmd+O` to choose a drawing, `Ctrl/Cmd+Enter` to analyse, and `Esc` to clear the current drawing). After analysis, `Export JSON` downloads a versioned candidate-review file with source pixel dimensions, bounding boxes and detector scores; it does not include the uploaded image or claim to contain measurements. The manual dimension-chain checker validates entered values with decimal arithmetic. When exactly one segment is blank, it can propose the arithmetic remainder only if the overall dimension and every known segment are marked verified. The proposal is inserted only after an explicit click and remains unchecked for manual confirmation; it is not OCR and does not associate values with detected walls.
+5. The UI draws the returned boxes over the preview. Use zoom, Fit, the detector threshold, class filter and detection list to inspect candidates. The review toolbar supports search and sorting. When the local PaddleOCR inference runtime is available, the Drawing workspace automatically sends the detected dimension crops (up to 30 per analysis) to the recogniser. OCR text is inserted into each dimension row and interpreted using the conservative unit parser; it remains an unverified draft. The geometric association stage ranks dimension-value boxes against dimension-line boxes and wall spans, then preselects its global best wall-gap match where one exists. Check the crop, text, line and wall pair, then explicitly confirm both the transcription and association. A confirmed linear dimension/span pair can derive a candidate pixel-to-mm scale directly from the span's pixel length. No match or scale is silently verified. The manual dimension-chain checker remains a separate arithmetic tool; it does not infer which drawing geometry a chain describes.
 
 The application does not intentionally save an uploaded drawing as a project file. However, FastAPI/Starlette receive multipart uploads using a spooled temporary file: smaller uploads may remain in memory, while larger uploads can roll over to temporary disk storage before this endpoint reads them. The endpoint then reads the file into memory for decoding and closes the upload. For raster images, Pillow checks the header dimensions against the pixel limit before OpenCV allocates the decoded raster; the limit is checked again after decode. PDF page dimensions are checked before rasterisation. Therefore, this is **not a guarantee of memory-only handling**. Review the operating-system temporary directory, container storage, reverse-proxy buffering, server logs and browser caches before processing sensitive drawings. The 25 MB application check is performed after multipart parsing, so it is not a pre-parser disk-spooling limit.
 
@@ -54,25 +64,30 @@ On macOS/Linux, install requirements-desktop.txt and run sh run_planline_desktop
 5. Reuse the same source ID for all crops from the same drawing. Use a stable pseudonymous writer ID for one handwriting author when evaluating generalisation across writers.
 6. Review, correct or delete saved labels in the sample library. Any label/group change invalidates the previous split plan.
 
-Only the selected crop is sent to the local API. The full input scan stays in the browser. The Drawing workspace can also send an individual dimension crop directly into a selected OCR dataset after its transcription is manually verified. Saved crop images and manifests are written below datasets/ocr/ for source/development runs. Installed Windows builds use %LOCALAPPDATA%/Planline/ocr, outside the application folder. The OCR Studio endpoint accepts raster images only; add PDF pages through the drawing workflow or rasterise the desired page locally before adding it as an image. Do not commit personal property information or complete source plans into the repository.
+Normal crop annotation sends only the selected crop to the local API; the full scan stays in the browser. For bulk capture, OCR Studio can also import a Drawing review JSON together with its exact source raster and extract only the non-empty, verified crops whose bounds are recorded in that review. That optional operation sends the source raster to the local API for local crop extraction; it does not upload it to a remote service. The Drawing workspace can still save individual verified crops. OCR Studio also imports a ZIP containing one annotation CSV and its referenced crop images, and exports the current verified dataset plus split metadata without training checkpoints or logs. Saved crop images and manifests are written below datasets/ocr/ for source/development runs. Installed Windows builds use %LOCALAPPDATA%/Planline/ocr, outside the application folder. Bulk review import accepts raster images; rasterise PDF pages locally first. Do not commit personal property information or complete source plans into the repository.
 
 ### Training and evaluation
 
-The first Windows installer does not yet provision the optional PaddlePaddle/PaddleOCR fine-tuning runtime. Fine-tuning needs a separately managed compatible Python environment, a PaddleOCR source checkout and a matching PP-OCRv5 .pdparams checkpoint. The intended user experience is an in-app setup wizard rather than manual package commands; until that wizard ships, training is not ready for one-click use. The mobile recogniser and a conservative batch size are the initial low-VRAM option; the server model has a higher memory requirement.
+The Windows installer provisions the compatible PaddlePaddle and PaddleOCR inference runtime in Planline's private Python environment. OCR Studio can prepare the pinned PaddleOCR source checkout and matching PP-OCRv5 pretrained checkpoint on demand for fine-tuning; those larger training assets are not bundled with the installer. The mobile recogniser is the initial low-memory option; the server model has higher memory requirements.
 
-Build drawing-safe splits before training. Samples sharing a source drawing or writer ID are kept in one connected group so crops from one drawing/author cannot leak across train, validation and test. Fine-tuning receives train and validation data only; the held-out test split is excluded from optimisation. Benchmark runs generate predictions and calculate exact full-string match, prediction coverage and character error rate on the held-out test group.
+Build drawing-safe splits before training. Samples sharing a source drawing or writer ID are kept in one connected group so crops from one drawing/author cannot leak across train, validation and test. Fine-tuning receives train and validation data only; the held-out test split is excluded from optimisation. Benchmark runs generate predictions and calculate exact full-string match, prediction coverage and character error rate on the held-out test group. Training and benchmark job status, progress and recent logs are written alongside each run; reloading the browser reconnects to an active local job, while restarting the application marks unfinished jobs as interrupted and preserves their logs and output files.
 
-A small number of crops validates the workflow, not model quality. No claim of useful recognition accuracy is made until representative, independent drawings have been labelled and the model has been evaluated on a sufficiently varied held-out set. All OCR predictions remain candidates; this workbench does not associate a dimension with a wall, calibrate scale or generate measured CAD geometry.
+A small number of crops validates the workflow, not model quality. No claim of useful recognition accuracy is made until representative, independent drawings have been labelled and the model has been evaluated on a sufficiently varied held-out set. OCR Studio manages training data and models; the Drawing workspace performs geometric candidate association and can derive a candidate scale from a confirmed dimension/span pair. Neither workspace automatically reconstructs measured CAD geometry.
 
 ## Manual geometry export
 
-The Drawing workspace can export user-authored wall segments and closed room outlines as SVG or DXF. DXF is a 2D AutoCAD R2000-compatible ASCII file with separate `WALLS` and `ROOMS` layers. When a user-supplied two-point scale is present, coordinates are converted to millimetres and `$INSUNITS` is set accordingly; without calibration, the DXF is unitless and retains source-pixel distances. Image Y coordinates are flipped into CAD Cartesian coordinates. Only manual geometry is exported: detector boxes, OCR suggestions and calculated dimension candidates are never promoted to walls or rooms. This export is not a dimension-constrained or verified CAD reconstruction.
+The Drawing workspace can export user-authored wall segments and closed room outlines as SVG or DXF. DXF is a 2D AutoCAD R2000-compatible ASCII file with separate `WALLS` and `ROOMS` layers. When a manual two-point scale or a scale derived from a confirmed dimension/span association is present, coordinates are converted to millimetres and `$INSUNITS` is set accordingly; without calibration, the DXF is unitless and retains source-pixel distances. Image Y coordinates are flipped into CAD Cartesian coordinates. Only manual geometry is exported: detector boxes, OCR suggestions and calculated dimension candidates are never promoted to walls or rooms. This export is not a dimension-constrained or verified CAD reconstruction.
 
 ## API
 
 - `GET /api/health` — lightweight service/model readiness status; does not load the detector.
 - `POST /api/analyze` — candidate-region detection for one uploaded file. Optional multipart field `confidence_threshold` defaults to `0.25` and must be in `(0, 1]`; the UI exposes a narrower `0.05–0.80` range.
-- `POST /api/validate-dimension-chain` — arithmetic check for explicitly supplied dimension values and verification flags. This does not run OCR or associate dimensions with walls.
+- `POST /api/ocr/recognize-review` — recognition-only OCR for dimension crops from a review export; the Drawing UI calls it automatically when the local OCR runtime is ready.
+- `POST /api/ocr/datasets/{id}/import-review` — bulk-import verified crops from a review JSON and its matching raster image.
+- `POST /api/ocr/datasets/{id}/import-archive` and `GET /api/ocr/datasets/{id}/export` — transfer verified crop datasets through a bounded, path-checked ZIP archive.
+- `GET /api/ocr/jobs` — list recent persisted OCR training and benchmark jobs; `GET /api/ocr/jobs/{id}` retrieves an individual job.
+- `POST /api/interpret-dimension` — conservative parsing of explicitly written metric/imperial dimension strings.
+- `POST /api/validate-dimension-chain` — arithmetic check for explicitly supplied dimension values and verification flags. This remains separate from geometric association.
 - `GET /docs` — interactive FastAPI/OpenAPI documentation.
 - `GET /architecture` — renders the maintained architecture, implementation status, research findings and roadmap as a themed HTML page.
 
@@ -84,9 +99,9 @@ The **Export JSON** button is enabled after an analysis result is returned. It d
 - Original source filename and source pixel dimensions.
 - Detector name, confidence threshold and pixel-coordinate convention.
 - Per-class counts and candidate IDs, classes, confidence scores, bounding boxes and centres.
-- Explicit limitations stating that OCR, dimension association, scale calibration and measured DXF generation have not occurred.
+- Explicit limitations that distinguish OCR suggestions, candidate associations, confirmed review state, candidate scale and the absence of measured DXF reconstruction.
 
-The export intentionally excludes the uploaded image and crop pixels. It includes user-entered dimension-text transcriptions with source detection IDs, a printed/handwritten/unclear style label and verification flags, but not manual dimension-chain entries. It is a review/interchange artifact, not a CAD file or verified measurement record. The version 1 contract is defined in [the JSON Schema](../schemas/planline-detection-review-v1.schema.json).
+The export intentionally excludes the uploaded image and crop pixels. It includes OCR drafts and/or corrected dimension text, parser results, source detection IDs, writing-style and verification flags, association candidates and reviewer selections, calibration provenance and limitations. It is a review/interchange artifact, not a CAD file or verified reconstruction. The version 1 contract is defined in [the JSON Schema](../schemas/planline-detection-review-v1.schema.json).
 
 ### Manual dimension-chain validation
 
@@ -110,24 +125,24 @@ The response status is one of:
 - `needs_review` — values are present, but one or more are not verified;
 - `unresolved` — a segment or overall value is missing.
 
-Values use decimal arithmetic. The endpoint does not parse OCR text, convert units, infer missing values, associate dimensions with geometry, or enable DXF export. The caller must supply one consistent unit for the entire chain; the API does not verify that the drawing actually uses that unit. The dimension-value crop panel is for manual transcription only; entries are user-entered text and are not OCR output. Crops are taken from the original raster with padding and bounded to a maximum 384-pixel edge; at most 30 candidates receive crops per analysis. Crop pixels are not embedded in the review JSON export.
+Values use decimal arithmetic. The endpoint does not parse OCR text, convert units, infer missing values, associate dimensions with geometry, or enable DXF export. The caller must supply one consistent unit for the entire chain; the API does not verify that the drawing actually uses that unit. The dimension-value crop panel receives OCR draft text when the local recogniser is available; reviewers can correct it manually. Parsed values and OCR output remain unverified until checked. Crops are taken from the original raster with padding and bounded to a maximum 384-pixel edge; at most 30 candidates receive crops per analysis. Crop pixels are not embedded in the review JSON export.
 
 ## What is and is not implemented
 
 | Capability | Status |
 |---|---|
 | Image import and preview | Implemented |
-| First-page PDF rasterisation | Implemented; multi-page selection is not |
+| Multi-page PDF rasterisation | Implemented; select a page before analysis; password-protected PDFs are rejected |
 | YOLO candidate detection | Implemented when the tracked weights are present |
 | Detection list, class filter, box selection | Implemented in the UI |
-| Manual transcription of dimension-value crops in drawing review | Implemented; user-entered text only, not OCR |
+| Dimension OCR in drawing review | Automatically runs on detected dimension crops when local PaddleOCR is available; OCR drafts are interpreted but never verified automatically |
 | OCR Studio crop annotation and verified label library | Implemented at /ocr; only selected raster crops are uploaded |
 | Source/writer-grouped splits and OCR dataset audit | Implemented; held-out test set remains separate |
 | PP-OCRv5 fine-tuning and benchmark orchestration | Implemented; requires local PaddlePaddle/PaddleOCR dependencies and checkpoint |
-| Automatic OCR of all drawing detections in the main drawing workflow | Not implemented; OCR Studio currently captures human-selected crops |
-| Dimension-to-wall association | Not implemented |
+| Automatic OCR of all drawing text across the entire sheet | Not implemented; OCR runs on YOLO dimension-value crops only, up to 30 per analysis |
+| Dimension-value → dimension-line → wall-span association | Geometric candidates ranked and global best match preselected; axis-aligned box heuristic, reviewer confirmation required |
 | Dimension-chain constraint solving | Not implemented |
-| Scale calibration from written dimensions | Not implemented |
+| Scale from a written dimension | Candidate scale derived from a verified text and reviewer-confirmed wall-span association; multi-dimension reconciliation is not implemented |
 | Measured 2D reconstruction | Not implemented |
 | Verified DXF export | Not implemented; intentionally unavailable |
 
@@ -274,14 +289,14 @@ crops/plan-b-001.png,3.65m,plan-b,writer-02,handwritten,true
 crops/plan-c-001.png,1800,plan-c,writer-03,handwritten,true
 ~~~
 
-- image is a path relative to the CSV file (or an absolute path).
+- image is a path relative to the CSV file (or an absolute path for local CLI imports). For the OCR Studio ZIP importer, keep paths relative and include the referenced image files in the same ZIP.
 - text is the exact visible string; preserve decimal marks and units rather than normalising them.
 - source_id must be the same for every crop from the same drawing.
 - writer_id is optional but should be a stable pseudonymous ID when known. Do not use a person's real name. Samples with the same writer_id are kept in the same split, even across different drawings. If every crop is from one writer, keeping that writer_id will intentionally make one group and prevent an independent split. You can omit writer_id to measure generalisation to unseen drawings by that same writer, but that will not test generalisation to new handwriting styles.
 - text_style is handwritten, printed, unclear or unknown. The default import selects handwritten rows.
 - verified must be true only after the label has been checked against the source.
 
-Import, validate and split:
+For the UI, place the CSV and its crop images in one ZIP, then use **Import CSV + crop ZIP** in OCR Studio. Choose handwritten, printed or all verified styles. The ZIP must contain exactly one CSV; image paths must resolve inside the archive. Alternatively, import, validate and split from the CLI:
 
 ~~~bash
 python -m planline.dataset import-csv --annotations crops.csv --output-dir datasets/handwriting
@@ -326,7 +341,7 @@ python -m playwright install chromium
 python -m pytest -q tests/e2e
 ```
 
-The browser test exercises local image preview, zoom controls and the manual dimension-chain checker with API responses stubbed. It does not validate YOLO accuracy or OCR.
+The browser test exercises automatic OCR draft insertion and parsing, candidate association preselection, manual confirmation, scale derivation, project save/restore and geometry tools with API responses stubbed. It does not validate real YOLO or PaddleOCR accuracy.
 
 The automated tests use a fake detector. Passing them verifies API behaviour and serialization, not the accuracy of the real model. A separate smoke test with the actual weights and representative scans is still required.
 

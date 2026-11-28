@@ -8,8 +8,10 @@ automatically; users can explicitly save portable project files. Multipart parsi
 from __future__ import annotations
 
 import base64
+import importlib.util
 import io
 import math
+import sys
 import warnings
 from functools import lru_cache
 from pathlib import Path
@@ -310,8 +312,16 @@ def health() -> dict[str, Any]:
         "version": app.version,
         "detector_weights_present": DETECTOR_PATH.is_file(),
         "detector_loaded": get_detector.cache_info().currsize > 0,
-        "ocr_available": False,
+        "ocr_available": (
+            sys.version_info.major == 3
+            and 9 <= sys.version_info.minor <= 13
+            and importlib.util.find_spec("paddle") is not None
+            and importlib.util.find_spec("paddleocr") is not None
+        ),
         "dimension_chain_validation_available": True,
+        "dimension_association_available": True,
+        "manual_geometry_available": True,
+        "automatic_geometry_available": False,
         "geometry_available": False,
     }
 
@@ -469,7 +479,7 @@ async def analyze_drawing(
     height, width = processed_image.shape[:2]
     notes = [
         "Detected boxes are candidate regions, not recognised measurements.",
-        "OCR has not run. Read and verify every dimension against the source drawing.",
+        "The API returns before OCR; the Drawing UI runs local OCR automatically when its inference runtime is available. Readings remain unverified.",
         "Geometric association candidates rank dimension-value boxes against dimension lines and wall pairs; they are unconfirmed hypotheses, not verified measurements.",
         "Association scores are relative geometric-fit rankings, not probabilities or measurement confidence.",
         "No pixel-to-millimetre scale has been inferred.",
