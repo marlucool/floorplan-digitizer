@@ -820,12 +820,12 @@ def test_ocr_studio_ignores_stale_training_asset_and_dataset_responses() -> None
             page = browser.new_page()
             page.goto(f"http://127.0.0.1:{server.server_port}/ocr.html", wait_until="domcontentloaded")
 
-            page.wait_for_request(lambda request: "/api/ocr/training-assets?model_variant=mobile" in request.url)
+            page.wait_for_event("request", predicate=lambda request: "/api/ocr/training-assets?model_variant=mobile" in request.url)
             page.locator("#modelVariant").select_option("server")
             page.wait_for_function("document.querySelector('#pretrainedPath')?.value === '/models/server'")
 
             # The delayed mobile response must not overwrite the newer server selection.
-            page.wait_for_request(lambda request: request.url.endswith("/api/ocr/datasets/dataset-one"))
+            page.wait_for_event("request", predicate=lambda request: request.url.endswith("/api/ocr/datasets/dataset-one"))
             assert page.locator("#pretrainedPath").input_value() == "/models/server"
 
             # Select another dataset while the first dataset's detail request is still pending.
