@@ -1588,7 +1588,7 @@ async function exportManualGeometryDxf() {
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     $("#geometryStatus").textContent = hasReconstructionScale
-      ? "DXF exported in millimetres using confirmed X/Y dimension scales. Detected wall edges are on DETECTED_WALL_DRAFT and still require review."
+      ? "DXF exported in millimetres using confirmed X/Y dimension scales. Detected wall edges are on DETECTED_WALL_DRAFT; reviewed opening markers are on DOORS, WINDOWS or OPENINGS."
       : payload.pixels_per_mm
         ? "DXF exported in millimetres using the user-supplied, unverified scale."
         : "DXF exported with unitless source-pixel coordinates. Apply scale calibration for metric units.";
@@ -2753,7 +2753,7 @@ async function saveProject() {
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1500);
-  showNotice("Project saved", "The source drawing, review, manual linework and any dimension-driven wall draft with its X/Y scales were packaged into a local .planline file. Nothing was uploaded.");
+  showNotice("Project saved", "The source drawing, review, wall geometry, room polygons, opening markers and dimension-driven draft with its X/Y scales were packaged into a local .planline file. Nothing was uploaded.");
 }
 
 function restoreProjectReview(review) {
@@ -3032,7 +3032,7 @@ async function openProjectFile(file) {
     renderGeometryControls();
     restoreProjectReview(project.review);
     $("#saveProject").disabled = false;
-    showNotice("Project opened", "The source drawing, previous analysis, manual transcriptions, associations and calibration were restored locally.");
+    showNotice("Project opened", "The source drawing, previous analysis, manual transcriptions, wall and room geometry, opening markers, associations and calibration were restored locally.");
   } catch (error) {
     showNotice("Could not open project", error.message || "The project file is damaged or uses an unsupported version.");
   } finally {
