@@ -363,8 +363,18 @@ def documentation_asset(doc_path: str) -> FileResponse:
         source_path = safe_document_path(ROOT_DIR / "docs", doc_path)
     except (FileNotFoundError, OSError):
         raise HTTPException(status_code=404, detail="Documentation asset not found.") from None
+    relative_path = source_path.relative_to(ROOT_DIR / "docs").as_posix()
+    document = next(
+        (item for item in discover_documents(ROOT_DIR / "docs") if item["path"] == relative_path),
+        None,
+    )
+    if document is None:
+        raise HTTPException(status_code=404, detail="Documentation asset not found.")
     media_type = mimetypes.guess_type(source_path.name)[0] or "application/octet-stream"
-    return FileResponse(source_path, media_type=media_type)
+    # Source files (including HTML) must download instead of executing in the
+    # application's origin. Images and PDFs remain inline for the document viewer.
+    filename = source_path.name if document["kind"] in {"source", "download"} else None
+    return FileResponse(source_path, media_type=media_type, filename=filename)
 
 
 @app.get("/api/health")
