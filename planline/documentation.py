@@ -149,6 +149,7 @@ def _document_catalog_html(
     *,
     static_site: bool,
     current_output_path: str,
+    active_path: str | None = None,
 ) -> str:
     groups = (
         "Guides and technical references",
@@ -170,8 +171,10 @@ def _document_catalog_html(
                 )
             else:
                 destination = f"/documentation/{quote(item['path'], safe='/')}"
+            active_class = " is-active" if item["path"] == active_path else ""
+            aria_current = ' aria-current="page"' if item["path"] == active_path else ""
             rows.append(
-                f'<a class="documentation-file" href="{html.escape(destination, quote=True)}" '
+                f'<a class="documentation-file{active_class}" href="{html.escape(destination, quote=True)}"{aria_current} '
                 f'data-search="{html.escape((item["title"] + " " + item["path"] + " " + item["kind"]).casefold(), quote=True)}">'
                 f'<span class="documentation-file-icon" aria-hidden="true">{_file_symbol(item["kind"])}</span>'
                 f'<span class="documentation-file-name"><strong>{html.escape(item["title"])}</strong>'
@@ -470,6 +473,7 @@ def render_document_page(
         documents,
         static_site=static_site,
         current_output_path=current_output_path,
+        active_path=path,
     )
     source_link_attributes = (
         "download"
