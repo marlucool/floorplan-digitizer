@@ -123,6 +123,9 @@ class OCRDatasetListRaceHandler(OCRRaceHandler):
         return super().do_GET()
 
     def do_POST(self) -> None:
+        length = int(self.headers.get("Content-Length", "0"))
+        if length:
+            self.rfile.read(length)
         if urlparse(self.path).path == "/api/ocr/datasets":
             return self._json({"dataset_id": "dataset-two", "summary": {"samples": 2}})
         self.send_error(404)
