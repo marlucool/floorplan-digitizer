@@ -62,7 +62,12 @@ def discover_documents(docs_root: Path) -> list[dict[str, Any]]:
         return []
     documents: list[dict[str, Any]] = []
     for source in sorted(root.rglob("*"), key=lambda item: item.as_posix().casefold()):
-        if not source.is_file():
+        # Do not follow symlinks: a docs entry must never expose files outside
+        # the documentation tree through titles, sizes, previews or downloads.
+        if source.is_symlink() or not source.is_file():
+            continue
+        resolved_source = source.resolve()
+        if not resolved_source.is_relative_to(root):
             continue
         relative = source.relative_to(root)
         if any(part.startswith(".") for part in relative.parts):
