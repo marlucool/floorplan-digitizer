@@ -248,9 +248,8 @@ def test_reconstruction_endpoint_rejects_missing_axis_measurement() -> None:
 def test_reconstruction_rejects_reusing_one_dimension_value_for_multiple_spans() -> None:
     dimensions = [item.model_dump() for item in sample_request().dimensions]
     dimensions[1]["detection_id"] = "value-x"
-    request = sample_request(dimensions=dimensions)
     with pytest.raises(ValueError, match="can only be used once"):
-        reconstruct_wall_edges(request)
+        sample_request(dimensions=dimensions)
 
 
 def test_reconstruction_rejects_dimension_entry_that_is_not_a_value_detection() -> None:
