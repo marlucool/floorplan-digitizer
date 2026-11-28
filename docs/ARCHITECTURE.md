@@ -8,23 +8,23 @@ Scanned plans may be rotated, skewed, faded, low-resolution or drawn approximate
 
 A value that is unreadable, ambiguous, unassociated, contradictory or insufficient to constrain the plan must remain unresolved and be presented for review. Do not silently invent dimensions or close gaps by visual guesswork.
 
-## Current implementation
+## Current implementation (reviewed 2026-11-28)
 
 The active application is served from the root web/ directory by the local FastAPI service in planline/api.py.
 
 | Component | Current state |
 | --- | --- |
 | Browser workspace | Implemented: source preview, detector overlay, zoom, threshold control, class filter, detection selection and review crops |
-| Upload/decode | Implemented for raster files and first-page PDF rasterisation, with file-size and pixel limits |
+| Upload/decode | Implemented for raster files and explicit multi-page PDF selection, with file-size and pixel limits |
 | Feature detection | Implemented: bundled YOLO weights produce candidate wall, dimension-line and dimension-value regions |
 | Candidate review export | Implemented: versioned JSON schema with source metadata, boxes, class scores and review transcriptions |
-| Manual dimension transcription | Implemented as reviewer-entered text associated with a detector candidate; this is not OCR |
+| Manual dimension transcription | Implemented as reviewer-entered text associated with a detector candidate; local PaddleOCR can also supply unverified draft suggestions when its runtime is available |
 | Dimension-chain arithmetic | Implemented as a separate API endpoint for explicit values, verification flags, units and tolerance |
-| OCR runner | Optional standalone PaddleOCR crop recogniser; not wired into the web analysis endpoint |
+| OCR inference | Local PaddleOCR runs on detected dimension crops when its runtime is available; results remain unverified drafts and require review |
 | OCR evaluation | Implemented for review exports and curated crop datasets; dataset mode scores the held-out split by default |
 | Dataset inference | Optional PaddleOCR runner can recognise crops from a validated local manifest |
-| Handwriting crop curation | Implemented as a local CLI for verified review crops or manually cropped images, manifest validation and source/writer-grouped splits |
-| Dimension association | Uses local parallel-wall gaps, value/line alignment, facing wall-box edges, and global one-to-one text-to-wall-gap assignment (dimension-line detections may be shared by chained labels); explicit human confirmation required |
+| OCR Studio | Crop editor, verified-label library, bulk review import, CSV-plus-image ZIP import/export, source/writer-safe splits, quality audits, training and benchmark job monitoring |
+| Dimension association | Ranks text-to-line and line-to-wall-gap candidates using local geometry and global assignment; chained labels can share a line; reviewer confirmation is required |
 | Metric reconstruction | Not implemented |
 | Verified CAD export | Not implemented in the web application |
 
@@ -35,16 +35,17 @@ The old command-line pipeline (main.py, model.py, ocr.py, dxf_export.py) remains
 ```mermaid
 flowchart TD
   A[Scanned plan] --> B[Local browser upload]
-  B --> C[Bounded image or first-page PDF decode]
+  B --> C[Bounded image or selected PDF page decode]
   C --> D[YOLO candidate detection]
   D --> E[Boxes, class scores and bounded crops]
-  E --> F[Human inspection and manual transcription]
-  F --> G[Versioned review JSON]
-  F --> H[Optional offline OCR runner]
-  H --> I[OCR predictions JSON]
-  G --> J[OCR evaluation against verified labels]
-  J --> K[Metrics by text style]
-  F --> L[Manual dimension-chain validator]
+  E --> F[Local PaddleOCR draft suggestions when runtime is available]
+  F --> G[Human inspection, correction and verification]
+  E --> G
+  G --> H[Versioned review JSON]
+  H --> I[OCR evaluation against verified labels]
+  I --> J[Metrics by text style]
+  G --> K[Dimension association review]
+  G --> L[Manual dimension-chain validator]
   L --> M[Match, mismatch, needs review or unresolved]
 ```
 
@@ -66,7 +67,7 @@ The current data flow now includes a geometric association review stage inspired
 
 The first OCR target is dimension numerals and numeric annotations, not every English word on the page. Room names, title blocks and general notes can be deferred until there is an evaluated reason to include them.
 
-The optional PaddleOCR runner provides a recognition-only baseline on review crops and curated dataset images. The evaluator can score review-export detection IDs or dataset crop IDs; curated-dataset evaluation defaults to the source/writer-grouped held-out test split. Output remains raw and unverified until a person checks it. Compare it with other compact printed-numeral and handwriting recognisers on the same held-out crops. Do not allow contextual reasoning to silently overwrite the characters read from the source image.
+When the local PaddleOCR inference runtime is available, the Drawing workflow runs recognition on detected dimension crops and inserts the result as an unverified draft. The reviewer must correct or confirm every suggestion. The standalone runner remains available for repeatable recognition/evaluation of review crops and curated datasets. The evaluator can score review-export detection IDs or dataset crop IDs; curated-dataset evaluation defaults to the source/writer-grouped held-out test split. Output remains raw and unverified until a person checks it. Compare it with other compact printed-numeral and handwriting recognisers on the same held-out crops. Do not allow contextual reasoning to silently overwrite the characters read from the source image.
 
 ## Data and evaluation
 
