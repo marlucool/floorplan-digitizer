@@ -2,6 +2,16 @@
 
 The browser UI and local FastAPI service are one application. Start the server from the repository root; do not open the HTML file directly.
 
+## Documentation publishing
+
+The files in the repository's `docs/` directory are the source of truth for the documentation library. The static-site builder discovers the directory recursively and regenerates the documentation index and rendered reader pages during every GitHub Pages build; do not edit generated HTML in the published site.
+
+- A push to `main` rebuilds the public documentation library from the current `main/docs/` contents.
+- A pull request labelled `preview` gets a separate preview built from that PR's `docs/` contents. The preview is not the public site, and its changes are not public until the PR is merged.
+- Markdown links between files in `docs/` are rewritten to their rendered documentation pages. Images, PDFs, source files and other attachments remain available as supporting assets.
+
+If a documentation change is missing from the public site, first check whether the source file was committed under `docs/`, then check the latest **Desktop UI preview** GitHub Actions run and the Pages deployment. The builder does not maintain a separate hand-edited copy of the rendered pages.
+
 ## Start locally
 
 ```bash
