@@ -42,7 +42,7 @@
     const dark = theme !== "light";
     const value = dark ? "dark" : "light";
     root.dataset.theme = value;
-    if (meta) meta.content = dark ? "#07090f" : "#f5f6fb";
+    if (meta) meta.content = dark ? "#151c17" : "#f4f3ec";
     if (button) {
       button.innerHTML = dark ? sun : moon;
       button.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
