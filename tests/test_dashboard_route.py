@@ -29,6 +29,7 @@ def test_all_workspaces_use_shared_theme_control_and_navigation() -> None:
         response = client.get(path)
         assert response.status_code == 200
         assert 'id="themeToggle"' in response.text
+        assert 'href="/documentation"' in response.text
         assert 'src="/theme.js" defer' in response.text
         assert 'href="/" aria-label="Planline dashboard"' in response.text
         assert 'href="/styles.css"' in response.text
