@@ -914,3 +914,258 @@ def test_ocr_job_status_polling_never_overlaps_requests() -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None:
+    web_dir = Path(__file__).resolve().parents[2] / "web"
+    handler = partial(QuietHandler, directory=str(web_dir))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    image_data = make_png(400, 300)
+    preview_url = "data:image/png;base64," + base64.b64encode(image_data).decode("ascii")
+
+    detections = [
+        {"id":"det-001","class_name":"wall","confidence":0.95,"bbox":{"x1":50,"y1":50,"x2":60,"y2":250,"width":10,"height":200},"centre":{"x":55,"y":150}},
+        {"id":"det-002","class_name":"wall","confidence":0.94,"bbox":{"x1":220,"y1":50,"x2":230,"y2":250,"width":10,"height":200},"centre":{"x":225,"y":150}},
+        {"id":"det-003","class_name":"dimension_line","confidence":0.92,"bbox":{"x1":40,"y1":60,"x2":240,"y2":64,"width":200,"height":4},"centre":{"x":140,"y":62}},
+        {"id":"det-004","class_name":"dimension_value","confidence":0.91,"bbox":{"x1":110,"y1":25,"x2":170,"y2":45,"width":60,"height":20},"centre":{"x":140,"y":35}},
+        {"id":"det-005","class_name":"wall","confidence":0.93,"bbox":{"x1":60,"y1":40,"x2":220,"y2":50,"width":160,"height":10},"centre":{"x":140,"y":45}},
+        {"id":"det-006","class_name":"wall","confidence":0.92,"bbox":{"x1":60,"y1":230,"x2":220,"y2":240,"width":160,"height":10},"centre":{"x":140,"y":235}},
+        {"id":"det-007","class_name":"dimension_line","confidence":0.90,"bbox":{"x1":55,"y1":45,"x2":59,"y2":235,"width":4,"height":190},"centre":{"x":57,"y":140}},
+        {"id":"det-008","class_name":"dimension_value","confidence":0.89,"bbox":{"x1":15,"y1":110,"x2":40,"y2":170,"width":25,"height":60},"centre":{"x":27.5,"y":140}},
+    ]
+    horizontal_association = {
+        "dimension_value_id":"det-004","status":"candidate","confirmed":False,
+        "candidate_lines":[{
+            "dimension_line_id":"det-003","orientation":"horizontal","score":0.93,
+            "assignment_score":0.93,"wall_span_status":"candidate",
+            "wall_spans":[{
+                "wall_ids":["det-001","det-002"],"orientation":"horizontal",
+                "method":"between_vertical_walls","span_px":160,"score":0.93,
+                "assignment_score":0.93,"globally_assigned":True,
+                "globally_assigned_to":"det-004","gap_center_px":140,
+                "text_center_offset_px":0,"line_center_offset_px":0,
+                "endpoint_residual_px":0,"perpendicular_offset_px":0,
+                "intervening_wall_count":0
+            }]
+        }]
+    }
+    vertical_association = {
+        "dimension_value_id":"det-008","status":"candidate","confirmed":False,
+        "candidate_lines":[{
+            "dimension_line_id":"det-007","orientation":"vertical","score":0.92,
+            "assignment_score":0.92,"wall_span_status":"candidate",
+            "wall_spans":[{
+                "wall_ids":["det-005","det-006"],"orientation":"vertical",
+                "method":"between_horizontal_walls","span_px":180,"score":0.92,
+                "assignment_score":0.92,"globally_assigned":True,
+                "globally_assigned_to":"det-008","gap_center_px":140,
+                "text_center_offset_px":0,"line_center_offset_px":0,
+                "endpoint_residual_px":0,"perpendicular_offset_px":0,
+                "intervening_wall_count":0
+            }]
+        }]
+    }
+    dimension_regions = [
+        {"id":"det-004","class_name":"dimension_value","bbox":detections[3]["bbox"],
+         "confidence":0.91,"association":horizontal_association,
+         "crop_bbox":{"x1":105,"y1":20,"x2":175,"y2":50,"width":70,"height":30},
+         "crop_data_url":preview_url},
+        {"id":"det-008","class_name":"dimension_value","bbox":detections[7]["bbox"],
+         "confidence":0.89,"association":vertical_association,
+         "crop_bbox":{"x1":10,"y1":105,"x2":45,"y2":175,"width":35,"height":70},
+         "crop_data_url":preview_url}
+    ]
+
+    segments = []
+    wall_boxes = {
+        "det-001": (50,50,60,250,"vertical"),
+        "det-002": (220,50,230,250,"vertical"),
+        "det-005": (60,40,220,50,"horizontal"),
+        "det-006": (60,230,220,240,"horizontal"),
+    }
+    for wall_id, (x1,y1,x2,y2,orientation) in wall_boxes.items():
+        if orientation == "horizontal":
+            edges = [({"x":x1,"y":y1},{"x":x2,"y":y1}),({"x":x1,"y":y2},{"x":x2,"y":y2})]
+        else:
+            edges = [({"x":x1,"y":y1},{"x":x1,"y":y2}),({"x":x2,"y":y1},{"x":x2,"y":y2})]
+        for face_index,(start_point,end_point) in enumerate(edges,1):
+            segments.append({
+                "id":f"reconstructed-wall-{len(segments)+1:04d}",
+                "type":"wall_segment","start_px":start_point,"end_px":end_point,
+                "source_page_index":0,"created_by_reconstruction":True,
+                "source_detection_id":wall_id,"detector_confidence":0.94,
+                "wall_orientation":orientation,"wall_face_index":face_index
+            })
+    reconstruction_payload = {
+        "status":"draft","geometry_kind":"detected_wall_face_edges",
+        "segments":segments,
+        "scale":{
+            "pixels_per_mm_x":0.04,"pixels_per_mm_y":0.06,
+            "source":"confirmed_dimension_to_wall_associations"
+        },
+        "measurements":[
+            {"detection_id":"det-004","raw_text":"4000 mm","value_mm":4000,
+             "unit":"mm","dimension_line_id":"det-003","wall_ids":["det-001","det-002"],
+             "orientation":"horizontal","axis":"x","span_px":160,
+             "pixels_per_mm":0.04,"association_score":0.93},
+            {"detection_id":"det-008","raw_text":"3000 mm","value_mm":3000,
+             "unit":"mm","dimension_line_id":"det-007","wall_ids":["det-005","det-006"],
+             "orientation":"vertical","axis":"y","span_px":180,
+             "pixels_per_mm":0.06,"association_score":0.92}
+        ],
+        "skipped_dimensions":[],"skipped_walls":[],"wall_regions_used":4,
+        "warnings":[
+            "This is editable draft wall-face linework, not a verified construction drawing.",
+            "Wall junctions, doors, windows, rooms and diagonal walls are not reconstructed.",
+            "Inspect every generated edge against the source scan."
+        ]
+    }
+    requests: dict[str, object] = {}
+    downloads_seen: list[str] = []
+
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            page = browser.new_page()
+            page_errors: list[str] = []
+            page.on("pageerror", lambda error: page_errors.append(str(error)))
+
+            def api_handler(route) -> None:
+                request=route.request
+                path=urlparse(request.url).path
+                method=request.method
+                if path=="/api/health":
+                    route.fulfill(json={
+                        "status":"ok","detector_weights_present":True,
+                        "ocr_available":False,"dimension_association_available":True,
+                        "dimension_chain_validation_available":True,
+                        "manual_geometry_available":True,"automatic_geometry_available":False
+                    })
+                elif path=="/api/ocr/status":
+                    route.fulfill(json={
+                        "paddle_installed":False,"paddleocr_installed":False,
+                        "inference_runtime_ready":False,"training_runtime_ready":False,
+                        "paddle_cuda_available":False,"training_note":"OCR runtime not installed."
+                    })
+                elif path=="/api/ocr/models":
+                    route.fulfill(json={"models":[]})
+                elif path=="/api/ocr/datasets":
+                    route.fulfill(json={"datasets":[]})
+                elif path=="/api/analyze":
+                    route.fulfill(json={
+                        "confidence_threshold":0.25,
+                        "preprocessing":{"brightness":0,"contrast":1,"method":"linear_intensity_only"},
+                        "image":{"width":400,"height":300},
+                        "source":{"source_type":"image","page_count":1,"page_index":0},
+                        "counts":{"wall":4,"dimension_line":2,"dimension_value":2},
+                        "detections":detections,
+                        "dimension_regions":dimension_regions,
+                        "preview_data_url":preview_url,"notes":[]
+                    })
+                elif path=="/api/interpret-dimension":
+                    text_value=json.loads(request.post_data or "{}").get("text","")
+                    value="4000" if text_value=="4000 mm" else "3000"
+                    route.fulfill(json={
+                        "raw_text":text_value,"status":"parsed","dimension_type":"linear",
+                        "value":value,"unit":"mm","value_mm":value,"reason":None,
+                        "requires_review":True
+                    })
+                elif path=="/api/reconstruct-wall-draft":
+                    requests["reconstruction"]=json.loads(request.post_data or "{}")
+                    route.fulfill(json=reconstruction_payload)
+                elif path=="/api/export-dxf":
+                    requests["dxf"]=json.loads(request.post_data or "{}")
+                    route.fulfill(
+                        body="0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n",
+                        headers={"Content-Type":"application/dxf",
+                                 "Content-Disposition":'attachment; filename="survey-measured-wall-draft.dxf"'}
+                    )
+                else:
+                    requests.setdefault("unexpected",[]).append({"method":method,"path":path})
+                    route.fulfill(status=404,json={"detail":"Unexpected test API path"})
+            page.route("**/api/**",api_handler)
+            page.goto(f"http://127.0.0.1:{server.server_port}/",wait_until="domcontentloaded")
+            page.set_input_files("#fileInput",{
+                "name":"survey.png","mimeType":"image/png","buffer":image_data
+            })
+            page.locator("#analyzeButton").click()
+            page.wait_for_function("document.querySelector('#resultStatus')?.textContent === 'DETECTION COMPLETE'")
+            assert page.locator(".dimension-text-item").count()==2
+
+            rows=page.locator(".dimension-text-item")
+            for index,value in enumerate(("4000 mm","3000 mm")):
+                row=rows.nth(index)
+                row.locator(".dimension-text-value").fill(value)
+                row.locator(".interpret-dimension-button").click()
+                page.wait_for_function(
+                    "(index) => document.querySelectorAll('.dimension-text-item')[index]?.dataset.parsedValueMm !== undefined",
+                    arg=index
+                )
+                row.locator(".dimension-text-verified-input").check()
+                row.locator(".dimension-association-details").locator("summary").click()
+                assert row.locator(".dimension-line-select").input_value()
+                assert row.locator(".dimension-wall-span-select").input_value()=="0"
+                row.locator(".dimension-association-verified-input").check()
+
+            assert page.locator("#reconstructWalls").is_enabled()
+            page.locator("#reconstructWalls").click()
+            page.wait_for_function(
+                "document.querySelector('#reconstructionStatus')?.dataset.state === 'success'"
+            )
+            assert "8 editable wall-face edges" in page.locator("#reconstructionStatus").inner_text()
+            assert requests["reconstruction"]["dimensions"][0]["text_verified"] is True
+            assert requests["reconstruction"]["dimensions"][0]["association_confirmed"] is True
+            assert requests["reconstruction"]["dimensions"][0]["wall_ids"]==["det-001","det-002"]
+            assert requests["reconstruction"]["dimensions"][1]["wall_ids"]==["det-005","det-006"]
+            assert page.locator("#geometryCount").inner_text().endswith("8 detected draft")
+
+            with page.expect_download() as dxf_download_info:
+                page.locator("#exportDxf").click()
+            dxf_download=dxf_download_info.value
+            assert dxf_download.suggested_filename=="survey-measured-wall-draft.dxf"
+            assert requests["dxf"]["pixels_per_mm_x"]==0.04
+            assert requests["dxf"]["pixels_per_mm_y"]==0.06
+            assert requests["dxf"]["pixels_per_mm"] is None
+            assert len(requests["dxf"]["segments"])==8
+            assert all(item["source_detection_id"] for item in requests["dxf"]["segments"])
+
+            with page.expect_download() as review_download_info:
+                page.locator("#exportReview").click()
+            review_download=review_download_info.value
+            review_payload=json.loads(Path(review_download.path()).read_text())
+            from jsonschema import Draft202012Validator,FormatChecker
+            review_schema=json.loads((Path(__file__).resolve().parents[2]/"schemas"/"planline-detection-review-v1.schema.json").read_text())
+            Draft202012Validator(review_schema,format_checker=FormatChecker()).validate(review_payload)
+            assert review_payload["analysis"]["status"]=="dimension_constrained_wall_edge_draft"
+            assert len(review_payload["dimension_driven_wall_draft"])==8
+            assert review_payload["reconstruction"]["scale"]["pixels_per_mm_y"]==0.06
+
+            with page.expect_download() as project_download_info:
+                page.locator("#saveProject").click()
+            project_download=project_download_info.value
+            assert project_download.suggested_filename=="survey.planline"
+            project_payload=json.loads(Path(project_download.path()).read_text())
+            project_schema=json.loads((Path(__file__).resolve().parents[2]/"schemas"/"planline-project-v1.schema.json").read_text())
+            Draft202012Validator(project_schema,format_checker=FormatChecker()).validate(project_payload)
+            assert len(project_payload["geometry"])==8
+            assert project_payload["reconstruction"]["scale"]["pixels_per_mm_x"]==0.04
+
+            page.locator("#projectInput").set_input_files({
+                "name":"survey.planline",
+                "mimeType":"application/vnd.planline.project+json",
+                "buffer":json.dumps(project_payload).encode("utf-8")
+            })
+            page.wait_for_function("document.querySelector('#resultStatus')?.textContent === 'DETECTION COMPLETE'")
+            assert page.locator("#geometryCount").inner_text().endswith("8 detected draft")
+            assert "Restored 8 generated wall-face edges" in page.locator("#reconstructionStatus").inner_text()
+            assert page.locator("#calibrationState").inner_text()=="X/Y scales"
+            assert page_errors==[]
+            assert not requests.get("unexpected")
+            browser.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
