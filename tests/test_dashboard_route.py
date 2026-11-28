@@ -23,7 +23,7 @@ def test_drawing_has_its_own_route() -> None:
 
 def test_all_workspaces_use_shared_theme_control_and_navigation() -> None:
     client = TestClient(app)
-    for path in ("/", "/dashboard", "/drawing", "/ocr", "/settings", "/architecture"):
+    for path in ("/", "/dashboard", "/drawing", "/ocr", "/settings", "/architecture", "/documentation"):
         response = client.get(path)
         assert response.status_code == 200
         assert 'id="themeToggle"' in response.text
@@ -43,3 +43,42 @@ def test_architecture_route_renders_html_instead_of_raw_markdown() -> None:
     assert '<article class="architecture-prose">' in response.text
     assert '<nav class="architecture-toc"' in response.text
     assert "Implemented application state" in response.text
+
+
+def test_local_documentation_hub_and_markdown_routes_work() -> None:
+    client = TestClient(app)
+    index = client.get("/documentation")
+    assert index.status_code == 200
+    assert index.headers["content-type"].startswith("text/html")
+    assert "Documentation" in index.text
+    assert "PLANLINE_ARCHITECTURE.md" in index.text
+    assert 'href="/architecture"' in index.text
+
+    article = client.get("/documentation/PLANLINE_ARCHITECTURE.md")
+    assert article.status_code == 200
+    assert article.headers["content-type"].startswith("text/html")
+    assert '<article class="documentation-article">' in article.text
+
+
+def test_local_documentation_serves_images_and_rejects_traversal() -> None:
+    client = TestClient(app)
+    image = client.get("/docs/rysunek.png")
+    assert image.status_code == 200
+    assert image.headers["content-type"].startswith("image/png")
+    assert image.content.startswith(bytes((137, 80, 78, 71, 13, 10, 26, 10)))
+
+    assert client.get("/documentation/../README.md").status_code in {404, 422}
+    assert client.get("/docs/../README.md").status_code in {404, 422}
+
+
+def test_architecture_and_documentation_have_mobile_navigation_controls() -> None:
+    client = TestClient(app)
+    architecture = client.get("/architecture")
+    documentation = client.get("/documentation")
+    for response in (architecture, documentation):
+        assert response.status_code == 200
+        assert 'class="nav-menu-toggle"' in response.text
+        assert 'id="primaryNavigation"' in response.text
+        assert 'href="#mainContent"' in response.text
+        assert 'href="/architecture"' in response.text
+        assert 'href="/documentation"' in response.text
