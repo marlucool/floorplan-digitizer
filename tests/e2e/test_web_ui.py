@@ -1245,7 +1245,10 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
                 "buffer":json.dumps(project_payload).encode("utf-8")
             })
             page.wait_for_function("document.querySelector('#resultStatus')?.textContent === 'DETECTION COMPLETE'")
-            page.wait_for_function("document.querySelector('#reconstructionStatus')?.textContent.startsWith('Restored 8 generated wall-face edges')")
+            page.wait_for_function(
+                "() => document.querySelector('#reconstructionStatus')?.textContent.startsWith('Restored 8 generated wall-face edges') || !document.querySelector('#notice')?.classList.contains('hidden')"
+            )
+            assert page.locator("#reconstructionStatus").inner_text().startswith("Restored 8 generated wall-face edges"), page.locator("#notice").inner_text()
             assert page.locator("#geometryCount").inner_text().endswith("8 detected draft")
             assert "Restored 8 generated wall-face edges" in page.locator("#reconstructionStatus").inner_text()
             assert page.locator("#calibrationState").inner_text()=="X/Y scales"
