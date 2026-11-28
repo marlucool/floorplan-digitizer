@@ -1193,6 +1193,7 @@ function renderGeometryControls() {
   }
   renderJunctionReview();
   renderRoomLoopReview();
+  renderOpeningReview();
 }
 
 function setGeometryMode(mode) {
@@ -1511,6 +1512,7 @@ async function reconstructWallDraft() {
     $("#geometryDetails").open = true;
     const skipped = result.skipped_walls?.length || 0;
     const junctions = result.junction_candidates?.length || 0;
+    const openings = result.opening_candidates?.length || 0;
     output.dataset.state = skipped ? "warning" : "success";
     output.textContent =
       "Created " + result.segments.length + " editable wall-face edges from " +
@@ -1518,9 +1520,11 @@ async function reconstructWallDraft() {
       result.scale.pixels_per_mm_x.toFixed(6) + " px/mm; Y scale " +
       result.scale.pixels_per_mm_y.toFixed(6) + " px/mm. " +
       (skipped ? skipped + " ambiguous wall regions were skipped. " : "") +
-      (junctions ? junctions + " possible wall junctions need review in the panel below. " :
-        "No endpoint junction candidates found; connections still need review. ") +
-      "No junctions have been joined automatically.";
+      (junctions ? junctions + " possible wall junctions need review below. " :
+        "No endpoint junction candidates found. ") +
+      (openings ? openings + " possible wall gaps need classification below. " :
+        "No wall gaps passed the opening heuristic. ") +
+      "No junctions or openings have been applied automatically.";
     if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
     showNotice("Wall draft generated", result.warnings?.join(" ") || "Review all generated wall edges against the source.");
   } catch (error) {
