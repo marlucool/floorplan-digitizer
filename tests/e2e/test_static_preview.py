@@ -114,7 +114,10 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), f"Settings overflows at {width}px"
                     page.set_viewport_size({"width": 1440, "height": 1000})
 
-                    page.goto(url + "documentation/", wait_until="domcontentloaded")
+                    # Open the documentation through the shared Settings navigation,
+                    # not by typing its URL directly.
+                    page.locator('.top-links a[href="documentation/index.html"]').click()
+                    expect(page).to_have_url(url + "documentation/index.html")
                     expect(page.locator("h1").first).to_have_text("Documentation.")
                     assert page.locator(".documentation-file").count() > 10
                     expect(page.locator('.documentation-file[href="PLANLINE_ARCHITECTURE.md.html"]')).to_be_visible()
