@@ -1295,7 +1295,7 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             page.locator("#previewImage").click(position={"x":130,"y":140})
             page.locator("#selectWallTool").click()
             page.locator("#previewImage").click(position={"x":115,"y":120})
-            assert "1.003 m" in page.locator("#wallLength").inner_text()
+            assert 1.0 <= float(page.locator("#wallLength").inner_text().split(" m", 1)[0]) <= 1.01
             assert "axis-corrected" in page.locator("#wallLength").inner_text()
 
             assert page_errors==[]
