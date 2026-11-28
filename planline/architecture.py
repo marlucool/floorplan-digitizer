@@ -32,6 +32,7 @@ def render_architecture_page(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#151c17">
   <meta name="description" content="Planline implementation status, technical architecture, research notes and engineering roadmap.">
   <title>Planline — Architecture &amp; roadmap</title>
   <link rel="stylesheet" href="{asset_prefix}styles.css">
@@ -46,18 +47,37 @@ def render_architecture_page(
     }})();
   </script>
   <script src="{asset_prefix}theme.js" defer></script>
+  <script>
+    (() => {{
+      const root = document.documentElement;
+      const syncOffset = () => {{
+        const header = document.querySelector(".topbar");
+        if (!header) return;
+        root.style.setProperty("--docs-anchor-offset", Math.ceil(header.getBoundingClientRect().height + 16) + "px");
+      }};
+      document.addEventListener("DOMContentLoaded", () => {{
+        syncOffset();
+        const header = document.querySelector(".topbar");
+        if (header && "ResizeObserver" in window) new ResizeObserver(syncOffset).observe(header);
+      }}, {{ once: true }});
+      window.addEventListener("resize", syncOffset, {{ passive: true }});
+    }})();
+  </script>
 </head>
 <body class="architecture-page">
+  <a class="skip-link" href="#mainContent">Skip to content</a>
   <header class="topbar">
     <a class="brand" href="{home_href}" aria-label="Planline dashboard">
-      <span class="brand-mark">P</span><span>planline<span class="brand-dot">.</span></span>
+      <img class="brand-mark" src="{asset_prefix}icon.svg" alt=""><span>planline<span class="brand-dot">.</span></span>
     </a>
     <div class="top-meta"><span class="local-dot"></span><span>TECHNICAL REFERENCE</span></div>
-    <nav class="top-links" aria-label="Main navigation">
+    <button class="nav-menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="primaryNavigation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <nav class="top-links" id="primaryNavigation" aria-label="Primary navigation">
       <a class="repo-link" href="{home_href}">Dashboard</a>
       <a class="repo-link" href="{drawing_href}">Drawing</a>
       <a class="repo-link" href="{ocr_href}">OCR Studio</a>
       <a class="repo-link" href="{settings_href}">Settings</a>
+      <a class="repo-link" href="/documentation">Documentation</a>
       <a class="repo-link active" href="{architecture_href}" aria-current="page">Architecture</a>
       <button id="themeToggle" class="toolbar-button theme-toggle" type="button"
               aria-label="Switch to light theme" title="Switch to light theme" aria-pressed="false">
@@ -75,7 +95,7 @@ def render_architecture_page(
       <a class="architecture-source-link" href="{source_href}">View Markdown source ↗</a>
     </aside>
 
-    <main class="architecture-main">
+    <main class="architecture-main" id="mainContent">
       <div class="architecture-page-heading">
         <p class="eyebrow">PLANLINE / ENGINEERING NOTES</p>
         <p class="architecture-lede">What exists today, what is deliberately not automated, and what must be proven before Planline can produce measured CAD geometry.</p>

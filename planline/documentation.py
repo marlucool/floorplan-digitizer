@@ -62,7 +62,12 @@ def discover_documents(docs_root: Path) -> list[dict[str, Any]]:
         return []
     documents: list[dict[str, Any]] = []
     for source in sorted(root.rglob("*"), key=lambda item: item.as_posix().casefold()):
-        if not source.is_file():
+        # Do not follow symlinks: a docs entry must never expose files outside
+        # the documentation tree through titles, sizes, previews or downloads.
+        if source.is_symlink() or not source.is_file():
+            continue
+        resolved_source = source.resolve()
+        if not resolved_source.is_relative_to(root):
             continue
         relative = source.relative_to(root)
         if any(part.startswith(".") for part in relative.parts):
@@ -218,10 +223,11 @@ def _navigation(
     <button class="nav-menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="primaryNavigation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <nav class="top-links" id="primaryNavigation" aria-label="Primary navigation">
       <a class="repo-link" href="{home_href}">Dashboard</a>
-      <a class="repo-link" href="{drawing_href}">Drawing</a>
+      <a class="repo-link" href="{drawing_href}">Drawing workspace</a>
       <a class="repo-link" href="{ocr_href}">OCR Studio</a>
       <a class="repo-link" href="{settings_href}">Settings</a>
       <a class="repo-link active" href="{documentation_href}" aria-current="page">Documentation</a>
+      <a class="repo-link" href="/architecture">Architecture</a>
       <button id="themeToggle" class="toolbar-button theme-toggle" type="button" aria-label="Switch to light theme" title="Switch to light theme" aria-pressed="false">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.2 15.1A8.5 8.5 0 0 1 8.9 3.8 8.7 8.7 0 1 0 20.2 15.1Z"/></svg>
       </button>
@@ -248,6 +254,7 @@ def _page_shell(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#151c17">
   <meta name="description" content="{html.escape(description, quote=True)}">
   <title>{html.escape(title)} — Planline</title>
   <link rel="stylesheet" href="{asset_prefix}styles.css">

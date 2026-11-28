@@ -90,6 +90,9 @@ The Drawing workspace can export user-authored wall segments and closed room out
 - `POST /api/validate-dimension-chain` — arithmetic check for explicitly supplied dimension values and verification flags. This remains separate from geometric association.
 - `GET /docs` — interactive FastAPI/OpenAPI documentation.
 - `GET /architecture` — renders the maintained architecture, implementation status, research findings and roadmap as a themed HTML page.
+- `GET /documentation` — searchable index of the files under `docs/`.
+- `GET /documentation/{path}` — rendered Markdown, image, PDF, source-code or attachment viewer for a file under `docs/`.
+- `GET /docs/{path}` — serves original images and PDFs inline; source files and other attachments are forced to download rather than execute in the app origin.
 
 
 ### Candidate review JSON
