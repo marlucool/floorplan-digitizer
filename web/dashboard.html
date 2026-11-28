@@ -32,30 +32,71 @@
   </header>
   <main class="dashboard-main" id="mainContent">
     <section class="dashboard-hero">
-      <div><p class="eyebrow">PLANLINE / WORKSPACE</p><h1>Your floor-plan<br><em>workbench.</em></h1><p>Start with a floor-plan drawing. Planline helps you inspect it, check dimensions and create editable geometry. Your files stay on this computer.</p></div>
-      <div class="dashboard-health" id="healthCard" role="status" aria-live="polite"><span class="health-mark">●</span><div><strong id="healthTitle">Connecting to local API</strong><span id="healthDetails">Checking application readiness…</span></div><button id="refreshHealth" class="toolbar-button" type="button">Refresh</button></div>
+      <div class="dashboard-heading">
+        <h1>Turn a scanned plan into editable geometry.</h1>
+        <p>Inspect a drawing, verify its dimensions and trace the walls and rooms you need. Your source files stay on this computer.</p>
+      </div>
+      <div class="dashboard-health" id="healthCard" role="status" aria-live="polite">
+        <span class="health-mark" aria-hidden="true">●</span>
+        <div><strong id="healthTitle">Connecting to local API</strong><span id="healthDetails">Checking application readiness…</span></div>
+        <button id="refreshHealth" class="toolbar-button" type="button">Refresh</button>
+      </div>
     </section>
-    <section class="workspace-grid" aria-label="Planline workspaces">
+
+    <section class="dashboard-workspaces" aria-label="Planline workspaces">
       <a class="workspace-card drawing-card" href="/drawing">
-        <span class="workspace-number">START HERE</span><span class="workspace-icon" aria-hidden="true">▧</span>
-        <h2>Work with a floor plan</h2><p>Upload a drawing, inspect suggested areas, check written dimensions, then trace walls and rooms.</p><span class="workspace-action">Open drawing workspace <b>→</b></span>
+        <div class="drawing-preview" aria-hidden="true">
+          <svg viewBox="0 0 440 250" role="presentation">
+            <path class="plan-wall" d="M54 44H386V206H54Z M54 126H177V206 M177 44V126H386 M262 126V206 M262 164H386"/>
+            <path class="plan-wall plan-wall-light" d="M54 83H105 M105 83V126 M177 83H224 M224 83V126 M316 44V88H386 M316 164V206"/>
+            <path class="plan-door" d="M177 126A42 42 0 0 1 219 168 M262 164A38 38 0 0 0 300 126"/>
+            <path class="plan-dimension" d="M54 24V36 M386 24V36 M54 30H386 M34 44H46 M34 206H46 M40 44V206"/>
+            <path class="plan-tick" d="M49 25L59 35 M381 25L391 35 M35 49L45 39 M35 201L45 211"/>
+            <circle class="plan-node" cx="177" cy="126" r="3"/>
+            <circle class="plan-node" cx="262" cy="164" r="3"/>
+          </svg>
+          <span class="drawing-preview-label">DRAWING / WORKSPACE</span>
+        </div>
+        <div class="drawing-card-copy">
+          <span class="workspace-number">MAIN WORKSPACE</span>
+          <h2>Drawing workspace</h2>
+          <p>Upload a scan or PDF. Review detected regions and dimensions, then draw your own walls and rooms.</p>
+          <span class="workspace-action">Open drawing workspace <b aria-hidden="true">→</b></span>
+        </div>
       </a>
-      <a class="workspace-card ocr-card" href="/ocr">
-        <span class="workspace-number">OPTIONAL · ADVANCED</span><span class="workspace-icon" aria-hidden="true">Aa</span>
-        <h2>Improve text reading</h2><p>For advanced users: label dimension text examples and prepare a dataset to improve OCR.</p><span class="workspace-action">Open OCR tools <b>→</b></span>
-      </a>
-      <a class="workspace-card settings-card" href="/settings">
-        <span class="workspace-number">APP PREFERENCES</span><span class="workspace-icon" aria-hidden="true">⚙</span>
-        <h2>Settings</h2><p>Check the app version and install available updates.</p><span class="workspace-action">Open settings <b>→</b></span>
-      </a>
-      <a class="workspace-card docs-card" href="/architecture">
-        <span class="workspace-number">HELP &amp; REFERENCE</span><span class="workspace-icon" aria-hidden="true">⌘</span>
-        <h2>Guides and technical details</h2><p>Read how Planline works, what its tools do and which results need checking.</p><span class="workspace-action">Read technical notes <b>→</b></span>
-      </a>
+
+      <nav class="workspace-utilities" aria-label="Other workspaces">
+        <a class="utility-link" href="/ocr">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19 10.5 5h3L19 19M7.2 14h9.6"/></svg>
+          <span><strong>OCR Studio</strong><small>Label dimension crops and evaluate text recognition.</small></span>
+          <b aria-hidden="true">↗</b>
+        </a>
+        <a class="utility-link" href="/settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M9 4v6M15 14v6"/></svg>
+          <span><strong>Settings</strong><small>Application version and update controls.</small></span>
+          <b aria-hidden="true">↗</b>
+        </a>
+        <a class="utility-link" href="/architecture">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h8l4 4V20H6zM14 3.5V8h4M9 12h6M9 16h6"/></svg>
+          <span><strong>Technical notes</strong><small>How Planline works and where review is required.</small></span>
+          <b aria-hidden="true">↗</b>
+        </a>
+      </nav>
     </section>
+
     <section class="dashboard-lower">
-      <div class="dashboard-info"><p class="eyebrow">YOUR FIRST TASK</p><h2>Three simple steps</h2><ol><li><b>Upload your plan.</b> Choose an image or PDF in the Drawing workspace.</li><li><b>Check the suggestions.</b> Review detected areas and confirm dimensions against the drawing.</li><li><b>Draw and export.</b> Trace the walls or rooms you need, then export your work.</li></ol></div>
-      <aside class="dashboard-info limits"><p class="eyebrow">IMPORTANT</p><h2>Human review stays in control</h2><p>Detector scores are not measurement confidence. OCR output is not verified automatically. Pixel scale is user-supplied, and automatic CAD reconstruction is not claimed.</p></aside>
+      <div class="dashboard-info">
+        <h2>From scan to drawing</h2>
+        <ol>
+          <li><b>Open a plan.</b> Choose an image or PDF in the Drawing workspace.</li>
+          <li><b>Review the evidence.</b> Check detected regions and confirm written dimensions against the source.</li>
+          <li><b>Create geometry.</b> Trace the walls or rooms you need, then export your work.</li>
+        </ol>
+      </div>
+      <aside class="dashboard-info limits">
+        <h2>Measurements stay under your control</h2>
+        <p>Detector scores are not measurement confidence. OCR output is not verified automatically. Pixel scale must be established from a confirmed dimension; Planline does not claim unattended CAD reconstruction.</p>
+      </aside>
     </section>
     <footer><span>PLANLINE · LOCAL-FIRST FLOOR-PLAN WORKSPACE</span><span><a href="https://github.com/marlucool/floorplan-digitizer" target="_blank" rel="noreferrer">Source repository ↗</a></span></footer>
   </main>
