@@ -114,6 +114,14 @@
             <p>Use verified horizontal and vertical dimensions with confirmed wall matches to set X/Y scale and create editable draft edges.</p>
             <button id="reconstructWalls" class="toolbar-button" type="button" disabled>Generate wall-edge draft</button>
             <output id="reconstructionStatus" aria-live="polite">Analyse a drawing, verify at least one horizontal and one vertical dimension, then confirm each matching wall pair.</output>
+            <section id="junctionReview" class="junction-review hidden" aria-label="Review possible wall junctions">
+              <div class="junction-review-heading">
+                <strong>Possible wall junctions</strong>
+                <span id="junctionReviewSummary">No candidates</span>
+              </div>
+              <p>Join only endpoints that you have checked against the drawing. Joining changes the editable draft; it does not infer a complete wall network.</p>
+              <div id="junctionCandidateList" class="junction-candidate-list"></div>
+            </section>
           </section>
           <details id="geometryDetails" class="geometry-tools-details">
             <summary><span>Open drawing tools</span><small>Walls · rooms · export</small></summary>

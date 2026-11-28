@@ -1244,6 +1244,58 @@
                   },
                   "status": {
                     "const": "candidate_requires_review"
+                  },
+                  "endpoints": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "segment_id",
+                        "endpoint",
+                        "original_point_px"
+                      ],
+                      "properties": {
+                        "segment_id": {
+                          "type": "string",
+                          "pattern": "^reconstructed-wall-[0-9]{4,}$"
+                        },
+                        "endpoint": {
+                          "type": "string",
+                          "enum": [
+                            "start_px",
+                            "end_px"
+                          ]
+                        },
+                        "original_point_px": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "x",
+                            "y"
+                          ],
+                          "properties": {
+                            "x": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "y": {
+                              "type": "number",
+                              "minimum": 0
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "review_status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "joined"
+                    ]
                   }
                 }
               }

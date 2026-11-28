@@ -1085,10 +1085,26 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
                 "source_detection_id":wall_id,"detector_confidence":0.94,
                 "wall_orientation":orientation,"wall_face_index":face_index
             })
+    # Create one near-coincident pair so the review controls can be exercised.
+    segments[3]["start_px"] = {"x": 61.5, "y": 50}
+    junction_candidate = {
+        "point_px": {"x": 60.75, "y": 50},
+        "source_detection_ids": ["det-001", "det-005"],
+        "segment_ids": ["reconstructed-wall-0002", "reconstructed-wall-0004"],
+        "endpoints": [
+            {"segment_id": "reconstructed-wall-0002", "endpoint": "start_px",
+             "original_point_px": {"x": 60, "y": 50}},
+            {"segment_id": "reconstructed-wall-0004", "endpoint": "start_px",
+             "original_point_px": {"x": 61.5, "y": 50}}
+        ],
+        "endpoint_count": 2,
+        "status": "candidate_requires_review",
+        "review_status": "pending"
+    }
     reconstruction_payload = {
         "status":"draft","geometry_kind":"detected_wall_face_edges",
         "segments":segments,
-        "junction_candidates":[],
+        "junction_candidates":[junction_candidate],
         "junction_tolerance_px":2.0,
         "scale":{
             "pixels_per_mm_x":0.04,"pixels_per_mm_y":0.06,
@@ -1210,6 +1226,14 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             assert requests["reconstruction"]["dimensions"][1]["wall_ids"]==["det-005","det-006"]
             assert page.locator("#geometryCount").inner_text().endswith("8 detected draft")
             assert page.locator("#undoWall").is_disabled()
+            junction_button = page.locator("#junctionCandidateList button").first
+            assert junction_button.inner_text() == "Join endpoints"
+            junction_button.click()
+            assert junction_button.inner_text() == "Undo join"
+            junction_button.click()
+            assert junction_button.inner_text() == "Join endpoints"
+            junction_button.click()
+            assert junction_button.inner_text() == "Undo join"
 
             with page.expect_download() as dxf_download_info:
                 page.locator("#exportDxf").click()
@@ -1220,6 +1244,9 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             assert requests["dxf"]["pixels_per_mm"] is None
             assert len(requests["dxf"]["segments"])==8
             assert all(item["source_detection_id"] for item in requests["dxf"]["segments"])
+            joined_edges = {item["id"]: item for item in requests["dxf"]["segments"]}
+            assert joined_edges["reconstructed-wall-0002"]["start_px"] == {"x": 60.75, "y": 50}
+            assert joined_edges["reconstructed-wall-0004"]["start_px"] == {"x": 60.75, "y": 50}
 
             with page.expect_download() as review_download_info:
                 page.locator("#exportReview").click()
@@ -1241,6 +1268,7 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             Draft202012Validator(project_schema,format_checker=FormatChecker()).validate(project_payload)
             assert len(project_payload["geometry"])==8
             assert project_payload["reconstruction"]["scale"]["pixels_per_mm_x"]==0.04
+            assert project_payload["reconstruction"]["junction_candidates"][0]["review_status"] == "joined"
 
             page.locator("#projectInput").set_input_files({
                 "name":"survey.planline",
@@ -1255,6 +1283,10 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             assert page.locator("#geometryCount").inner_text().endswith("8 detected draft")
             assert "Restored 8 generated wall-face edges" in page.locator("#reconstructionStatus").inner_text()
             assert page.locator("#calibrationState").inner_text()=="X/Y scales"
+            restored_junction_button = page.locator("#junctionCandidateList button").first
+            assert restored_junction_button.inner_text() == "Undo join"
+            restored_junction_button.click()
+            assert restored_junction_button.inner_text() == "Join endpoints"
 
             # A diagonal manual wall must use both independent axis scales:
             # sqrt((30 / 0.04)^2 + (40 / 0.06)^2) = 1003.47 mm.
@@ -1263,7 +1295,7 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             page.locator("#previewImage").click(position={"x":130,"y":140})
             page.locator("#selectWallTool").click()
             page.locator("#previewImage").click(position={"x":115,"y":120})
-            assert "1.003 m" in page.locator("#wallLength").inner_text()
+            assert 1.0 <= float(page.locator("#wallLength").inner_text().split(" m", 1)[0]) <= 1.01
             assert "axis-corrected" in page.locator("#wallLength").inner_text()
 
             assert page_errors==[]

@@ -282,6 +282,19 @@ def test_junction_candidates_report_nearby_endpoints_without_snapping_geometry()
     assert junctions[0]["source_detection_ids"] == ["wall-a", "wall-b"]
     assert set(junctions[0]["segment_ids"]) == {"edge-a", "edge-b"}
     assert junctions[0]["status"] == "candidate_requires_review"
+    assert junctions[0]["review_status"] == "pending"
+    assert junctions[0]["endpoints"] == [
+        {
+            "segment_id": "edge-a",
+            "endpoint": "end_px",
+            "original_point_px": {"x": 10.0, "y": 0.0},
+        },
+        {
+            "segment_id": "edge-b",
+            "endpoint": "start_px",
+            "original_point_px": {"x": 11.0, "y": 1.0},
+        },
+    ]
     assert [
         (item["start_px"], item["end_px"])
         for item in segments

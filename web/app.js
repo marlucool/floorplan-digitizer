@@ -627,6 +627,148 @@ async function compareSelectedWallToDimension() {
   }
 }
 
+function junctionEndpointKey(reference) {
+  return reference?.segment_id + ":" + reference?.endpoint;
+}
+
+function syncReconstructionSegmentCopies() {
+  if (!state.reconstruction || !Array.isArray(state.reconstruction.segments)) return;
+  const live = new Map(
+    state.geometry.segments
+      .filter((segment) => segment.created_by_reconstruction)
+      .map((segment) => [segment.id, segment])
+  );
+  state.reconstruction.segments = state.reconstruction.segments.map((segment) => {
+    const current = live.get(segment.id);
+    return current ? {
+      ...segment,
+      start_px: { ...current.start_px },
+      end_px: { ...current.end_px }
+    } : segment;
+  });
+}
+
+function junctionCandidateHasConflict(candidate, candidateIndex) {
+  const keys = new Set((candidate.endpoints || []).map(junctionEndpointKey));
+  return (state.reconstruction?.junction_candidates || []).some((other, index) =>
+    index !== candidateIndex && other.review_status === "joined" &&
+    (other.endpoints || []).some((reference) => keys.has(junctionEndpointKey(reference)))
+  );
+}
+
+function renderJunctionReview() {
+  const panel = $("#junctionReview");
+  if (!panel) return;
+  const candidates = state.reconstruction?.junction_candidates || [];
+  panel.classList.toggle("hidden", candidates.length === 0);
+  $("#junctionReviewSummary").textContent = candidates.length
+    ? candidates.filter((item) => item.review_status === "joined").length + " joined · " +
+      candidates.filter((item) => item.review_status !== "joined").length + " to review"
+    : "No candidates";
+  const list = $("#junctionCandidateList");
+  list.replaceChildren();
+  candidates.forEach((candidate, index) => {
+    const card = document.createElement("article");
+    const joined = candidate.review_status === "joined";
+    const conflict = !joined && junctionCandidateHasConflict(candidate, index);
+    const actionable = Array.isArray(candidate.endpoints) && candidate.endpoints.length === 2 &&
+      candidate.endpoints.every((item) => item && typeof item.segment_id === "string" &&
+        ["start_px", "end_px"].includes(item.endpoint) && item.original_point_px);
+    card.className = "junction-candidate";
+    card.dataset.state = joined ? "joined" : conflict || !actionable ? "blocked" : "pending";
+
+    const copy = document.createElement("div");
+    copy.className = "junction-candidate-copy";
+    const title = document.createElement("strong");
+    title.textContent = "Possible connection " + (index + 1) + " · " +
+      (candidate.source_detection_ids || []).join(" ↔ ");
+    const detail = document.createElement("small");
+    detail.textContent = actionable
+      ? candidate.endpoints.map((item) =>
+          item.segment_id + " " + (item.endpoint === "start_px" ? "start" : "end")
+        ).join(" ↔ ") + " · " +
+        Number(candidate.point_px?.x || 0).toFixed(1) + ", " +
+        Number(candidate.point_px?.y || 0).toFixed(1) + " px"
+      : "Endpoint references unavailable in this saved project; inspect manually.";
+    copy.append(title, detail);
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "toolbar-button";
+    button.textContent = joined ? "Undo join" :
+      conflict ? "Endpoint already joined" : actionable ? "Join endpoints" : "Manual review";
+    button.disabled = PREVIEW_MODE || (!joined && (!actionable || conflict));
+    button.addEventListener("click", () => {
+      if (joined) undoJunctionCandidate(index);
+      else applyJunctionCandidate(index);
+    });
+    card.append(copy, button);
+    list.append(card);
+  });
+}
+
+function applyJunctionCandidate(index) {
+  const candidate = state.reconstruction?.junction_candidates?.[index];
+  if (!candidate || candidate.review_status === "joined") return;
+  if (junctionCandidateHasConflict(candidate, index)) {
+    showNotice("Endpoint already joined", "Undo the existing join before using this endpoint in another candidate.");
+    return;
+  }
+  const references = candidate.endpoints || [];
+  if (references.length !== 2 || !Number.isFinite(candidate.point_px?.x) ||
+      !Number.isFinite(candidate.point_px?.y)) {
+    showNotice("Junction cannot be applied", "This candidate does not contain two valid endpoint references.");
+    return;
+  }
+  const resolved = references.map((reference) => {
+    const segment = state.geometry.segments.find((item) =>
+      item.id === reference.segment_id && item.created_by_reconstruction === true
+    );
+    const property = reference.endpoint;
+    const current = segment && ["start_px", "end_px"].includes(property) ? segment[property] : null;
+    return { reference, segment, property, current };
+  });
+  if (resolved.some((item) => !item.segment || !item.current ||
+      !Number.isFinite(item.reference.original_point_px?.x) ||
+      !Number.isFinite(item.reference.original_point_px?.y) ||
+      Math.hypot(
+        item.current.x - item.reference.original_point_px.x,
+        item.current.y - item.reference.original_point_px.y
+      ) > 0.05)) {
+    showNotice("Junction candidate is stale", "One or both wall endpoints have changed since detection. Regenerate the wall draft or inspect this connection manually.");
+    return;
+  }
+  const point = { x: candidate.point_px.x, y: candidate.point_px.y };
+  resolved.forEach(({ segment, property }) => {
+    segment[property] = { ...point };
+  });
+  candidate.review_status = "joined";
+  syncReconstructionSegmentCopies();
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+  showNotice("Wall endpoints joined", "The two reviewed endpoints now share one coordinate. Inspect the connection and undo it if it does not match the drawing.");
+}
+
+function undoJunctionCandidate(index) {
+  const candidate = state.reconstruction?.junction_candidates?.[index];
+  if (!candidate || candidate.review_status !== "joined") return;
+  for (const reference of candidate.endpoints || []) {
+    const segment = state.geometry.segments.find((item) =>
+      item.id === reference.segment_id && item.created_by_reconstruction === true
+    );
+    if (!segment || !["start_px", "end_px"].includes(reference.endpoint)) {
+      showNotice("Could not undo junction", "A referenced wall edge is missing. Reopen the source project or regenerate the draft.");
+      return;
+    }
+    segment[reference.endpoint] = { ...reference.original_point_px };
+  }
+  candidate.review_status = "pending";
+  syncReconstructionSegmentCopies();
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+  showNotice("Wall endpoint join undone", "The original endpoint coordinates have been restored.");
+}
+
 function renderGeometryControls() {
   const geometry = state.geometry;
   const wallCount = geometry?.segments?.length || 0;
@@ -707,6 +849,7 @@ function renderGeometryControls() {
   } else {
     $("#roomArea").textContent = "Select a room to view its area.";
   }
+  renderJunctionReview();
 }
 
 function setGeometryMode(mode) {
@@ -1032,9 +1175,9 @@ async function reconstructWallDraft() {
       result.scale.pixels_per_mm_x.toFixed(6) + " px/mm; Y scale " +
       result.scale.pixels_per_mm_y.toFixed(6) + " px/mm. " +
       (skipped ? skipped + " ambiguous wall regions were skipped. " : "") +
-      (junctions ? junctions + " possible wall junctions found; inspect them manually. " :
+      (junctions ? junctions + " possible wall junctions need review in the panel below. " :
         "No endpoint junction candidates found; connections still need review. ") +
-      "No automatic snapping or topology repair has been applied.";
+      "No junctions have been joined automatically.";
     if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
     showNotice("Wall draft generated", result.warnings?.join(" ") || "Review all generated wall edges against the source.");
   } catch (error) {
@@ -2349,7 +2492,44 @@ function isValidReconstructionState(reconstruction, segments, analysisResult) {
     Array.isArray(measurement.wall_ids) && measurement.wall_ids.length === 2 &&
     measurement.wall_ids.every((id) => wallIds.has(id))
   );
-  return validMeasurements && generated.every((segment) =>
+  const validJunctions = (reconstruction.junction_candidates || []).every((candidate) => {
+    if (!candidate || !Array.isArray(candidate.source_detection_ids) ||
+        candidate.source_detection_ids.length < 2 ||
+        !Array.isArray(candidate.segment_ids) || candidate.segment_ids.length < 2 ||
+        candidate.status !== "candidate_requires_review") return false;
+    // Endpoint metadata was added without changing the v1 project format;
+    // older saved projects remain readable but their candidates stay review-only.
+    if (candidate.endpoints === undefined) return true;
+    const validReferences = Array.isArray(candidate.endpoints) && candidate.endpoints.length === 2 &&
+      ["pending", "joined"].includes(candidate.review_status) &&
+      Number.isFinite(candidate.point_px?.x) && Number.isFinite(candidate.point_px?.y) &&
+      candidate.point_px.x >= 0 && candidate.point_px.y >= 0 &&
+      candidate.point_px.x <= analysisResult.image.width &&
+      candidate.point_px.y <= analysisResult.image.height &&
+      candidate.endpoints.every((reference) =>
+        draftIds.has(reference.segment_id) &&
+        candidate.segment_ids.includes(reference.segment_id) &&
+        ["start_px", "end_px"].includes(reference.endpoint) &&
+        Number.isFinite(reference.original_point_px?.x) &&
+        Number.isFinite(reference.original_point_px?.y) &&
+        reference.original_point_px.x >= 0 && reference.original_point_px.y >= 0 &&
+        reference.original_point_px.x <= analysisResult.image.width &&
+        reference.original_point_px.y <= analysisResult.image.height
+      );
+    if (!validReferences) return false;
+    if (candidate.review_status === "joined") {
+      return candidate.endpoints.every((reference) => {
+        const segment = generated.find((item) => item.id === reference.segment_id);
+        const point = segment?.[reference.endpoint];
+        return point && Math.hypot(
+          point.x - candidate.point_px.x,
+          point.y - candidate.point_px.y
+        ) <= 0.05;
+      });
+    }
+    return true;
+  });
+  return validMeasurements && validJunctions && generated.every((segment) =>
     wallIds.has(segment.source_detection_id) && draftIds.has(segment.id)
   );
 }
@@ -2433,6 +2613,7 @@ async function openProjectFile(file) {
     state.geometry.segments = Array.isArray(project.geometry) ? project.geometry : [];
     state.reconstruction = project.reconstruction && typeof project.reconstruction === "object"
       ? project.reconstruction : null;
+    syncReconstructionSegmentCopies();
     $("#reconstructionStatus").textContent = state.reconstruction
       ? "Restored " + (state.reconstruction.segments?.length || 0) +
         " generated wall-face edges. Inspect them before exporting."

@@ -267,8 +267,20 @@ def _junction_candidates(
                             endpoint["segment_id"],
                             other["segment_id"],
                         }),
+                        "endpoints": [
+                            {
+                                "segment_id": item["segment_id"],
+                                "endpoint": item["endpoint"],
+                                "original_point_px": {
+                                    "x": item["x"],
+                                    "y": item["y"],
+                                },
+                            }
+                            for item in sorted((endpoint, other), key=lambda value: (value["segment_id"], value["endpoint"]))
+                        ],
                         "endpoint_count": 2,
                         "status": "candidate_requires_review",
+                        "review_status": "pending",
                     })
         buckets.setdefault((cell_x, cell_y), []).append(index)
 
@@ -355,7 +367,7 @@ def reconstruct_wall_edges(
         "wall_regions_used": len({item["source_detection_id"] for item in segments}),
         "warnings": [
             "This is editable draft wall-face linework, not a verified construction drawing.",
-            "Each detected wall bounding box becomes two parallel face lines. Near-coincident endpoints are reported as junction candidates only; no snapping or topology repair is applied.",
+            "Each detected wall bounding box becomes two parallel face lines. Near-coincident endpoints include source endpoint references and can be joined only after explicit review; no automatic topology repair is applied.",
             "Doors, windows, room boundaries, diagonal walls and missing wall regions are not inferred.",
             "X and Y scales are derived independently from confirmed dimensions. Local perspective, skew and paper distortion are not rectified.",
             "Inspect every generated edge against the source scan before relying on the DXF.",
