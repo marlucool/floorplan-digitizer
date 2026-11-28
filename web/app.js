@@ -2492,7 +2492,25 @@ function isValidReconstructionState(reconstruction, segments, analysisResult) {
     Array.isArray(measurement.wall_ids) && measurement.wall_ids.length === 2 &&
     measurement.wall_ids.every((id) => wallIds.has(id))
   );
-  return validMeasurements && generated.every((segment) =>
+  const validJunctions = (reconstruction.junction_candidates || []).every((candidate) => {
+    if (!candidate || !Array.isArray(candidate.source_detection_ids) ||
+        candidate.source_detection_ids.length < 2 ||
+        !Array.isArray(candidate.segment_ids) || candidate.segment_ids.length < 2 ||
+        candidate.status !== "candidate_requires_review") return false;
+    // Endpoint metadata was added without changing the v1 project format;
+    // older saved projects remain readable but their candidates stay review-only.
+    if (candidate.endpoints === undefined) return true;
+    return Array.isArray(candidate.endpoints) && candidate.endpoints.length === 2 &&
+      ["pending", "joined"].includes(candidate.review_status) &&
+      Number.isFinite(candidate.point_px?.x) && Number.isFinite(candidate.point_px?.y) &&
+      candidate.endpoints.every((reference) =>
+        draftIds.has(reference.segment_id) &&
+        ["start_px", "end_px"].includes(reference.endpoint) &&
+        Number.isFinite(reference.original_point_px?.x) &&
+        Number.isFinite(reference.original_point_px?.y)
+      );
+  });
+  return validMeasurements && validJunctions && generated.every((segment) =>
     wallIds.has(segment.source_detection_id) && draftIds.has(segment.id)
   );
 }
@@ -2576,6 +2594,7 @@ async function openProjectFile(file) {
     state.geometry.segments = Array.isArray(project.geometry) ? project.geometry : [];
     state.reconstruction = project.reconstruction && typeof project.reconstruction === "object"
       ? project.reconstruction : null;
+    syncReconstructionSegmentCopies();
     $("#reconstructionStatus").textContent = state.reconstruction
       ? "Restored " + (state.reconstruction.segments?.length || 0) +
         " generated wall-face edges. Inspect them before exporting."
