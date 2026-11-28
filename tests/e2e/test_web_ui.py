@@ -1121,6 +1121,7 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             assert requests["reconstruction"]["dimensions"][0]["wall_ids"]==["det-001","det-002"]
             assert requests["reconstruction"]["dimensions"][1]["wall_ids"]==["det-005","det-006"]
             assert page.locator("#geometryCount").inner_text().endswith("8 detected draft")
+            assert page.locator("#undoWall").is_disabled()
 
             with page.expect_download() as dxf_download_info:
                 page.locator("#exportDxf").click()
