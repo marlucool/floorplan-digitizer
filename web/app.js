@@ -1031,6 +1031,7 @@ async function reconstructWallDraft() {
     renderGeometryControls();
     $("#geometryDetails").open = true;
     const skipped = result.skipped_walls?.length || 0;
+    const junctions = result.junction_candidates?.length || 0;
     output.dataset.state = skipped ? "warning" : "success";
     output.textContent =
       "Created " + result.segments.length + " editable wall-face edges from " +
@@ -1038,7 +1039,9 @@ async function reconstructWallDraft() {
       result.scale.pixels_per_mm_x.toFixed(6) + " px/mm; Y scale " +
       result.scale.pixels_per_mm_y.toFixed(6) + " px/mm. " +
       (skipped ? skipped + " ambiguous wall regions were skipped. " : "") +
-      "Inspect every edge and junction before exporting.";
+      (junctions ? junctions + " possible wall junctions found; inspect them manually. " :
+        "No endpoint junction candidates found; connections still need review. ") +
+      "No automatic snapping or topology repair has been applied.";
     if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
     showNotice("Wall draft generated", result.warnings?.join(" ") || "Review all generated wall edges against the source.");
   } catch (error) {
