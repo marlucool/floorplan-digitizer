@@ -2339,21 +2339,19 @@ function isValidReconstructionState(reconstruction, segments, analysisResult) {
       !Number.isFinite(reconstruction.scale?.pixels_per_mm_y) ||
       reconstruction.scale.pixels_per_mm_y <= 0 ||
       !Array.isArray(reconstruction.measurements) ||
-      reconstruction.measurements.length < 2) return false;
+      reconstruction.measurements.length < 2 ||
+      !Array.isArray(reconstruction.segments)) return false;
   const wallIds = new Set((analysisResult?.detections || [])
     .filter((item) => item.class_name === "wall")
     .map((item) => item.id));
-  const measurementIds = new Set(reconstruction.measurements.map((measurement) => measurement.detection_id));
-  const validMeasurements = reconstruction.measurements.length >= 2 &&
-    reconstruction.measurements.every((measurement) =>
-      measurementIds.has(measurement.detection_id) &&
-      ["x", "y"].includes(measurement.axis) &&
-      Number.isFinite(measurement.value_mm) && measurement.value_mm > 0 &&
-      Number.isFinite(measurement.pixels_per_mm) && measurement.pixels_per_mm > 0 &&
-      Array.isArray(measurement.wall_ids) && measurement.wall_ids.length === 2 &&
-      measurement.wall_ids.every((id) => wallIds.has(id))
-    );
-  const draftIds = new Set((reconstruction.segments || []).map((segment) => segment.id));
+  const draftIds = new Set(reconstruction.segments.map((segment) => segment.id));
+  const validMeasurements = reconstruction.measurements.every((measurement) =>
+    ["x", "y"].includes(measurement.axis) &&
+    Number.isFinite(measurement.value_mm) && measurement.value_mm > 0 &&
+    Number.isFinite(measurement.pixels_per_mm) && measurement.pixels_per_mm > 0 &&
+    Array.isArray(measurement.wall_ids) && measurement.wall_ids.length === 2 &&
+    measurement.wall_ids.every((id) => wallIds.has(id))
+  );
   return validMeasurements && generated.every((segment) =>
     wallIds.has(segment.source_detection_id) && draftIds.has(segment.id)
   );
