@@ -111,3 +111,11 @@ def test_documentation_source_assets_download_instead_of_rendering() -> None:
 
     hidden = client.get("/docs/.hidden-secret.txt")
     assert hidden.status_code == 404
+
+
+def test_workspace_footers_link_to_the_documentation_hub() -> None:
+    client = TestClient(app)
+    for path in ("/drawing", "/ocr", "/settings"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert response.text.count('href="/documentation">Documentation</a>') >= 2
