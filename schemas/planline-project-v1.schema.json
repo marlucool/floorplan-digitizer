@@ -150,8 +150,7 @@
           "type",
           "start_px",
           "end_px",
-          "source_page_index",
-          null
+          "source_page_index"
         ],
         "properties": {
           "id": {
