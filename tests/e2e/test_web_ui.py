@@ -75,6 +75,8 @@ class OCRRaceHandler(QuietHandler):
                 "samples": [],
                 "available_models": [],
             })
+        if parsed.path == "/api/ocr/jobs/active":
+            return self._json({"job": None})
         if parsed.path == "/api/ocr/jobs":
             return self._json({"jobs": []})
         self.send_error(404)
