@@ -267,8 +267,20 @@ def _junction_candidates(
                             endpoint["segment_id"],
                             other["segment_id"],
                         }),
+                        "endpoints": [
+                            {
+                                "segment_id": item["segment_id"],
+                                "endpoint": item["endpoint"],
+                                "original_point_px": {
+                                    "x": item["x"],
+                                    "y": item["y"],
+                                },
+                            }
+                            for item in (endpoint, other)
+                        ],
                         "endpoint_count": 2,
                         "status": "candidate_requires_review",
+                        "review_status": "pending",
                     })
         buckets.setdefault((cell_x, cell_y), []).append(index)
 
