@@ -271,18 +271,24 @@ def test_junction_candidates_report_nearby_endpoints_without_snapping_geometry()
             "start_px": {"x": 11, "y": 1},
             "end_px": {"x": 10, "y": 10},
         },
-        {
-            "id": "edge-c",
-            "source_detection_id": "wall-a",
-            "start_px": {"x": 10, "y": 0},
-            "end_px": {"x": 20, "y": 0},
-        },
     ]
-    before = [dict(item["end_px"]) for item in segments]
+    before = [
+        (dict(item["start_px"]), dict(item["end_px"]))
+        for item in segments
+    ]
     junctions = reconstruction._junction_candidates(segments, tolerance_px=2.0)
     assert len(junctions) == 1
     assert junctions[0]["source_detection_ids"] == ["wall-a", "wall-b"]
     assert set(junctions[0]["segment_ids"]) == {"edge-a", "edge-b"}
     assert junctions[0]["status"] == "candidate_requires_review"
-    assert [item["end_px"] for item in segments] == before
+    assert [
+        (item["start_px"], item["end_px"])
+        for item in segments
+    ] == before
+
+    same_wall = [
+        {**segments[0], "id": "same-a"},
+        {**segments[0], "id": "same-b"},
+    ]
+    assert reconstruction._junction_candidates(same_wall, tolerance_px=2.0) == []
 
