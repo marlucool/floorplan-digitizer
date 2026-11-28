@@ -808,6 +808,114 @@
           }
         }
       ]
+    },
+    "openings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "type",
+          "opening_type",
+          "source_detection_ids",
+          "axis",
+          "start_px",
+          "end_px",
+          "width_mm",
+          "source_page_index",
+          "created_by_user"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^manual-opening-[0-9]{3,}$"
+          },
+          "type": {
+            "const": "opening_marker"
+          },
+          "opening_type": {
+            "type": "string",
+            "enum": [
+              "door",
+              "window",
+              "unknown"
+            ]
+          },
+          "candidate_id": {
+            "type": "string",
+            "pattern": "^opening-candidate-[0-9]{3,}$"
+          },
+          "source_detection_ids": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^det-[0-9]{3,}$"
+            }
+          },
+          "axis": {
+            "type": "string",
+            "enum": [
+              "x",
+              "y"
+            ]
+          },
+          "start_px": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "type": "number",
+                "minimum": 0
+              },
+              "y": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          },
+          "end_px": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "type": "number",
+                "minimum": 0
+              },
+              "y": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          },
+          "width_mm": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "source_page_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "created_by_user": {
+            "const": true
+          }
+        }
+      }
+    },
+    "opening_next_id": {
+      "type": "integer",
+      "minimum": 1
     }
   }
 }
