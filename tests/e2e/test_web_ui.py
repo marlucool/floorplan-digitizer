@@ -1070,7 +1070,7 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
         "det-001": (50,50,60,250,"vertical"),
         "det-002": (220,50,230,250,"vertical"),
         "det-005": (60,40,220,50,"horizontal"),
-        "det-006": (60,230,220,240,"horizontal"),
+        "det-006": (60,250,220,260,"horizontal"),
     }
     for wall_id, (x1,y1,x2,y2,orientation) in wall_boxes.items():
         if orientation == "horizontal":
@@ -1085,26 +1085,62 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
                 "source_detection_id":wall_id,"detector_confidence":0.94,
                 "wall_orientation":orientation,"wall_face_index":face_index
             })
-    # Create one near-coincident pair so the review controls can be exercised.
+    # Build four reviewable corner joins that close a rectangular room outline.
     segments[3]["start_px"] = {"x": 61.5, "y": 50}
-    junction_candidate = {
-        "point_px": {"x": 60.75, "y": 50},
-        "source_detection_ids": ["det-001", "det-005"],
-        "segment_ids": ["reconstructed-wall-0002", "reconstructed-wall-0004"],
-        "endpoints": [
-            {"segment_id": "reconstructed-wall-0002", "endpoint": "start_px",
-             "original_point_px": {"x": 60, "y": 50}},
-            {"segment_id": "reconstructed-wall-0004", "endpoint": "start_px",
-             "original_point_px": {"x": 61.5, "y": 50}}
-        ],
-        "endpoint_count": 2,
-        "status": "candidate_requires_review",
-        "review_status": "pending"
-    }
+    junction_candidates = [
+        {
+            "point_px": {"x": 60.75, "y": 50},
+            "source_detection_ids": ["det-001", "det-005"],
+            "segment_ids": ["reconstructed-wall-0002", "reconstructed-wall-0004"],
+            "endpoints": [
+                {"segment_id": "reconstructed-wall-0002", "endpoint": "start_px",
+                 "original_point_px": {"x": 60, "y": 50}},
+                {"segment_id": "reconstructed-wall-0004", "endpoint": "start_px",
+                 "original_point_px": {"x": 61.5, "y": 50}}
+            ],
+            "endpoint_count": 2, "status": "candidate_requires_review", "review_status": "pending"
+        },
+        {
+            "point_px": {"x": 220, "y": 50},
+            "source_detection_ids": ["det-002", "det-005"],
+            "segment_ids": ["reconstructed-wall-0004", "reconstructed-wall-0005"],
+            "endpoints": [
+                {"segment_id": "reconstructed-wall-0004", "endpoint": "end_px",
+                 "original_point_px": {"x": 220, "y": 50}},
+                {"segment_id": "reconstructed-wall-0005", "endpoint": "start_px",
+                 "original_point_px": {"x": 220, "y": 50}}
+            ],
+            "endpoint_count": 2, "status": "candidate_requires_review", "review_status": "pending"
+        },
+        {
+            "point_px": {"x": 220, "y": 250},
+            "source_detection_ids": ["det-002", "det-006"],
+            "segment_ids": ["reconstructed-wall-0005", "reconstructed-wall-0007"],
+            "endpoints": [
+                {"segment_id": "reconstructed-wall-0005", "endpoint": "end_px",
+                 "original_point_px": {"x": 220, "y": 250}},
+                {"segment_id": "reconstructed-wall-0007", "endpoint": "end_px",
+                 "original_point_px": {"x": 220, "y": 250}}
+            ],
+            "endpoint_count": 2, "status": "candidate_requires_review", "review_status": "pending"
+        },
+        {
+            "point_px": {"x": 60, "y": 250},
+            "source_detection_ids": ["det-001", "det-006"],
+            "segment_ids": ["reconstructed-wall-0002", "reconstructed-wall-0007"],
+            "endpoints": [
+                {"segment_id": "reconstructed-wall-0002", "endpoint": "end_px",
+                 "original_point_px": {"x": 60, "y": 250}},
+                {"segment_id": "reconstructed-wall-0007", "endpoint": "start_px",
+                 "original_point_px": {"x": 60, "y": 250}}
+            ],
+            "endpoint_count": 2, "status": "candidate_requires_review", "review_status": "pending"
+        }
+    ]
     reconstruction_payload = {
         "status":"draft","geometry_kind":"detected_wall_face_edges",
         "segments":segments,
-        "junction_candidates":[junction_candidate],
+        "junction_candidates":junction_candidates,
         "junction_tolerance_px":2.0,
         "scale":{
             "pixels_per_mm_x":0.04,"pixels_per_mm_y":0.06,
@@ -1123,7 +1159,7 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
         "skipped_dimensions":[],"skipped_walls":[],"wall_regions_used":4,
         "warnings":[
             "This is editable draft wall-face linework, not a verified construction drawing.",
-            "Wall junctions, doors, windows, rooms and diagonal walls are not reconstructed.",
+            "Only individually reviewed wall junction pairs and room loops are suggested; doors, windows and diagonal walls are not reconstructed.",
             "Inspect every generated edge against the source scan."
         ]
     }
@@ -1226,7 +1262,9 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             assert requests["reconstruction"]["dimensions"][1]["wall_ids"]==["det-005","det-006"]
             assert page.locator("#geometryCount").inner_text().endswith("8 detected draft")
             assert page.locator("#undoWall").is_disabled()
-            junction_button = page.locator("#junctionCandidateList button").first
+            junction_buttons = page.locator("#junctionCandidateList button")
+            assert junction_buttons.count() == 4
+            junction_button = junction_buttons.nth(0)
             assert junction_button.inner_text() == "Join endpoints"
             junction_button.click()
             assert junction_button.inner_text() == "Undo join"
@@ -1234,6 +1272,13 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             assert junction_button.inner_text() == "Join endpoints"
             junction_button.click()
             assert junction_button.inner_text() == "Undo join"
+            for index in range(1, 4):
+                junction_buttons.nth(index).click()
+                assert junction_buttons.nth(index).inner_text() == "Undo join"
+            room_candidate_button = page.locator("#roomLoopCandidateList button").first
+            assert room_candidate_button.inner_text() == "Add room outline"
+            room_candidate_button.click()
+            assert page.locator("#roomCount").inner_text() == "1 room"
 
             with page.expect_download() as dxf_download_info:
                 page.locator("#exportDxf").click()
@@ -1268,7 +1313,9 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             Draft202012Validator(project_schema,format_checker=FormatChecker()).validate(project_payload)
             assert len(project_payload["geometry"])==8
             assert project_payload["reconstruction"]["scale"]["pixels_per_mm_x"]==0.04
-            assert project_payload["reconstruction"]["junction_candidates"][0]["review_status"] == "joined"
+            assert all(item["review_status"] == "joined" for item in project_payload["reconstruction"]["junction_candidates"])
+            assert len(project_payload["rooms"]) == 1
+            assert len(project_payload["rooms"][0]["vertices_px"]) == 4
 
             page.locator("#projectInput").set_input_files({
                 "name":"survey.planline",
@@ -1285,6 +1332,7 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             assert page.locator("#calibrationState").inner_text()=="X/Y scales"
             restored_junction_button = page.locator("#junctionCandidateList button").first
             assert restored_junction_button.inner_text() == "Undo join"
+            assert page.locator("#roomCount").inner_text() == "1 room"
             restored_junction_button.click()
             assert restored_junction_button.inner_text() == "Join endpoints"
 
