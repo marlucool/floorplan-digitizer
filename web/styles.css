@@ -2242,3 +2242,8 @@ body{overflow-x:clip}
 .junction-candidate[data-state="joined"]{border-color:var(--green);background:var(--paper)}
 .junction-candidate[data-state="blocked"]{opacity:.75}
 @media(max-width:620px){.junction-candidate{align-items:flex-start;flex-direction:column}.junction-candidate button{width:100%}.junction-review-heading{align-items:flex-start;flex-direction:column}}
+
+
+.opening-candidate-actions{display:flex;align-items:center;gap:8px;flex:none}
+.opening-type-select{min-width:112px;max-width:140px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);font:600 11px Manrope,sans-serif}
+@media(max-width:620px){.opening-candidate-actions{width:100%}.opening-type-select{flex:1;max-width:none}}

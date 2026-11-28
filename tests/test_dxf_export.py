@@ -192,3 +192,51 @@ def test_dxf_rejects_incomplete_or_mixed_axis_scales(overrides, message) -> None
     values.update(overrides)
     with pytest.raises(ValidationError, match=message):
         ManualGeometryDXFRequest(**values)
+
+
+def test_dxf_exports_reviewed_openings_on_typed_layers() -> None:
+    request = sample_request(
+        segments=[],
+        rooms=[],
+        openings=[
+            {
+                "id": "manual-opening-001",
+                "opening_type": "door",
+                "start_px": {"x": 40, "y": 30},
+                "end_px": {"x": 70, "y": 30},
+                "source_detection_ids": ["det-001", "det-002"],
+            },
+            {
+                "id": "manual-opening-002",
+                "opening_type": "window",
+                "start_px": {"x": 80, "y": 50},
+                "end_px": {"x": 110, "y": 50},
+                "source_detection_ids": ["det-003", "det-004"],
+            },
+        ],
+    )
+    text = export_manual_geometry_dxf(request).decode("ascii")
+    pairs = list(zip(text.splitlines()[0::2], text.splitlines()[1::2]))
+
+    assert ("2", "DOORS") in pairs
+    assert ("2", "WINDOWS") in pairs
+    assert pairs.count(("0", "LINE")) == 2
+    door_line = pairs.index(("0", "LINE"))
+    assert pairs[door_line + 1] == ("8", "DOORS")
+    window_line = pairs.index(("0", "LINE"), door_line + 1)
+    assert pairs[window_line + 1] == ("8", "WINDOWS")
+
+
+def test_dxf_rejects_zero_length_opening_marker() -> None:
+    with pytest.raises(ValidationError, match="Opening .* zero length"):
+        sample_request(
+            segments=[],
+            rooms=[],
+            openings=[{
+                "id": "manual-opening-001",
+                "opening_type": "door",
+                "start_px": {"x": 40, "y": 30},
+                "end_px": {"x": 40, "y": 30},
+                "source_detection_ids": ["det-001", "det-002"],
+            }],
+        )

@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const PREVIEW_MODE = window.PLANLINE_PREVIEW === true;
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, ocrReady: false, ocrModels: [], ocrDatasets: [], ocrPredictions: {}, ocrRunning: false, ocrModelId: null, ocrDevice: null, ocrCapabilitiesLoaded: false, ocrCapabilitiesPromise: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, reconstruction: null, geometry: { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, ocrReady: false, ocrModels: [], ocrDatasets: [], ocrPredictions: {}, ocrRunning: false, ocrModelId: null, ocrDevice: null, ocrCapabilitiesLoaded: false, ocrCapabilitiesPromise: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, reconstruction: null, geometry: { segments: [], rooms: [], openings: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, nextOpeningId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
 
 function updateWorkflow(stage) {
   const order = ["upload", "analyse", "review", "draw"];
@@ -45,7 +45,7 @@ function resetWorkspace() {
   state.detections = []; state.selectedId = null; state.activeFilter = "all";
   state.overlayVisible = true; state.resizeObserver = null; state.resizeHandler = null; state.zoom = 1;
   state.searchQuery = ""; state.sortMode = "original";
-  state.geometry = { segments: [], rooms: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1 };
+  state.geometry = { segments: [], rooms: [], openings: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, nextOpeningId: 1 };
   clearCalibration();
   renderGeometryControls();
   if ($("#detectionSearch")) $("#detectionSearch").value = "";
@@ -286,6 +286,33 @@ function drawDetections(previewUrl, detections, imageSize) {
         ctx.arc(point.x * sx, point.y * sy, Math.max(4, canvas.width / 450), 0, Math.PI * 2);
         ctx.fill();
       });
+    });
+    (state.geometry.openings || []).forEach((opening) => {
+      const start = { x: opening.start_px.x * sx, y: opening.start_px.y * sy };
+      const end = { x: opening.end_px.x * sx, y: opening.end_px.y * sy };
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const length = Math.hypot(dx, dy) || 1;
+      const normal = { x: -dy / length * 3, y: dx / length * 3 };
+      ctx.strokeStyle = opening.opening_type === "door" ? "#c47734" :
+        opening.opening_type === "window" ? "#4778a8" : "#7a6b91";
+      ctx.lineWidth = Math.max(4, canvas.width / 450);
+      ctx.lineCap = "butt";
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+      if (opening.opening_type === "window") {
+        ctx.moveTo(start.x + normal.x, start.y + normal.y);
+        ctx.lineTo(end.x + normal.x, end.y + normal.y);
+      }
+      ctx.stroke();
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.font = "bold " + Math.max(11, canvas.width / 100) + "px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(opening.opening_type === "door" ? "D" :
+        opening.opening_type === "window" ? "W" : "O",
+        (start.x + end.x) / 2, (start.y + end.y) / 2 - 5);
     });
     (state.geometry.rooms || []).forEach((room) => {
       const selected = room.id === state.geometry.selectedRoomId;
@@ -962,18 +989,142 @@ function addRoomLoopCandidate(candidate) {
   showNotice("Room outline added", "The closed wall loop was added as an editable room polygon. Check its corners and area before exporting.");
 }
 
+function renderOpeningReview() {
+  const panel = $("#openingReview");
+  if (!panel) return;
+  const candidates = state.reconstruction?.opening_candidates || [];
+  const openings = state.geometry.openings || [];
+  panel.classList.toggle("hidden", candidates.length === 0 && openings.length === 0);
+  const added = openings.length;
+  $("#openingReviewSummary").textContent = candidates.length
+    ? added + " added · " + Math.max(0, candidates.length - added) + " to review"
+    : added + " opening marker" + (added === 1 ? "" : "s");
+  const list = $("#openingCandidateList");
+  list.replaceChildren();
+
+  candidates.forEach((candidate) => {
+    const marker = openings.find((item) => item.candidate_id === candidate.id);
+    const card = document.createElement("article");
+    card.className = "junction-candidate";
+    card.dataset.state = marker ? "joined" : "pending";
+    const copy = document.createElement("div");
+    copy.className = "junction-candidate-copy";
+    const title = document.createElement("strong");
+    title.textContent = "Possible opening · " + Number(candidate.width_mm).toFixed(0) + " mm";
+    const detail = document.createElement("small");
+    detail.textContent = (candidate.axis === "x" ? "Horizontal wall run" : "Vertical wall run") +
+      " · " + candidate.wall_ids.join(" ↔ ");
+    copy.append(title, detail);
+
+    const actions = document.createElement("div");
+    actions.className = "opening-candidate-actions";
+    const select = document.createElement("select");
+    select.className = "opening-type-select";
+    select.setAttribute("aria-label", "Opening type for " + candidate.id);
+    [
+      ["door", "Door"],
+      ["window", "Window"],
+      ["unknown", "Unclassified"]
+    ].forEach(([value, label]) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      select.append(option);
+    });
+    if (marker) select.value = marker.opening_type;
+    select.disabled = PREVIEW_MODE || Boolean(marker);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "toolbar-button";
+    button.textContent = marker ? "Remove marker" : "Add marker";
+    button.disabled = PREVIEW_MODE;
+    button.addEventListener("click", () => {
+      if (marker) removeOpeningMarker(marker.id);
+      else addOpeningCandidate(candidate.id, select.value);
+    });
+    actions.append(select, button);
+    card.append(copy, actions);
+    list.append(card);
+  });
+
+  openings.filter((marker) => !candidates.some((candidate) => candidate.id === marker.candidate_id))
+    .forEach((marker) => {
+      const card = document.createElement("article");
+      card.className = "junction-candidate";
+      const copy = document.createElement("div");
+      copy.className = "junction-candidate-copy";
+      const title = document.createElement("strong");
+      title.textContent = (marker.opening_type === "door" ? "Door" :
+        marker.opening_type === "window" ? "Window" : "Opening") + " marker";
+      const detail = document.createElement("small");
+      detail.textContent = Number(marker.width_mm).toFixed(0) + " mm · " + marker.id;
+      copy.append(title, detail);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "toolbar-button";
+      button.textContent = "Remove marker";
+      button.disabled = PREVIEW_MODE;
+      button.addEventListener("click", () => removeOpeningMarker(marker.id));
+      card.append(copy, button);
+      list.append(card);
+    });
+}
+
+function addOpeningCandidate(candidateId, openingType) {
+  if (PREVIEW_MODE) return;
+  const candidate = state.reconstruction?.opening_candidates?.find((item) => item.id === candidateId);
+  if (!candidate || state.geometry.openings.some((item) => item.candidate_id === candidateId)) return;
+  let nextId = Math.max(1, state.geometry.nextOpeningId || 1);
+  let id = "manual-opening-" + String(nextId).padStart(3, "0");
+  while (state.geometry.openings.some((item) => item.id === id)) {
+    nextId += 1;
+    id = "manual-opening-" + String(nextId).padStart(3, "0");
+  }
+  state.geometry.openings.push({
+    id,
+    type: "opening_marker",
+    opening_type: ["door", "window", "unknown"].includes(openingType) ? openingType : "unknown",
+    candidate_id: candidate.id,
+    source_detection_ids: [...candidate.wall_ids],
+    axis: candidate.axis,
+    start_px: { ...candidate.start_px },
+    end_px: { ...candidate.end_px },
+    width_mm: candidate.width_mm,
+    source_page_index: state.result?.source?.page_index ?? 0,
+    created_by_user: true
+  });
+  candidate.review_status = "added";
+  state.geometry.nextOpeningId = nextId + 1;
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+  showNotice("Opening marker added", "The heuristic gap was added as a user-classified CAD marker. Check its position and classification before exporting.");
+}
+
+function removeOpeningMarker(openingId) {
+  if (PREVIEW_MODE) return;
+  const marker = state.geometry.openings.find((item) => item.id === openingId);
+  if (!marker) return;
+  state.geometry.openings = state.geometry.openings.filter((item) => item.id !== openingId);
+  const candidate = state.reconstruction?.opening_candidates?.find((item) => item.id === marker.candidate_id);
+  if (candidate) candidate.review_status = "pending";
+  renderGeometryControls();
+  if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
+  showNotice("Opening marker removed", "The source wall-gap suggestion remains available for review.");
+}
+
 function renderGeometryControls() {
   const geometry = state.geometry;
   const wallCount = geometry?.segments?.length || 0;
   const reconstructedCount = (geometry?.segments || []).filter((segment) => segment.created_by_reconstruction).length;
   const manualCount = wallCount - reconstructedCount;
   const roomCount = geometry?.rooms?.length || 0;
+  const openingCount = geometry?.openings?.length || 0;
   if (!$("#geometryCount")) return;
-  $("#geometryCount").textContent = wallCount
-    ? (manualCount ? manualCount + " manual wall" + (manualCount === 1 ? "" : "s") : "") +
-      (manualCount && reconstructedCount ? " · " : "") +
-      (reconstructedCount ? reconstructedCount + " detected draft" : "")
-    : "No wall edges yet";
+  const geometryLabels = [];
+  if (manualCount) geometryLabels.push(manualCount + " manual wall" + (manualCount === 1 ? "" : "s"));
+  if (reconstructedCount) geometryLabels.push(reconstructedCount + " detected draft");
+  if (openingCount) geometryLabels.push(openingCount + " opening marker" + (openingCount === 1 ? "" : "s"));
+  $("#geometryCount").textContent = geometryLabels.join(" · ") || "No wall edges yet";
   $("#reconstructWalls").disabled = !state.result || PREVIEW_MODE;
   $("#roomCount").textContent = roomCount + (roomCount === 1 ? " room" : " rooms");
   $("#drawWallTool").disabled = !state.result;
@@ -986,8 +1137,8 @@ function renderGeometryControls() {
   $("#clearWalls").disabled = wallCount === 0;
   $("#deleteRoom").disabled = !geometry.selectedRoomId;
   $("#clearRooms").disabled = roomCount === 0;
-  $("#exportGeometry").disabled = wallCount === 0 && roomCount === 0;
-  $("#exportDxf").disabled = wallCount === 0 && roomCount === 0;
+  $("#exportGeometry").disabled = wallCount === 0 && roomCount === 0 && openingCount === 0;
+  $("#exportDxf").disabled = wallCount === 0 && roomCount === 0 && openingCount === 0;
   $("#drawWallTool").classList.toggle("active-tool", geometry.mode === "draw_wall");
   $("#drawRoomTool").classList.toggle("active-tool", geometry.mode === "draw_room");
   $("#selectWallTool").classList.toggle("active-tool", geometry.mode === "select");
@@ -1044,6 +1195,7 @@ function renderGeometryControls() {
   }
   renderJunctionReview();
   renderRoomLoopReview();
+  renderOpeningReview();
 }
 
 function setGeometryMode(mode) {
@@ -1362,6 +1514,7 @@ async function reconstructWallDraft() {
     $("#geometryDetails").open = true;
     const skipped = result.skipped_walls?.length || 0;
     const junctions = result.junction_candidates?.length || 0;
+    const openings = result.opening_candidates?.length || 0;
     output.dataset.state = skipped ? "warning" : "success";
     output.textContent =
       "Created " + result.segments.length + " editable wall-face edges from " +
@@ -1369,9 +1522,11 @@ async function reconstructWallDraft() {
       result.scale.pixels_per_mm_x.toFixed(6) + " px/mm; Y scale " +
       result.scale.pixels_per_mm_y.toFixed(6) + " px/mm. " +
       (skipped ? skipped + " ambiguous wall regions were skipped. " : "") +
-      (junctions ? junctions + " possible wall junctions need review in the panel below. " :
-        "No endpoint junction candidates found; connections still need review. ") +
-      "No junctions have been joined automatically.";
+      (junctions ? junctions + " possible wall junctions need review below. " :
+        "No endpoint junction candidates found. ") +
+      (openings ? openings + " possible wall gaps need classification below. " :
+        "No wall gaps passed the opening heuristic. ") +
+      "No junctions or openings have been applied automatically.";
     if (state.previewUrl) drawDetections(state.previewUrl, state.detections, state.result.image);
     showNotice("Wall draft generated", result.warnings?.join(" ") || "Review all generated wall edges against the source.");
   } catch (error) {
@@ -1401,6 +1556,13 @@ async function exportManualGeometryDxf() {
     rooms: state.geometry.rooms.map((room) => ({
       id: room.id,
       vertices_px: room.vertices_px
+    })),
+    openings: state.geometry.openings.map((opening) => ({
+      id: opening.id,
+      opening_type: opening.opening_type,
+      start_px: opening.start_px,
+      end_px: opening.end_px,
+      source_detection_ids: opening.source_detection_ids
     }))
   };
   const button = $("#exportDxf");
@@ -1428,7 +1590,7 @@ async function exportManualGeometryDxf() {
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     $("#geometryStatus").textContent = hasReconstructionScale
-      ? "DXF exported in millimetres using confirmed X/Y dimension scales. Detected wall edges are on DETECTED_WALL_DRAFT and still require review."
+      ? "DXF exported in millimetres using confirmed X/Y dimension scales. Detected wall edges are on DETECTED_WALL_DRAFT; reviewed opening markers are on DOORS, WINDOWS or OPENINGS."
       : payload.pixels_per_mm
         ? "DXF exported in millimetres using the user-supplied, unverified scale."
         : "DXF exported with unitless source-pixel coordinates. Apply scale calibration for metric units.";
@@ -1436,13 +1598,13 @@ async function exportManualGeometryDxf() {
     $("#geometryStatus").textContent = "DXF export failed: " + (error.message || "API unavailable");
   } finally {
     button.textContent = originalText;
-    button.disabled = state.geometry.segments.length === 0 && state.geometry.rooms.length === 0;
+    button.disabled = state.geometry.segments.length === 0 && state.geometry.rooms.length === 0 && state.geometry.openings.length === 0;
   }
 }
 
 
 function exportManualGeometrySvg() {
-  if (!state.result || (!state.geometry.segments.length && !state.geometry.rooms.length)) return;
+  if (!state.result || (!state.geometry.segments.length && !state.geometry.rooms.length && !state.geometry.openings.length)) return;
   const width = state.result.image.width;
   const height = state.result.image.height;
   const scaleX = state.reconstruction?.scale?.pixels_per_mm_x || state.calibration.applied?.pixels_per_mm;
@@ -1460,12 +1622,19 @@ function exportManualGeometrySvg() {
     '" stroke="' + (segment.created_by_reconstruction ? "#c47734" : "#172b4d") +
     '" stroke-width="6" stroke-linecap="round" />'
   );
-  const elements = [...polygons, ...lines].join("\n  ");
+  const openingLines = state.geometry.openings.map((opening) =>
+    '<line id="' + opening.id + '" data-opening-type="' + opening.opening_type +
+    '" x1="' + opening.start_px.x + '" y1="' + opening.start_px.y +
+    '" x2="' + opening.end_px.x + '" y2="' + opening.end_px.y +
+    '" stroke="' + (opening.opening_type === "door" ? "#c47734" : opening.opening_type === "window" ? "#4778a8" : "#7a6b91") +
+    '" stroke-width="5" />'
+  );
+  const elements = [...polygons, ...lines, ...openingLines].join("\n  ");
   const svg = '<?xml version="1.0" encoding="UTF-8"?>\n' +
     '<svg xmlns="http://www.w3.org/2000/svg" width="' + physicalWidth + '" height="' + physicalHeight +
     '" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">\n' +
-    '  <metadata>Planline editable linework: ' + state.geometry.segments.length + ' wall edges and ' +
-    state.geometry.rooms.length + ' room polygons. Coordinates are in original source-image pixels. ' +
+    '  <metadata>Planline editable linework: ' + state.geometry.segments.length + ' wall edges, ' +
+    state.geometry.rooms.length + ' room polygons and ' + state.geometry.openings.length + ' opening markers. Coordinates are in original source-image pixels. ' +
     (state.reconstruction ? 'Wall draft uses X/Y scales derived from confirmed dimensions and remains unverified.' :
       scaleX && scaleY ? 'Physical scale uses an explicit user reference; it is not verified geometry.' : 'No physical scale is embedded.') +
     '</metadata>\n  ' + elements + '\n</svg>';
@@ -2438,6 +2607,7 @@ function buildReviewObject() {
       .filter((segment) => segment.created_by_reconstruction === true)
       .map((segment) => ({ ...segment })),
     manual_rooms: state.geometry.rooms.map((room) => ({ ...room })),
+    manual_openings: state.geometry.openings.map((opening) => ({ ...opening })),
     reconstruction: state.reconstruction ? { ...state.reconstruction } : null,
     manual_dimension_text_review: (result.dimension_regions || []).map((region, index) => {
       const textInputs = document.querySelectorAll(".dimension-text-value");
@@ -2568,6 +2738,8 @@ async function saveProject() {
     geometry_next_id: state.geometry.nextId,
     rooms: state.geometry.rooms,
     room_next_id: state.geometry.nextRoomId,
+    openings: state.geometry.openings,
+    opening_next_id: state.geometry.nextOpeningId,
     review
   };
   const safeStem = (state.file.name || "drawing")
@@ -2583,7 +2755,7 @@ async function saveProject() {
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1500);
-  showNotice("Project saved", "The source drawing, review, manual linework and any dimension-driven wall draft with its X/Y scales were packaged into a local .planline file. Nothing was uploaded.");
+  showNotice("Project saved", "The source drawing, review, wall geometry, room polygons, opening markers and dimension-driven draft with its X/Y scales were packaged into a local .planline file. Nothing was uploaded.");
 }
 
 function restoreProjectReview(review) {
@@ -2686,6 +2858,21 @@ function isValidReconstructionState(reconstruction, segments, analysisResult) {
     Array.isArray(measurement.wall_ids) && measurement.wall_ids.length === 2 &&
     measurement.wall_ids.every((id) => wallIds.has(id))
   );
+  const validOpeningCandidates = (reconstruction.opening_candidates || []).every((candidate) =>
+    candidate && /^opening-candidate-[0-9]{3,}$/.test(candidate.id || "") &&
+    Array.isArray(candidate.wall_ids) && candidate.wall_ids.length === 2 &&
+    candidate.wall_ids.every((id) => wallIds.has(id)) &&
+    ["x", "y"].includes(candidate.axis) &&
+    Number.isFinite(candidate.width_mm) && candidate.width_mm >= 450 && candidate.width_mm <= 3000 &&
+    candidate.status === "candidate_requires_review" &&
+    ["pending", "added"].includes(candidate.review_status || "pending") &&
+    Number.isFinite(candidate.start_px?.x) && Number.isFinite(candidate.start_px?.y) &&
+    Number.isFinite(candidate.end_px?.x) && Number.isFinite(candidate.end_px?.y) &&
+    candidate.start_px.x >= 0 && candidate.start_px.y >= 0 &&
+    candidate.end_px.x >= 0 && candidate.end_px.y >= 0 &&
+    candidate.start_px.x <= analysisResult.image.width && candidate.end_px.x <= analysisResult.image.width &&
+    candidate.start_px.y <= analysisResult.image.height && candidate.end_px.y <= analysisResult.image.height
+  );
   const validJunctions = (reconstruction.junction_candidates || []).every((candidate) => {
     if (!candidate || !Array.isArray(candidate.source_detection_ids) ||
         candidate.source_detection_ids.length < 2 ||
@@ -2723,7 +2910,7 @@ function isValidReconstructionState(reconstruction, segments, analysisResult) {
     }
     return true;
   });
-  return validMeasurements && validJunctions && generated.every((segment) =>
+  return validMeasurements && validJunctions && validOpeningCandidates && generated.every((segment) =>
     wallIds.has(segment.source_detection_id) && draftIds.has(segment.id)
   );
 }
@@ -2731,11 +2918,14 @@ function isValidReconstructionState(reconstruction, segments, analysisResult) {
 function isValidProjectGeometry(project) {
   const segments = project.geometry ?? [];
   const rooms = project.rooms ?? [];
-  if (!Array.isArray(segments) || !Array.isArray(rooms)) return false;
+  const openings = project.openings ?? [];
+  if (!Array.isArray(segments) || !Array.isArray(rooms) || !Array.isArray(openings)) return false;
   if (project.geometry_next_id !== undefined &&
       (!Number.isInteger(project.geometry_next_id) || project.geometry_next_id < 1)) return false;
   if (project.room_next_id !== undefined &&
       (!Number.isInteger(project.room_next_id) || project.room_next_id < 1)) return false;
+  if (project.opening_next_id !== undefined &&
+      (!Number.isInteger(project.opening_next_id) || project.opening_next_id < 1)) return false;
   const ids = new Set();
   const pageIndex = project.analysis_result.source?.page_index ?? 0;
   const inBounds = (point) => point && Number.isFinite(point.x) && Number.isFinite(point.y) &&
@@ -2758,7 +2948,7 @@ function isValidProjectGeometry(project) {
       Math.hypot(segment.end_px.x - segment.start_px.x, segment.end_px.y - segment.start_px.y) >= 3;
   });
   if (!validSegments) return false;
-  return rooms.every((room) => {
+  const validRooms = rooms.every((room) => {
     if (!room || typeof room.id !== "string" || !/^manual-room-[0-9]{3,}$/.test(room.id) ||
         ids.has(room.id) || room.type !== "room_polygon" || room.created_by_user !== true ||
         !Number.isInteger(room.source_page_index) || room.source_page_index !== pageIndex ||
@@ -2766,6 +2956,22 @@ function isValidProjectGeometry(project) {
         !room.vertices_px.every(inBounds)) return false;
     ids.add(room.id);
     return isSimplePolygon(room.vertices_px) && polygonAreaPx2(room.vertices_px) >= 9;
+  });
+  if (!validRooms) return false;
+  return openings.every((opening) => {
+    if (!opening || typeof opening.id !== "string" || !/^manual-opening-[0-9]{3,}$/.test(opening.id) ||
+        ids.has(opening.id) || opening.type !== "opening_marker" || opening.created_by_user !== true ||
+        !["door", "window", "unknown"].includes(opening.opening_type) ||
+        !["x", "y"].includes(opening.axis) ||
+        !Number.isInteger(opening.source_page_index) || opening.source_page_index !== pageIndex ||
+        !Array.isArray(opening.source_detection_ids) || opening.source_detection_ids.length !== 2 ||
+        !opening.source_detection_ids.every((id) => project.analysis_result.detections.some((detection) =>
+          detection.id === id && detection.class_name === "wall")) ||
+        !Number.isFinite(opening.width_mm) || opening.width_mm <= 0 ||
+        (opening.candidate_id !== undefined && !/^opening-candidate-[0-9]{3,}$/.test(opening.candidate_id))) return false;
+    ids.add(opening.id);
+    return inBounds(opening.start_px) && inBounds(opening.end_px) &&
+      Math.hypot(opening.end_px.x - opening.start_px.x, opening.end_px.y - opening.start_px.y) >= 3;
   });
 }
 
@@ -2816,6 +3022,8 @@ async function openProjectFile(file) {
     state.geometry.nextId = Number.isInteger(project.geometry_next_id) ? project.geometry_next_id : state.geometry.segments.length + 1;
     state.geometry.rooms = Array.isArray(project.rooms) ? project.rooms : [];
     state.geometry.nextRoomId = Number.isInteger(project.room_next_id) ? project.room_next_id : state.geometry.rooms.length + 1;
+    state.geometry.openings = Array.isArray(project.openings) ? project.openings : [];
+    state.geometry.nextOpeningId = Number.isInteger(project.opening_next_id) ? project.opening_next_id : state.geometry.openings.length + 1;
     state.geometry.selectedId = null;
     state.geometry.pendingPoint = null;
     state.previewUrl = project.analysis_result.preview_data_url;
@@ -2826,7 +3034,7 @@ async function openProjectFile(file) {
     renderGeometryControls();
     restoreProjectReview(project.review);
     $("#saveProject").disabled = false;
-    showNotice("Project opened", "The source drawing, previous analysis, manual transcriptions, associations and calibration were restored locally.");
+    showNotice("Project opened", "The source drawing, previous analysis, manual transcriptions, wall and room geometry, opening markers, associations and calibration were restored locally.");
   } catch (error) {
     showNotice("Could not open project", error.message || "The project file is damaged or uses an unsupported version.");
   } finally {
