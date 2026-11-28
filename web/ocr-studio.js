@@ -5,7 +5,8 @@
     image: null, imageFile: null, cropBlob: null, cropRect: null,
     pointerStart: null, editingId: null, activeJobId: null, pollTimer: null,
     lastTrainedModel: null, busy: false, paddleReady: false, ocrReady: false,
-    pythonCompatible: false, paddleGpuAvailable: false, trainingAssets: null
+    pythonCompatible: false, paddleGpuAvailable: false, trainingAssets: null,
+    trainingAssetsRequestId: 0, datasetRequestId: 0
   };
 
   const terminalStatuses = new Set(["completed", "completed_no_export", "failed", "cancelled", "interrupted"]);
@@ -74,6 +75,7 @@
     const splitCounts = summary?.split_counts || {};
     const splitReady = Boolean(summary?.splits_present && splitCounts.train > 0 && splitCounts.validation > 0 && splitCounts.test > 0);
     const hasJob = Boolean(state.activeJobId);
+    $("#modelVariant").disabled = state.busy || hasJob;
     $("#auditDatasetButton").disabled = state.busy || !state.dataset;
     const assetsReady = Boolean(state.trainingAssets?.ready);
     $("#trainButton").disabled = state.busy || hasJob || !splitReady || !state.paddleReady || !assetsReady || summary?.valid === false;
@@ -94,8 +96,10 @@
 
   async function loadTrainingAssets() {
     const variant = $("#modelVariant").value;
+    const requestId = ++state.trainingAssetsRequestId;
     try {
       const assets = await api(`/api/ocr/training-assets?model_variant=${encodeURIComponent(variant)}`);
+      if (requestId !== state.trainingAssetsRequestId || variant !== $("#modelVariant").value) return;
       state.trainingAssets = assets;
       $("#paddleSourcePath").value = assets.paddleocr_dir || "";
       $("#pretrainedPath").value = assets.pretrained_model || "";
@@ -104,6 +108,7 @@
         ? `Official PaddleOCR ${assets.source_version} source and ${variant} checkpoint are ready locally.`
         : "Training files are not downloaded yet. Prepare them once; subsequent training runs reuse the local files.";
     } catch (error) {
+      if (requestId !== state.trainingAssetsRequestId || variant !== $("#modelVariant").value) return;
       state.trainingAssets = null;
       $("#prepareTrainingAssetsButton").disabled = state.busy;
       $("#trainingAssetsStatus").textContent = error.message;
@@ -177,8 +182,12 @@
   }
 
   async function loadDataset() {
-    if (!state.datasetId) return;
-    state.dataset = await api(`/api/ocr/datasets/${encodeURIComponent(state.datasetId)}`);
+    const datasetId = state.datasetId;
+    if (!datasetId) return;
+    const requestId = ++state.datasetRequestId;
+    const dataset = await api(`/api/ocr/datasets/${encodeURIComponent(datasetId)}`);
+    if (requestId !== state.datasetRequestId || state.datasetId !== datasetId) return;
+    state.dataset = dataset;
     renderDataset();
   }
 
