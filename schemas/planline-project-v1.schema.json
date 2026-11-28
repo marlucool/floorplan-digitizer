@@ -151,7 +151,7 @@
           "start_px",
           "end_px",
           "source_page_index",
-          "created_by_user"
+          null
         ],
         "properties": {
           "id": {
@@ -203,8 +203,50 @@
           },
           "created_by_user": {
             "const": true
+          },
+          "created_by_reconstruction": {
+            "const": true
+          },
+          "source_detection_id": {
+            "type": "string",
+            "pattern": "^det-[0-9]{3,}$"
+          },
+          "detector_confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "wall_orientation": {
+            "type": "string",
+            "enum": [
+              "horizontal",
+              "vertical"
+            ]
+          },
+          "wall_face_index": {
+            "type": "integer",
+            "enum": [
+              1,
+              2
+            ]
           }
-        }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "created_by_user"
+            ]
+          },
+          {
+            "required": [
+              "created_by_reconstruction",
+              "source_detection_id",
+              "detector_confidence",
+              "wall_orientation",
+              "wall_face_index"
+            ]
+          }
+        ]
       }
     },
     "geometry_next_id": {
@@ -266,6 +308,272 @@
     "room_next_id": {
       "type": "integer",
       "minimum": 1
+    },
+    "reconstruction": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "geometry_kind",
+            "segments",
+            "scale",
+            "measurements",
+            "skipped_dimensions",
+            "skipped_walls",
+            "wall_regions_used",
+            "warnings"
+          ],
+          "properties": {
+            "status": {
+              "const": "draft"
+            },
+            "geometry_kind": {
+              "const": "detected_wall_face_edges"
+            },
+            "segments": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "type",
+                  "start_px",
+                  "end_px",
+                  "source_page_index",
+                  "created_by_reconstruction",
+                  "source_detection_id",
+                  "detector_confidence",
+                  "wall_orientation",
+                  "wall_face_index"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^reconstructed-wall-[0-9]{4,}$"
+                  },
+                  "type": {
+                    "const": "wall_segment"
+                  },
+                  "start_px": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "x",
+                      "y"
+                    ],
+                    "properties": {
+                      "x": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "y": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
+                  },
+                  "end_px": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "x",
+                      "y"
+                    ],
+                    "properties": {
+                      "x": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "y": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
+                  },
+                  "source_page_index": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "created_by_reconstruction": {
+                    "const": true
+                  },
+                  "source_detection_id": {
+                    "type": "string",
+                    "pattern": "^det-[0-9]{3,}$"
+                  },
+                  "detector_confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "wall_orientation": {
+                    "type": "string",
+                    "enum": [
+                      "horizontal",
+                      "vertical"
+                    ]
+                  },
+                  "wall_face_index": {
+                    "type": "integer",
+                    "enum": [
+                      1,
+                      2
+                    ]
+                  }
+                }
+              }
+            },
+            "scale": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "pixels_per_mm_x",
+                "pixels_per_mm_y",
+                "source"
+              ],
+              "properties": {
+                "pixels_per_mm_x": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "pixels_per_mm_y": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "source": {
+                  "const": "confirmed_dimension_to_wall_associations"
+                }
+              }
+            },
+            "measurements": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "detection_id",
+                  "raw_text",
+                  "value_mm",
+                  "unit",
+                  "dimension_line_id",
+                  "wall_ids",
+                  "orientation",
+                  "axis",
+                  "span_px",
+                  "pixels_per_mm",
+                  "association_score"
+                ],
+                "properties": {
+                  "detection_id": {
+                    "type": "string",
+                    "pattern": "^det-[0-9]{3,}$"
+                  },
+                  "raw_text": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "value_mm": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "dimension_line_id": {
+                    "type": "string",
+                    "pattern": "^det-[0-9]{3,}$"
+                  },
+                  "wall_ids": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^det-[0-9]{3,}$"
+                    }
+                  },
+                  "orientation": {
+                    "type": "string",
+                    "enum": [
+                      "horizontal",
+                      "vertical"
+                    ]
+                  },
+                  "axis": {
+                    "type": "string",
+                    "enum": [
+                      "x",
+                      "y"
+                    ]
+                  },
+                  "span_px": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "pixels_per_mm": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "association_score": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                }
+              }
+            },
+            "skipped_dimensions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "skipped_walls": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "detection_id",
+                  "reason"
+                ],
+                "properties": {
+                  "detection_id": {
+                    "type": "string",
+                    "pattern": "^det-[0-9]{3,}$"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "wall_regions_used": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "warnings": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }
