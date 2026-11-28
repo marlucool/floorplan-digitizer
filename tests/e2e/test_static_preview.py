@@ -183,9 +183,14 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     )
 
 
-                    # The Architecture reader must retain a usable mobile menu
-                    # and provide a route back to the documentation library.
-                    page.goto(url + "architecture.html", wait_until="domcontentloaded")
+                    # Follow the relative Architecture link from a nested documentation page.
+                    page.locator(".nav-menu-toggle").click()
+                    expect(page.locator("#primaryNavigation")).to_be_visible()
+                    page.locator('#primaryNavigation a[href="../architecture.html"]').click()
+                    expect(page).to_have_url(url + "architecture.html")
+                    expect(page.locator(".architecture-prose")).to_be_visible()
+
+                    # The Architecture workspace must link back into the project documentation.
                     page.set_viewport_size({"width": 390, "height": 844})
                     expect(page.locator(".nav-menu-toggle")).to_be_visible()
                     expect(page.locator("#primaryNavigation")).to_be_hidden()
@@ -194,8 +199,9 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     expect(page.locator('#primaryNavigation a[aria-current="page"]')).to_have_text("Architecture")
                     expect(page.locator('#primaryNavigation a[href="documentation/index.html"]')).to_be_visible()
                     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), "Architecture overflows at 390px"
-                    page.locator(".nav-menu-toggle").click()
-                    expect(page.locator("#primaryNavigation")).to_be_hidden()
+                    page.locator('#primaryNavigation a[href="documentation/index.html"]').click()
+                    expect(page).to_have_url(url + "documentation/index.html")
+                    expect(page.locator("h1").first).to_have_text("Documentation.")
 
                     assert not api_requests, f"The static preview attempted backend requests: {api_requests}"
                 finally:
