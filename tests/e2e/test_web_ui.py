@@ -85,6 +85,52 @@ class OCRRaceHandler(QuietHandler):
 
 
 
+class OCRDatasetListRaceHandler(OCRRaceHandler):
+    dataset_list_calls = 0
+    dataset_list_lock = threading.Lock()
+
+    def do_GET(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/ocr/training-assets":
+            return self._json({
+                "ready": True, "paddleocr_dir": "/assets/mobile",
+                "pretrained_model": "/models/mobile", "source_version": "test",
+            })
+        if parsed.path == "/api/ocr/datasets":
+            with self.dataset_list_lock:
+                type(self).dataset_list_calls += 1
+                call_number = type(self).dataset_list_calls
+            if call_number == 1:
+                time.sleep(1.0)
+                return self._json({"datasets": [
+                    {"dataset_id": "dataset-one", "summary": {"samples": 1}},
+                ]})
+            return self._json({"datasets": [
+                {"dataset_id": "dataset-one", "summary": {"samples": 1}},
+                {"dataset_id": "dataset-two", "summary": {"samples": 2}},
+            ]})
+        if parsed.path.startswith("/api/ocr/datasets/"):
+            dataset_id = parsed.path.rsplit("/", 1)[-1]
+            samples = 1 if dataset_id == "dataset-one" else 2
+            return self._json({
+                "dataset_id": dataset_id,
+                "summary": {
+                    "samples": samples, "sources": 1, "writers": 1,
+                    "independent_groups": 3, "splits_present": False, "valid": True,
+                },
+                "samples": [], "available_models": [],
+            })
+        return super().do_GET()
+
+    def do_POST(self) -> None:
+        length = int(self.headers.get("Content-Length", "0"))
+        if length:
+            self.rfile.read(length)
+        if urlparse(self.path).path == "/api/ocr/datasets":
+            return self._json({"dataset_id": "dataset-two", "summary": {"samples": 2}})
+        self.send_error(404)
+
+
 class OCRPollingHandler(OCRRaceHandler):
     active_polls = 0
     max_active_polls = 0
@@ -909,6 +955,34 @@ def test_ocr_job_status_polling_never_overlaps_requests() -> None:
             page.wait_for_timeout(2600)
             assert OCRPollingHandler.poll_count == 1
             assert OCRPollingHandler.max_active_polls == 1
+            browser.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_ocr_dataset_creation_wins_over_older_dataset_list_response() -> None:
+    web_dir = Path(__file__).resolve().parents[2] / "web"
+    OCRDatasetListRaceHandler.dataset_list_calls = 0
+    handler = partial(OCRDatasetListRaceHandler, directory=str(web_dir))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            page = browser.new_page()
+            with page.expect_request(lambda request: request.url.endswith("/api/ocr/datasets") and request.method == "GET"):
+                page.goto(f"http://127.0.0.1:{server.server_port}/ocr.html", wait_until="domcontentloaded")
+            page.locator("#newDatasetButton").click()
+            page.locator("#newDatasetName").fill("New handwritten set")
+            page.locator("#createDatasetButton").click()
+            page.wait_for_function("document.querySelector('#datasetSelect')?.value === 'dataset-two'")
+            page.wait_for_timeout(1100)
+            assert page.locator("#datasetSelect").input_value() == "dataset-two"
+            assert page.locator("#datasetStats strong").first.inner_text() == "2"
             browser.close()
     finally:
         server.shutdown()
