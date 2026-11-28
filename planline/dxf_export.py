@@ -173,7 +173,7 @@ def export_manual_geometry_dxf(request: ManualGeometryDXFRequest) -> bytes:
         _pair(9, "$MEASUREMENT"), _pair(70, 1 if calibrated else 0),
         _pair(9, "$LUNITS"), _pair(70, 2),
         _pair(9, "$LUPREC"), _pair(70, 3),
-        _pair(999, "Calibrated millimetres use a user-supplied two-point reference; it is not verified."),
+        _pair(999, "Metric coordinates use a supplied scale or confirmed dimension-derived X/Y scales; review all geometry."),
         _pair(0, "ENDSEC"),
         _pair(0, "SECTION"), _pair(2, "TABLES"),
         _pair(0, "TABLE"), _pair(2, "LAYER"), _pair(70, 3),
