@@ -460,7 +460,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.locator("#previewImage").click(position={"x": 180, "y": 200})
             assert page.locator("#deleteWall").is_enabled()
             page.locator("#deleteWall").click()
-            assert page.locator("#geometryCount").inner_text() == "0 manual walls"
+            assert page.locator("#geometryCount").inner_text() == "No wall edges yet"
             page.locator("#drawWallTool").click()
             page.locator("#previewImage").click(position={"x": 60, "y": 220})
             page.locator("#previewImage").click(position={"x": 300, "y": 220})
