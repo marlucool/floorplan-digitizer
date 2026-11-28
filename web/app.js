@@ -1176,23 +1176,28 @@ function beginWallEndpointDrag(event) {
   const point = getSourcePoint(event);
   if (!point) return;
 
-  if (state.geometry.selectedRoomId) {
-    const room = state.geometry.rooms.find((item) => item.id === state.geometry.selectedRoomId);
-    if (!room) return;
-    let nearestIndex = -1;
-    let nearestDistance = 14;
+  const selectedRoom = state.geometry.rooms.find((item) => item.id === state.geometry.selectedRoomId);
+  const roomCandidates = selectedRoom
+    ? [selectedRoom]
+    : [...state.geometry.rooms].reverse();
+  let nearestRoomVertex = null;
+  let nearestRoomDistance = 14;
+  roomCandidates.forEach((room) => {
     room.vertices_px.forEach((vertex, index) => {
       const distance = Math.hypot(point.x - vertex.x, point.y - vertex.y);
-      if (distance <= nearestDistance) {
-        nearestIndex = index;
-        nearestDistance = distance;
+      if (distance <= nearestRoomDistance) {
+        nearestRoomVertex = { room, index, vertex };
+        nearestRoomDistance = distance;
       }
     });
-    if (nearestIndex < 0) return;
+  });
+  if (nearestRoomVertex) {
+    state.geometry.selectedRoomId = nearestRoomVertex.room.id;
+    state.geometry.selectedId = null;
     state.geometry.drag = {
-      roomId: room.id,
-      vertexIndex: nearestIndex,
-      originalPoint: { ...room.vertices_px[nearestIndex] },
+      roomId: nearestRoomVertex.room.id,
+      vertexIndex: nearestRoomVertex.index,
+      originalPoint: { ...nearestRoomVertex.vertex },
       pointerId: event.pointerId
     };
   } else if (state.geometry.selectedId) {
