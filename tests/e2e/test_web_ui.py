@@ -976,6 +976,13 @@ def test_ocr_dataset_creation_wins_over_older_dataset_list_response() -> None:
             page = browser.new_page()
             with page.expect_request(lambda request: request.url.endswith("/api/ocr/datasets") and request.method == "GET"):
                 page.goto(f"http://127.0.0.1:{server.server_port}/ocr.html", wait_until="domcontentloaded")
+            # Wait until the first request has entered the server handler before
+            # creating a dataset; request dispatch in Chromium precedes handler
+            # scheduling, so clicking immediately can reverse server arrival order.
+            deadline = time.monotonic() + 3
+            while OCRDatasetListRaceHandler.dataset_list_calls < 1 and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert OCRDatasetListRaceHandler.dataset_list_calls == 1
             page.locator("#newDatasetButton").click()
             page.locator("#newDatasetName").fill("New handwritten set")
             page.locator("#createDatasetButton").click()
