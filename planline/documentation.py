@@ -222,6 +222,7 @@ def _navigation(
       <a class="repo-link" href="{ocr_href}">OCR Studio</a>
       <a class="repo-link" href="{settings_href}">Settings</a>
       <a class="repo-link active" href="{documentation_href}" aria-current="page">Documentation</a>
+      <a class="repo-link" href="/architecture">Architecture</a>
       <button id="themeToggle" class="toolbar-button theme-toggle" type="button" aria-label="Switch to light theme" title="Switch to light theme" aria-pressed="false">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.2 15.1A8.5 8.5 0 0 1 8.9 3.8 8.7 8.7 0 1 0 20.2 15.1Z"/></svg>
       </button>
