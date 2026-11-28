@@ -8,7 +8,6 @@ association. It does not infer rooms, openings, diagonal walls or topology.
 from __future__ import annotations
 
 import math
-import re
 from statistics import median
 from typing import Any
 
@@ -16,11 +15,6 @@ from pydantic import BaseModel, Field, model_validator
 
 from .association import associate_dimensions
 from .dimensions import interpret_dimension_text
-
-
-class ReconstructionPoint(BaseModel):
-    x: float = Field(ge=0, le=25_000_000)
-    y: float = Field(ge=0, le=25_000_000)
 
 
 class ReconstructionDetection(BaseModel):
