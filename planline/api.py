@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import importlib.util
 import io
+import mimetypes
 import math
 import sys
 import warnings
@@ -34,6 +35,12 @@ from .dxf_export import ManualGeometryDXFRequest, export_manual_geometry_dxf
 from .dimensions import interpret_dimension_text
 from .dimension_constraints import WallDimensionCheckRequest, compare_wall_dimension
 from .architecture import render_architecture_page
+from .documentation import (
+    discover_documents,
+    render_documentation_index,
+    render_document_page,
+    safe_document_path,
+)
 from .ocr_studio_api import router as ocr_studio_router
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -301,6 +308,63 @@ def architecture_notes() -> HTMLResponse:
         architecture_href="/architecture",
     )
     return HTMLResponse(content=page)
+
+
+@app.get("/documentation", response_class=HTMLResponse)
+@app.get("/documentation/", response_class=HTMLResponse)
+def documentation_home() -> HTMLResponse:
+    """Show every discoverable document and reference file in docs/."""
+    documents = discover_documents(ROOT_DIR / "docs")
+    page = render_documentation_index(
+        documents,
+        home_href="/",
+        drawing_href="/drawing",
+        ocr_href="/ocr",
+        settings_href="/settings",
+        documentation_href="/documentation",
+    )
+    return HTMLResponse(content=page)
+
+
+@app.get("/documentation/{doc_path:path}", response_class=HTMLResponse)
+def documentation_file(doc_path: str) -> HTMLResponse:
+    """Render Markdown, images, PDFs, source files and attachments from docs/."""
+    try:
+        source_path = safe_document_path(ROOT_DIR / "docs", doc_path)
+    except (FileNotFoundError, OSError):
+        raise HTTPException(status_code=404, detail="Documentation file not found.") from None
+
+    documents = discover_documents(ROOT_DIR / "docs")
+    relative_path = source_path.relative_to(ROOT_DIR / "docs").as_posix()
+    document = next((item for item in documents if item["path"] == relative_path), None)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Documentation file not found.")
+
+    page = render_document_page(
+        document,
+        source_path.read_bytes() if document["kind"] in {"markdown", "source"} else b"",
+        documents,
+        static_site=False,
+        current_output_path=f"documentation/{doc_path}",
+        asset_prefix="/",
+        home_href="/",
+        drawing_href="/drawing",
+        ocr_href="/ocr",
+        settings_href="/settings",
+        documentation_href="/documentation",
+    )
+    return HTMLResponse(content=page)
+
+
+@app.get("/docs/{doc_path:path}", response_class=FileResponse)
+def documentation_asset(doc_path: str) -> FileResponse:
+    """Serve original documentation assets for images, PDFs and downloads."""
+    try:
+        source_path = safe_document_path(ROOT_DIR / "docs", doc_path)
+    except (FileNotFoundError, OSError):
+        raise HTTPException(status_code=404, detail="Documentation asset not found.") from None
+    media_type = mimetypes.guess_type(source_path.name)[0] or "application/octet-stream"
+    return FileResponse(source_path, media_type=media_type)
 
 
 @app.get("/api/health")
