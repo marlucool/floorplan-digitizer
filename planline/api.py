@@ -457,7 +457,7 @@ def reconstruct_wall_draft_endpoint(request: WallReconstructionRequest) -> dict[
 def export_manual_geometry_dxf_endpoint(
     request: ManualGeometryDXFRequest,
 ) -> Response:
-    """Export manual geometry and separately layered detected wall-edge drafts."""
+    """Export editable walls, rooms and classified opening markers with separately layered detected wall-edge drafts."""
     try:
         content = export_manual_geometry_dxf(request)
     except ValueError as exc:
