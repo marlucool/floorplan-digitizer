@@ -223,7 +223,7 @@ def _navigation(
     <button class="nav-menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="primaryNavigation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <nav class="top-links" id="primaryNavigation" aria-label="Primary navigation">
       <a class="repo-link" href="{home_href}">Dashboard</a>
-      <a class="repo-link" href="{drawing_href}">Drawing</a>
+      <a class="repo-link" href="{drawing_href}">Drawing workspace</a>
       <a class="repo-link" href="{ocr_href}">OCR Studio</a>
       <a class="repo-link" href="{settings_href}">Settings</a>
       <a class="repo-link active" href="{documentation_href}" aria-current="page">Documentation</a>
@@ -254,6 +254,7 @@ def _page_shell(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#151c17">
   <meta name="description" content="{html.escape(description, quote=True)}">
   <title>{html.escape(title)} — Planline</title>
   <link rel="stylesheet" href="{asset_prefix}styles.css">
