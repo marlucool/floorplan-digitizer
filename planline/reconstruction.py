@@ -367,7 +367,7 @@ def reconstruct_wall_edges(
         "wall_regions_used": len({item["source_detection_id"] for item in segments}),
         "warnings": [
             "This is editable draft wall-face linework, not a verified construction drawing.",
-            "Each detected wall bounding box becomes two parallel face lines. Near-coincident endpoints include source endpoint references and can be joined only after explicit review; no automatic topology repair is applied.",
+            "Each detected wall bounding box becomes two parallel face lines. Near-coincident endpoints include source endpoint references and can be joined only after explicit review; closed cycles can then be offered as room outlines, but no automatic topology repair or room creation is applied.",
             "Doors, windows, room boundaries, diagonal walls and missing wall regions are not inferred.",
             "X and Y scales are derived independently from confirmed dimensions. Local perspective, skew and paper distortion are not rectified.",
             "Inspect every generated edge against the source scan before relying on the DXF.",
