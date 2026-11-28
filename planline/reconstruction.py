@@ -217,10 +217,13 @@ def _junction_candidates(
     segments: list[dict[str, Any]],
     tolerance_px: float = 2.0,
 ) -> list[dict[str, Any]]:
-    """Find near-coincident wall-face endpoints without changing linework.
+    """Report directly near-coincident endpoints without changing linework.
 
-    This is deliberately a review hint, not automatic snapping or topology
-    repair. Spatial buckets keep the search bounded for large detection sets.
+    Each result is a pairwise observation. Avoiding transitive clustering
+    prevents a chain of individually close endpoints from being presented as
+    one junction when the endpoints at either end are farther apart than the
+    configured tolerance. A multi-wall junction may therefore produce several
+    pairwise review candidates.
     """
     endpoints: list[dict[str, Any]] = []
     for segment in segments:
@@ -234,65 +237,48 @@ def _junction_candidates(
                 "y": float(point["y"]),
             })
 
-    parent = list(range(len(endpoints)))
-    rank = [0] * len(endpoints)
-
-    def find(index: int) -> int:
-        while parent[index] != index:
-            parent[index] = parent[parent[index]]
-            index = parent[index]
-        return index
-
-    def union(first: int, second: int) -> None:
-        root_a, root_b = find(first), find(second)
-        if root_a == root_b:
-            return
-        if rank[root_a] < rank[root_b]:
-            root_a, root_b = root_b, root_a
-        parent[root_b] = root_a
-        if rank[root_a] == rank[root_b]:
-            rank[root_a] += 1
-
-    cell_size = tolerance_px
+    candidates: list[dict[str, Any]] = []
     buckets: dict[tuple[int, int], list[int]] = {}
     for index, endpoint in enumerate(endpoints):
-        cell_x = math.floor(endpoint["x"] / cell_size)
-        cell_y = math.floor(endpoint["y"] / cell_size)
+        cell_x = math.floor(endpoint["x"] / tolerance_px)
+        cell_y = math.floor(endpoint["y"] / tolerance_px)
         for offset_x in (-1, 0, 1):
             for offset_y in (-1, 0, 1):
                 for other_index in buckets.get((cell_x + offset_x, cell_y + offset_y), []):
                     other = endpoints[other_index]
                     if other["source_detection_id"] == endpoint["source_detection_id"]:
                         continue
-                    if math.hypot(endpoint["x"] - other["x"], endpoint["y"] - other["y"]) <= tolerance_px:
-                        union(index, other_index)
+                    distance = math.hypot(
+                        endpoint["x"] - other["x"],
+                        endpoint["y"] - other["y"],
+                    )
+                    if distance > tolerance_px:
+                        continue
+                    candidates.append({
+                        "point_px": {
+                            "x": round((endpoint["x"] + other["x"]) / 2, 2),
+                            "y": round((endpoint["y"] + other["y"]) / 2, 2),
+                        },
+                        "source_detection_ids": sorted({
+                            endpoint["source_detection_id"],
+                            other["source_detection_id"],
+                        }),
+                        "segment_ids": sorted({
+                            endpoint["segment_id"],
+                            other["segment_id"],
+                        }),
+                        "endpoint_count": 2,
+                        "status": "candidate_requires_review",
+                    })
         buckets.setdefault((cell_x, cell_y), []).append(index)
 
-    groups: dict[int, list[dict[str, Any]]] = {}
-    for index, endpoint in enumerate(endpoints):
-        groups.setdefault(find(index), []).append(endpoint)
-
-    junctions: list[dict[str, Any]] = []
-    for group in groups.values():
-        source_ids = sorted({item["source_detection_id"] for item in group})
-        if len(source_ids) < 2:
-            continue
-        edge_ids = sorted({item["segment_id"] for item in group})
-        junctions.append({
-            "point_px": {
-                "x": round(sum(item["x"] for item in group) / len(group), 2),
-                "y": round(sum(item["y"] for item in group) / len(group), 2),
-            },
-            "source_detection_ids": source_ids,
-            "segment_ids": edge_ids,
-            "endpoint_count": len(group),
-            "status": "candidate_requires_review",
-        })
-
-    junctions.sort(key=lambda item: (
-        item["point_px"]["y"], item["point_px"]["x"], item["source_detection_ids"]
+    candidates.sort(key=lambda item: (
+        item["point_px"]["y"],
+        item["point_px"]["x"],
+        item["source_detection_ids"],
+        item["segment_ids"],
     ))
-    return junctions
+    return candidates
 
 
 def reconstruct_wall_edges(
