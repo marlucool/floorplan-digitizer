@@ -2065,3 +2065,99 @@ footer a{color:var(--app-accent)}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+
+/* Final shared shell + documentation rules. Keep docs inside the same app
+   shell and token system; only the reading column gets editorial typography. */
+.documentation-page,
+.architecture-page {
+  min-width:0;background:var(--app-bg);color:var(--app-text);
+  font-family:Inter,'DM Sans',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+.documentation-page .topbar,
+.architecture-page .topbar {
+  width:100%;min-width:0;margin:0;padding:0 clamp(16px,4vw,56px);
+  border:0;border-bottom:1px solid var(--app-border);border-radius:0;
+  background:var(--app-panel);box-shadow:none;backdrop-filter:none;
+}
+.documentation-page .brand,.architecture-page .brand{flex:0 0 auto}
+.documentation-page .brand-mark,.architecture-page .brand-mark{width:32px;height:32px;object-fit:contain;border-radius:8px}
+.documentation-page .top-meta,.architecture-page .top-meta{color:var(--app-muted);font:500 12px Inter,'DM Sans',sans-serif}
+.documentation-page .top-links,.architecture-page .top-links{min-width:0;gap:6px}
+.documentation-page .top-links .repo-link,.architecture-page .top-links .repo-link{
+  min-height:40px;padding:0 13px;border:0;border-radius:9px;
+  color:var(--app-muted);font:550 13px Inter,'DM Sans',sans-serif
+}
+.documentation-page .top-links .repo-link:hover,.architecture-page .top-links .repo-link:hover{background:var(--app-panel-soft);color:var(--app-text)}
+.documentation-page .top-links .repo-link[aria-current="page"],.architecture-page .top-links .repo-link[aria-current="page"]{background:var(--app-accent-soft);color:var(--app-accent-strong);font-weight:700}
+.documentation-page .theme-toggle,.architecture-page .theme-toggle{
+  display:grid;place-items:center;flex:0 0 40px;width:40px;height:40px;margin:0;padding:0;
+  border:1px solid var(--app-border);border-radius:10px;background:var(--app-panel-raised)
+}
+.documentation-page .documentation-hub,.documentation-page .documentation-layout,.architecture-page main{
+  width:min(1440px,100%);min-width:0;margin:0 auto;
+  padding:clamp(24px,3.5vw,48px) clamp(16px,4vw,56px) 36px
+}
+.documentation-page .documentation-layout{
+  display:grid;grid-template-columns:minmax(260px,340px) minmax(0,1fr);
+  align-items:start;gap:clamp(22px,3vw,40px)
+}
+.documentation-page .documentation-sidebar,.documentation-page .documentation-article{min-width:0;max-width:100%}
+.documentation-page .documentation-article-heading h1,.documentation-page .documentation-prose h1,
+.documentation-page .documentation-prose h2,.documentation-page .documentation-prose h3,
+.documentation-page .documentation-prose h4{
+  color:var(--app-text);font-family:Inter,'Manrope','DM Sans',sans-serif;
+  letter-spacing:-.035em;overflow-wrap:anywhere
+}
+.documentation-page .documentation-article-heading h1{font-size:clamp(30px,3.5vw,44px);line-height:1.12}
+.documentation-page .documentation-prose{min-width:0;color:var(--app-text);font-size:15px;line-height:1.75;overflow-wrap:anywhere}
+.documentation-page .documentation-prose p,.documentation-page .documentation-prose li{color:var(--app-muted);font-size:15px;line-height:1.75}
+.documentation-page .documentation-prose h2{font-size:clamp(22px,2.4vw,28px)}
+.documentation-page .documentation-prose h3{font-size:20px}
+.documentation-page .documentation-prose a{color:var(--app-accent-strong)}
+.documentation-page .documentation-prose pre,.documentation-page .documentation-prose table{max-width:100%}
+.documentation-page .documentation-prose pre{overflow:auto}
+.documentation-page .documentation-prose table{display:block;overflow-x:auto}
+.documentation-page .documentation-prose img,.documentation-page .documentation-image img{max-width:100%;height:auto}
+.documentation-page .documentation-file,.documentation-page .documentation-group,
+.documentation-page .documentation-toc,.documentation-page .documentation-file-name{min-width:0}
+.documentation-page .documentation-file-name strong,.documentation-page .documentation-file-name small{overflow-wrap:anywhere}
+.documentation-page .documentation-footer{flex-wrap:wrap}
+.documentation-page .documentation-pdf{max-width:100%}
+.documentation-page .documentation-search,.documentation-page .documentation-search input{min-width:0;max-width:100%}
+.documentation-page :where(pre,table,figure,iframe,video){max-width:100%}
+.documentation-page :where(code){overflow-wrap:anywhere}
+html,body{max-width:100%}
+body{overflow-x:clip}
+.topbar,.topbar>* ,.top-links{min-width:0}
+.top-links .repo-link{max-width:100%}
+@media (min-width:761px) and (max-width:1080px){
+  .topbar{min-height:64px;height:auto;flex-wrap:wrap;gap:8px 16px;padding:10px 20px}
+  .topbar .top-meta{margin-left:auto}
+  .topbar .top-links{order:3;width:100%;margin:0;justify-content:flex-start;flex-wrap:wrap}
+}
+@media (max-width:760px){
+  .documentation-page .topbar,.architecture-page .topbar{
+    width:calc(100% - 20px);margin:8px 10px 0;padding:7px 8px 7px 14px;
+    border:1px solid var(--app-border);border-radius:999px
+  }
+  .documentation-page .top-links,.architecture-page .top-links{
+    display:none;position:absolute;top:calc(100% + 9px);right:0;z-index:60;
+    width:min(280px,calc(100vw - 24px));margin:0;padding:9px;
+    flex-direction:column;align-items:stretch;gap:4px;overflow:visible;
+    border:1px solid var(--app-border);border-radius:18px;background:var(--app-panel-raised);
+    box-shadow:var(--app-shadow)
+  }
+  .documentation-page .topbar.menu-open .top-links,.architecture-page .topbar.menu-open .top-links{display:flex}
+  .documentation-page .top-links .repo-link,.architecture-page .top-links .repo-link{justify-content:flex-start;min-height:42px;padding:9px 13px}
+  .documentation-page .theme-toggle,.architecture-page .theme-toggle{width:100%;height:42px;flex-basis:42px;margin-top:3px}
+  .documentation-page .documentation-hub,.documentation-page .documentation-layout,.architecture-page main{padding:24px 16px 32px}
+  .documentation-page .documentation-layout{grid-template-columns:minmax(0,1fr);gap:18px}
+  .documentation-page .documentation-sidebar{position:static;max-height:420px}
+}
+@media (max-width:520px){
+  .documentation-page .documentation-prose,.documentation-page .documentation-prose p,
+  .documentation-page .documentation-prose li{font-size:14px}
+  .documentation-page .documentation-file-list{max-height:260px;overflow:auto}
+  .documentation-page .documentation-toc{max-height:220px;overflow:auto}
+}
