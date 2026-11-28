@@ -44,13 +44,14 @@ Planline is no longer just a detector preview. The current application is a **lo
 
 - Reviewers can draw, select, move either endpoint of, delete, undo and clear manual wall segments. Room polygons can be created and edited; self-crossing or degenerate outlines are rejected. Optional snapping applies only to user-created endpoints and vertices.
 - Wall lengths and room areas are reported in source pixels unless a user supplies a two-point scale reference. Calibrated metres or square metres are derived from that reference; they are not independently verified dimensions and a single global scale cannot correct perspective or local distortion.
-- Portable, versioned `.planline` projects support explicit local save/open of the source file, analysis, review state, manual transcriptions, association selections, scale calibration, wall segments and room polygons. Project saving is user-initiated; there is no background project upload or server-side project store.
-- SVG and DXF export are available for **user-authored** wall segments and room polygons only. Calibrated DXF uses millimetres based on the user-supplied scale; uncalibrated DXF is unitless source-pixel geometry. Detector boxes, OCR text and association suggestions are never silently promoted to CAD entities.
+- **Dimension-driven wall-edge draft (first-stage reconstruction):** after the reviewer verifies explicit linear dimension text and confirms the matching dimension line and two bounding wall detections, the API recomputes the candidate association and uses the agreed pixel span as a measurement. At least one horizontal and one vertical measurement are required; the median per-axis scale is used and inconsistent same-axis measurements block generation. Each clearly axis-aligned wall bounding box becomes two editable parallel face lines with source detection ID and confidence. Ambiguous/diagonal boxes are skipped. This is draft linework only: it does not join wall junctions, infer openings or rooms, or correct scan perspective/skew.
+- Portable, versioned `.planline` projects support explicit local save/open of the source file, analysis, review state, manual transcriptions, association selections, scale calibration, manual wall segments, the dimension-driven draft and its X/Y scale provenance, and room polygons. Project saving is user-initiated; there is no background project upload or server-side project store.
+- SVG and DXF export support manual linework and the explicitly generated wall-edge draft. Draft edges are exported on a separate `DETECTED_WALL_DRAFT` DXF layer, with metric coordinates using confirmed X/Y scales; manually drawn segments remain on `WALLS` and room polygons on `ROOMS`. Detector boxes, OCR text or unconfirmed associations are never promoted to CAD entities.
 - Raster dimensions are preflighted before full OpenCV decode and checked again after decode. PDF page dimensions are checked before rasterisation. The multipart request parser may spool uploads to temporary storage before the endpoint-level size check; the application must not be described as memory-only.
 
 ### Explicitly not implemented
 
-The following remain future engineering work: reliable real-scan detector performance; tiled inference; reversible deskew/dewarp; automatic full-sheet OCR; automatic acceptance of text-to-line or line-to-span associations; a global metric constraint solver; dimension-driven wall/opening topology reconstruction; and verified measured DXF export. The existing tools provide reviewable components, not an end-to-end automatic CAD pipeline.
+The following remain future engineering work: reliable real-scan detector performance; tiled inference; reversible deskew/dewarp; automatic full-sheet OCR; automatic acceptance of text-to-line or line-to-span associations; a global metric constraint solver; joining wall faces into consistent junctions; room, door and window reconstruction; diagonal/non-orthogonal wall handling; and validated, verified measured CAD export. The current wall-edge draft is an intermediate, reviewable output, not an end-to-end automatic CAD pipeline.
 
 A real-weight detector smoke test on representative older scans is still outstanding. API tests use a fake detector and therefore do not establish model accuracy. Browser automation covers key drawing, overlay, export and narrow-viewport behaviour; manual visual inspection across real scans and PDF cases remains outstanding.
 
@@ -120,11 +121,11 @@ A global scale estimate may be useful as a diagnostic when several trusted dimen
 
 ### 6. Reconstruct editable 2D topology — manual geometry implemented, automatic reconstruction planned
 
-Planline currently lets the reviewer draw and edit wall segments and room polygons manually. It does not infer connected wall topology, junctions, openings or closed room boundaries from detections, OCR or dimensions. Future reconstruction must preserve links back to source pixels and detection records. Geometric cleanup must not invent a closing wall merely to make a polygon valid.
+Planline supports manual wall/room drawing and a first automatic wall-edge draft. The draft stage turns each clearly axis-aligned detected wall region into two parallel edge lines only after at least one horizontal and one vertical dimension have been explicitly transcribed, verified and associated with the correct wall pair. It retains source detection IDs and per-axis scale provenance. It does not infer connected topology, wall junctions, openings or closed room boundaries. Future reconstruction must preserve links back to source pixels and detection records. Geometric cleanup must not invent a closing wall merely to make a polygon valid.
 
-### 7. Gate DXF export — manual-geometry export implemented, measured export planned
+### 7. Gate DXF export — draft wall-edge export implemented, verified measured export planned
 
-The current DXF exporter accepts only user-authored wall segments and room polygons. It does not export detector boxes, OCR candidates or automatically reconstructed measured geometry. A future measured export must be a separate, explicit operation gated by a validated project state, with clear layers, units and provenance. Unresolved or contradictory dimensions should block a **measured** export; a non-metric tracing must be explicitly labelled as unmeasured.
+The DXF exporter accepts manual wall segments, room polygons and the explicit dimension-driven wall-face draft. Draft wall faces are emitted on `DETECTED_WALL_DRAFT`, manual walls on `WALLS`, and rooms on `ROOMS`. The draft uses separate X/Y scales from confirmed dimensions and is labelled as draft geometry; it is not a certified measured drawing. The generation endpoint blocks missing axes, unsupported/ambiguous dimension text, associations that no longer match the source candidate geometry, and conflicting same-axis measurements. Full measured export still needs a topology/constraint solver, wall junction and opening reconstruction, scan-distortion handling, and an independent validation gate.
 
 ## Research findings that influence the design
 
@@ -300,7 +301,7 @@ A clean dataset-quality report is only a data-hygiene check. It does not prove t
 - [x] Add explicit multi-page PDF page selection and source-page provenance.
 - [x] Add portable `.planline` save/open with local user-controlled storage.
 - [x] Add editable manual wall segments, room polygons, endpoint/corner editing and optional snapping.
-- [x] Add SVG and DXF export for user-authored geometry only, with calibrated/unitless DXF handling.
+- [x] Add SVG and DXF export for manual geometry, plus a separate DXF layer for dimension-constrained wall-face drafts using confirmed X/Y scales.
 - [x] Add an OCR crop curator, manifest validation, source/writer-grouped splits and a dataset-quality audit.
 - [x] Add local PaddleOCR fine-tuning job orchestration and held-out recogniser benchmarking.
 - [x] Add browser smoke coverage for zoomed overlay alignment and a narrow mobile viewport.
@@ -317,7 +318,7 @@ A clean dataset-quality report is only a data-hygiene check. It does not prove t
 - [ ] Implement a global constraint solver that can identify under-constrained, over-constrained and inconsistent dimension systems without inventing measurements.
 - [ ] Benchmark reversible deskew/dewarp and map transformed detections back to original source coordinates.
 - [ ] Reconstruct wall/opening topology from reviewed source evidence and verified constraints; do not infer closure solely to make polygons valid.
-- [ ] Design a validation gate for dimension-driven measured DXF export, including units, layers, provenance and unresolved-item blocking.
+- [ ] Extend the wall-face draft into connected wall topology with validated junctions, rooms and openings; retain unit/layer/provenance validation before any certified measured export.
 - [ ] Manually inspect drawing, OCR and architecture pages at desktop/mobile sizes and verify PDF preview behaviour on representative files.
 - [ ] Keep OCR training datasets rights-cleared, source-/writer-separated and outside the application repository by default.
 
