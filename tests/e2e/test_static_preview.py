@@ -55,6 +55,8 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                 browser = playwright.chromium.launch(headless=True)
                 try:
                     page = browser.new_page(viewport={"width": 1440, "height": 1000})
+                    page_errors: list[str] = []
+                    page.on("pageerror", lambda error: page_errors.append(str(error)))
                     page.on(
                         "request",
                         lambda request: api_requests.append(request.url)
@@ -207,6 +209,7 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     expect(page.locator("h1").first).to_have_text("Documentation.")
 
                     assert not api_requests, f"The static preview attempted backend requests: {api_requests}"
+                    assert not page_errors, f"The static preview raised uncaught browser errors: {page_errors}"
                 finally:
                     browser.close()
         finally:
