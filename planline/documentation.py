@@ -214,6 +214,7 @@ def _navigation(
     ocr_href: str,
     settings_href: str,
     documentation_href: str,
+    architecture_href: str,
 ) -> str:
     return f"""
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -227,7 +228,7 @@ def _navigation(
       <a class="repo-link" href="{ocr_href}">OCR Studio</a>
       <a class="repo-link" href="{settings_href}">Settings</a>
       <a class="repo-link active" href="{documentation_href}" aria-current="page">Documentation</a>
-      <a class="repo-link" href="/architecture">Architecture</a>
+      <a class="repo-link" href="{architecture_href}">Architecture</a>
       <button id="themeToggle" class="toolbar-button theme-toggle" type="button" aria-label="Switch to light theme" title="Switch to light theme" aria-pressed="false">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.2 15.1A8.5 8.5 0 0 1 8.9 3.8 8.7 8.7 0 1 0 20.2 15.1Z"/></svg>
       </button>
@@ -245,6 +246,7 @@ def _page_shell(
     ocr_href: str,
     settings_href: str,
     documentation_href: str,
+    architecture_href: str,
     body: str,
     description: str = "Planline documentation, technical references and supporting files.",
 ) -> str:
@@ -287,7 +289,7 @@ def _page_shell(
   </script>
 </head>
 <body class="documentation-page">
-{_navigation(asset_prefix=asset_prefix, home_href=home_href, drawing_href=drawing_href, ocr_href=ocr_href, settings_href=settings_href, documentation_href=documentation_href)}
+{_navigation(asset_prefix=asset_prefix, home_href=home_href, drawing_href=drawing_href, ocr_href=ocr_href, settings_href=settings_href, documentation_href=documentation_href, architecture_href=architecture_href)}
 {body}
 </body>
 </html>
@@ -305,6 +307,7 @@ def render_documentation_index(
     ocr_href: str = "/ocr",
     settings_href: str = "/settings",
     documentation_href: str = "/documentation",
+    architecture_href: str = "/architecture",
 ) -> str:
     rows = _document_catalog_html(
         documents,
@@ -352,6 +355,7 @@ def render_documentation_index(
         ocr_href=ocr_href,
         settings_href=settings_href,
         documentation_href=documentation_href,
+        architecture_href=architecture_href,
         body=body,
         description="Browse all Planline documentation and reference files.",
     )
@@ -417,6 +421,7 @@ def render_document_page(
     ocr_href: str,
     settings_href: str,
     documentation_href: str,
+    architecture_href: str = "/architecture",
 ) -> str:
     path = str(document["path"])
     kind = str(document["kind"])
@@ -525,6 +530,7 @@ def render_document_page(
         ocr_href=ocr_href,
         settings_href=settings_href,
         documentation_href=documentation_href,
+        architecture_href=architecture_href,
         body=body,
         description=f"Planline documentation: {path}",
     )

@@ -169,6 +169,7 @@ def build_preview(output_dir: Path) -> Path:
             ocr_href=relative_to_site_root(current_output_path, "ocr.html"),
             settings_href=relative_to_site_root(current_output_path, "settings.html"),
             documentation_href=relative_to_site_root(current_output_path, documentation_index_path),
+            architecture_href=relative_to_site_root(current_output_path, "architecture.html"),
         )
 
     documentation_index.write_text(
@@ -182,6 +183,7 @@ def build_preview(output_dir: Path) -> Path:
             ocr_href="../ocr.html",
             settings_href="../settings.html",
             documentation_href="index.html",
+            architecture_href="../architecture.html",
         ),
         encoding="utf-8",
     )

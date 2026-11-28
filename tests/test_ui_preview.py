@@ -59,6 +59,7 @@ def test_preview_contains_every_workspace_and_uses_one_stylesheet(tmp_path: Path
     assert "Archived references" in hub
     assert 'href="ARCHITECTURE.md.html"' in hub
     assert 'href="rysunek.png.html"' in hub
+    assert 'href="../architecture.html">Architecture</a>' in hub
 
     architecture_notes = (output / "documentation" / "ARCHITECTURE.md.html").read_text(encoding="utf-8")
     assert 'href="PLANLINE_ARCHITECTURE.md.html"' in architecture_notes
@@ -81,6 +82,9 @@ def test_preview_contains_every_workspace_and_uses_one_stylesheet(tmp_path: Path
 
     for page in (output / "documentation").rglob("*.html"):
         page_html = page.read_text(encoding="utf-8")
+        architecture_link = re.search(r'<a class="repo-link" href="([^"]+)">Architecture</a>', page_html)
+        assert architecture_link, f"{page.relative_to(output)} has no Architecture navigation link"
+        assert (page.parent / architecture_link.group(1)).resolve().is_file(), f"{page.relative_to(output)} has a broken Architecture link"
         for link in re.findall(r'(?:href|src)="([^"]+)"', page_html):
             if link.startswith(("http://", "https://", "data:", "#", "mailto:")):
                 continue
