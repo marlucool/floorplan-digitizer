@@ -580,7 +580,8 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert "Within the selected tolerance" in page.locator("#wallDimensionResult").inner_text()
             assert wall_check_request["dimension_mm"] == "2685"
             assert wall_check_request["pixels_per_mm"] > 0
-            assert abs(wall_check_request["wall_length_px"] - 230.217) < 1
+            assert abs(wall_check_request["wall_length_px"] - 2685.98) < 0.1
+            assert wall_check_request["pixels_per_mm"] == 1
             assert wall_check_request["tolerance_percent"] == 1
             page.locator(".dataset-capture-details > summary").click()
             page.locator("#drawingDatasetSelect").select_option("handwritten-dimensions")
