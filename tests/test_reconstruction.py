@@ -257,3 +257,32 @@ def test_reconstruction_rejects_dimension_entry_that_is_not_a_value_detection() 
     with pytest.raises(ValueError, match="dimension-value detection"):
         sample_request(dimensions=dimensions)
 
+def test_junction_candidates_report_nearby_endpoints_without_snapping_geometry() -> None:
+    segments = [
+        {
+            "id": "edge-a",
+            "source_detection_id": "wall-a",
+            "start_px": {"x": 0, "y": 0},
+            "end_px": {"x": 10, "y": 0},
+        },
+        {
+            "id": "edge-b",
+            "source_detection_id": "wall-b",
+            "start_px": {"x": 11, "y": 1},
+            "end_px": {"x": 10, "y": 10},
+        },
+        {
+            "id": "edge-c",
+            "source_detection_id": "wall-a",
+            "start_px": {"x": 10, "y": 0},
+            "end_px": {"x": 20, "y": 0},
+        },
+    ]
+    before = [dict(item["end_px"]) for item in segments]
+    junctions = reconstruction._junction_candidates(segments, tolerance_px=2.0)
+    assert len(junctions) == 1
+    assert junctions[0]["source_detection_ids"] == ["wall-a", "wall-b"]
+    assert set(junctions[0]["segment_ids"]) == {"edge-a", "edge-b"}
+    assert junctions[0]["status"] == "candidate_requires_review"
+    assert [item["end_px"] for item in segments] == before
+
