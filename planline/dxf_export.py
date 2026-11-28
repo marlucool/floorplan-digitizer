@@ -45,7 +45,8 @@ class ManualGeometryDXFRequest(BaseModel):
     pixels_per_mm_x: float | None = Field(default=None, ge=1e-12, le=1_000_000)
     pixels_per_mm_y: float | None = Field(default=None, ge=1e-12, le=1_000_000)
     segments: list[WallSegmentInput] = Field(default_factory=list, max_length=10_000)
-    rooms: list[RoomPolygonInput] = Field(default_factory=list, max_length=2_000)\n    openings: list[OpeningMarkerInput] = Field(default_factory=list, max_length=2_000)
+    rooms: list[RoomPolygonInput] = Field(default_factory=list, max_length=2_000)
+    openings: list[OpeningMarkerInput] = Field(default_factory=list, max_length=2_000)
 
     @model_validator(mode="after")
     def validate_geometry(self) -> "ManualGeometryDXFRequest":
