@@ -122,6 +122,14 @@
               <p>Join only endpoints that you have checked against the drawing. Joining changes the editable draft; it does not infer a complete wall network.</p>
               <div id="junctionCandidateList" class="junction-candidate-list"></div>
             </section>
+            <section id="roomLoopReview" class="junction-review hidden" aria-label="Review possible room boundaries">
+              <div class="junction-review-heading">
+                <strong>Possible room boundaries</strong>
+                <span id="roomLoopReviewSummary">No closed loops</span>
+              </div>
+              <p>Closed wall-edge loops are only suggestions. Add a room outline after checking it against the drawing.</p>
+              <div id="roomLoopCandidateList" class="junction-candidate-list"></div>
+            </section>
           </section>
           <details id="geometryDetails" class="geometry-tools-details">
             <summary><span>Open drawing tools</span><small>Walls · rooms · export</small></summary>
