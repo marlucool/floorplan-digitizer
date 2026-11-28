@@ -107,8 +107,14 @@
           </details>
         </section>
         <section class="geometry-panel" id="manualGeometry" aria-labelledby="geometryHeading">
-          <div class="geometry-heading"><strong id="geometryHeading">Manual wall geometry</strong><span id="geometryCount">0 manual walls</span></div>
-          <p>Draw your own wall segments over the source image. These are user-created lines, not automatic wall detections or verified CAD geometry.</p>
+          <div class="geometry-heading"><strong id="geometryHeading">Wall geometry</strong><span id="geometryCount">No wall edges yet</span></div>
+          <p>Build an editable wall-edge draft from detected wall regions, then refine it manually. Every generated edge remains a draft until you inspect it.</p>
+          <section class="reconstruction-panel" aria-label="Generate dimension-driven wall draft">
+            <div class="reconstruction-panel-heading"><strong>Generate wall-edge draft</strong><span>Measured · review required</span></div>
+            <p>Use verified horizontal and vertical dimensions with confirmed wall matches to establish X/Y scale and convert detected wall regions into editable CAD edges.</p>
+            <button id="reconstructWalls" class="toolbar-button" type="button" disabled>Generate measured wall draft</button>
+            <output id="reconstructionStatus" aria-live="polite">Analyse a drawing, verify at least one horizontal and one vertical dimension, then confirm each matching wall pair.</output>
+          </section>
           <details id="geometryDetails" class="geometry-tools-details">
             <summary><span>Open drawing tools</span><small>Walls · rooms · export</small></summary>
           <label class="geometry-snap"><input id="geometrySnap" type="checkbox" checked> Snap to existing manual endpoints and room corners (10 px)</label>
@@ -125,7 +131,7 @@
             <button id="exportGeometry" class="toolbar-button" type="button" disabled>Export SVG</button>
             <button id="exportDxf" class="toolbar-button" type="button" disabled>Export DXF</button>
           </div>
-          <p class="geometry-export-note">DXF contains only the walls and room outlines you draw. A user-supplied scale is exported as millimetres; without calibration, coordinates are unitless source pixels.</p>
+          <p class="geometry-export-note">DXF contains your manually drawn geometry and any generated wall-edge draft on a separate DETECTED_WALL_DRAFT layer. Reconstructed drafts use separate X/Y scales from confirmed dimensions; manual-only drawings use the scale reference shown above.</p>
           <output id="wallLength" aria-live="polite">Select a wall to view its length.</output>
           <section class="wall-dimension-check" aria-label="Compare a selected wall with a verified dimension">
             <strong>Check a wall against a written dimension</strong>
@@ -161,7 +167,7 @@
           <li id="detectStep"><span class="pipeline-num">02</span><span><b>Object detection</b><small>YOLO candidate regions</small></span><i>○</i></li>
           <li><span class="pipeline-num">03</span><span><b>Dimension OCR</b><small>Automatic local OCR when available · manual verification required</small></span><i>◇</i></li>
           <li><span class="pipeline-num">04</span><span><b>Dimension association</b><small>Ranked line and wall-span candidates · review required</small></span><i>◇</i></li>
-          <li><span class="pipeline-num">05</span><span><b>Manual geometry export</b><small>User-drawn walls and rooms to SVG/DXF; no automatic measured reconstruction</small></span><i>◇</i></li>
+          <li><span class="pipeline-num">05</span><span><b>Wall-edge draft</b><small>Confirmed dimensions constrain editable detected wall edges; review is still required</small></span><i>◇</i></li>
         </ol>
         </details>
       </aside>
@@ -241,7 +247,7 @@
         <div id="chainResult" class="chain-result hidden" aria-live="polite"></div>
       </div>
     </details>
-    <footer><span>PLANLINE · 2D FLOOR-PLAN DIGITISATION</span><span><a href="/documentation">Documentation</a> · no measured DXF output</span></footer>
+    <footer><span>PLANLINE · 2D FLOOR-PLAN DIGITISATION</span><span><a href="/documentation">Documentation</a> · wall draft DXF requires review</span></footer>
   </main>
 </body>
 </html>
