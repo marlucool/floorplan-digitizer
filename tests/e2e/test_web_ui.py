@@ -501,7 +501,9 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             assert "not verified" in page.locator("#roomArea").inner_text()
             page.locator("#selectWallTool").click()
             room_box = page.locator("#previewImage").bounding_box()
-            page.mouse.move(room_box["x"] + 50, room_box["y"] + 40)
+            # The first room corner is within the snap radius of the wall
+            # endpoint at (50, 50), so drag from its actual snapped position.
+            page.mouse.move(room_box["x"] + 50, room_box["y"] + 50)
             page.mouse.down()
             page.mouse.move(room_box["x"] + 60, room_box["y"] + 45, steps=10)
             page.mouse.up()
@@ -1243,6 +1245,7 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
                 "buffer":json.dumps(project_payload).encode("utf-8")
             })
             page.wait_for_function("document.querySelector('#resultStatus')?.textContent === 'DETECTION COMPLETE'")
+            page.wait_for_function("document.querySelector('#reconstructionStatus')?.textContent.startsWith('Restored 8 generated wall-face edges')")
             assert page.locator("#geometryCount").inner_text().endswith("8 detected draft")
             assert "Restored 8 generated wall-face edges" in page.locator("#reconstructionStatus").inner_text()
             assert page.locator("#calibrationState").inner_text()=="X/Y scales"
