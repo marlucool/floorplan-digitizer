@@ -938,7 +938,9 @@
             "skipped_dimensions",
             "skipped_walls",
             "wall_regions_used",
-            "warnings"
+            "warnings",
+            "junction_candidates",
+            "junction_tolerance_px"
           ],
           "properties": {
             "status": {
@@ -1181,6 +1183,69 @@
               "items": {
                 "type": "string",
                 "minLength": 1
+              }
+            },
+            "junction_tolerance_px": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "junction_candidates": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "point_px",
+                  "source_detection_ids",
+                  "segment_ids",
+                  "endpoint_count",
+                  "status"
+                ],
+                "properties": {
+                  "point_px": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "x",
+                      "y"
+                    ],
+                    "properties": {
+                      "x": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "y": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
+                  },
+                  "source_detection_ids": {
+                    "type": "array",
+                    "minItems": 2,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^det-[0-9]{3,}$"
+                    }
+                  },
+                  "segment_ids": {
+                    "type": "array",
+                    "minItems": 2,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^reconstructed-wall-[0-9]{4,}$"
+                    }
+                  },
+                  "endpoint_count": {
+                    "type": "integer",
+                    "minimum": 2
+                  },
+                  "status": {
+                    "const": "candidate_requires_review"
+                  }
+                }
               }
             }
           }
