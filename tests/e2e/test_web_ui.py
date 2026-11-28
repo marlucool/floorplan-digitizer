@@ -109,10 +109,10 @@ class OCRPollingHandler(OCRRaceHandler):
                 },
                 "samples": [], "available_models": [],
             })
-        if parsed.path == "/api/ocr/jobs/active":
-            return self._json({"job": {
-                "job_id": "slow-job", "status": "running", "logs": "Training started",
-            }})
+        if parsed.path == "/api/ocr/jobs":
+            return self._json({"jobs": [{
+                "job_id": "slow-job", "status": "running", "kind": "training", "logs": "Training started",
+            }]})
         if parsed.path == "/api/ocr/jobs/slow-job":
             with self.poll_lock:
                 type(self).active_polls += 1
