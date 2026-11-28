@@ -52,8 +52,8 @@ class ManualGeometryDXFRequest(BaseModel):
     def validate_geometry(self) -> "ManualGeometryDXFRequest":
         if self.source_width * self.source_height > 25_000_000:
             raise ValueError("Source image exceeds the 25-megapixel geometry limit.")
-        if not self.segments and not self.rooms:
-            raise ValueError("Draw at least one wall or room before exporting DXF.")
+        if not self.segments and not self.rooms and not self.openings:
+            raise ValueError("Draw at least one wall, room or opening before exporting DXF.")
         axis_scales_provided = self.pixels_per_mm_x is not None or self.pixels_per_mm_y is not None
         if axis_scales_provided and (self.pixels_per_mm_x is None or self.pixels_per_mm_y is None):
             raise ValueError("Both X and Y scales are required for axis-specific DXF export.")
