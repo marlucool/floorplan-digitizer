@@ -1514,16 +1514,10 @@ textarea:focus-visible,summary:focus-visible {
 .dashboard-health strong,.dashboard-health span { display:block; }
 .dashboard-health strong { font-size:14px;font-weight:700; }
 .dashboard-health div span { margin-top:3px;color:var(--muted);font-size:12px;line-height:1.45; }
-.dashboard-health div .health-status {
-  width:max-content;max-width:100%;margin-top:8px;padding:4px 8px;
-  border:1px solid var(--app-border);border-radius:999px;
-  background:var(--app-panel-soft);color:var(--app-muted);
-  font-size:11px;font-weight:650;line-height:1.25;overflow-wrap:anywhere;
-}
-.dashboard-health[data-state="ok"] .health-status { color:var(--app-accent);background:var(--app-accent-soft);border-color:var(--app-border-strong); }
-.dashboard-health[data-state="warning"] .health-status { color:var(--amber); }
-.dashboard-health[data-state="error"] .health-status { color:var(--red); }
-.dashboard-health[data-state="preview"] .health-status { color:var(--app-muted); }
+.dashboard-health[data-state="ok"] .health-mark { color:#6d9a6e; }
+.dashboard-health[data-state="warning"] .health-mark { color:#c08a38; }
+.dashboard-health[data-state="error"] .health-mark { color:var(--red); }
+.dashboard-health[data-state="preview"] .health-mark { color:#8b8b7d; }
 .dashboard-health .toolbar-button { min-height:34px;padding:6px 10px;font-size:12px; }
 .dashboard-workspaces {
   display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,.85fr);
