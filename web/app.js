@@ -788,7 +788,8 @@ function getReviewableRoomLoops() {
   const union = (left, right) => {
     const a = find(left);
     const b = find(right);
-    if (a !== b) parent.set(b, a < b ? a : b);
+    if (a < b) parent.set(b, a);
+    else if (b < a) parent.set(a, b);
   };
   for (const candidate of candidates) {
     union(
