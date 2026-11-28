@@ -1162,6 +1162,17 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             assert page.locator("#geometryCount").inner_text().endswith("8 detected draft")
             assert "Restored 8 generated wall-face edges" in page.locator("#reconstructionStatus").inner_text()
             assert page.locator("#calibrationState").inner_text()=="X/Y scales"
+
+            # A diagonal manual wall must use both independent axis scales:
+            # sqrt((30 / 0.04)^2 + (40 / 0.06)^2) = 1003.47 mm.
+            page.locator("#drawWallTool").click()
+            page.locator("#previewImage").click(position={"x":100,"y":100})
+            page.locator("#previewImage").click(position={"x":130,"y":140})
+            page.locator("#selectWallTool").click()
+            page.locator("#previewImage").click(position={"x":115,"y":120})
+            assert "1.003 m" in page.locator("#wallLength").inner_text()
+            assert "axis-corrected" in page.locator("#wallLength").inner_text()
+
             assert page_errors==[]
             assert not requests.get("unexpected")
             browser.close()
