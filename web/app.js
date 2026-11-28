@@ -553,23 +553,24 @@ function refreshWallDimensionOptions() {
   updateWallDimensionCheckControls();
 }
 
-function getPixelsPerMmForSegment(segment) {
-  if (segment && state.reconstruction?.scale) {
-    const dx = segment.end_px.x - segment.start_px.x;
-    const dy = segment.end_px.y - segment.start_px.y;
-    const value = Math.abs(dx) >= Math.abs(dy)
-      ? state.reconstruction.scale.pixels_per_mm_x
-      : state.reconstruction.scale.pixels_per_mm_y;
-    if (Number.isFinite(value) && value > 0) return value;
+function getSegmentLengthMm(segment) {
+  if (!segment) return null;
+  const dx = segment.end_px.x - segment.start_px.x;
+  const dy = segment.end_px.y - segment.start_px.y;
+  const scaleX = state.reconstruction?.scale?.pixels_per_mm_x;
+  const scaleY = state.reconstruction?.scale?.pixels_per_mm_y;
+  if (Number.isFinite(scaleX) && scaleX > 0 && Number.isFinite(scaleY) && scaleY > 0) {
+    // Apply the independent axis transforms before measuring diagonal geometry.
+    return Math.hypot(dx / scaleX, dy / scaleY);
   }
   const uniform = state.calibration.applied?.pixels_per_mm;
-  return Number.isFinite(uniform) && uniform > 0 ? uniform : null;
+  return Number.isFinite(uniform) && uniform > 0 ? Math.hypot(dx, dy) / uniform : null;
 }
 
 function updateWallDimensionCheckControls() {
   const select = $("#wallDimensionSelect");
   const selectedWall = state.geometry?.segments?.find((segment) => segment.id === state.geometry.selectedId);
-  const hasCalibration = Boolean(getPixelsPerMmForSegment(selectedWall));
+  const hasCalibration = Number.isFinite(getSegmentLengthMm(selectedWall));
   const hasDimension = Boolean(select?.selectedOptions?.[0]?.dataset.valueMm);
   const toleranceText = $("#wallDimensionTolerance").value.trim();
   const tolerance = Number(toleranceText);
@@ -588,9 +589,9 @@ async function compareSelectedWallToDimension() {
   const selectedWall = state.geometry.segments.find((segment) => segment.id === state.geometry.selectedId);
   const option = $("#wallDimensionSelect").selectedOptions[0];
   const dimensionMm = option?.dataset.valueMm;
-  const pixelsPerMm = getPixelsPerMmForSegment(selectedWall);
+  const lengthMm = getSegmentLengthMm(selectedWall);
   const tolerance = Number($("#wallDimensionTolerance").value);
-  if (!selectedWall || !dimensionMm || !(pixelsPerMm > 0)) {
+  if (!selectedWall || !dimensionMm || !(lengthMm > 0)) {
     updateWallDimensionCheckControls();
     return;
   }
@@ -606,8 +607,10 @@ async function compareSelectedWallToDimension() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        wall_length_px: wallLengthPx,
-        pixels_per_mm: pixelsPerMm,
+        // Send the already axis-corrected physical length through the API's
+        // comparison contract using a neutral 1 px/mm scale.
+        wall_length_px: lengthMm,
+        pixels_per_mm: 1,
         dimension_mm: dimensionMm,
         tolerance_percent: tolerance,
         calibration_method: state.reconstruction
@@ -688,15 +691,10 @@ function renderGeometryControls() {
     const dx = selectedWall.end_px.x - selectedWall.start_px.x;
     const dy = selectedWall.end_px.y - selectedWall.start_px.y;
     const lengthPx = Math.hypot(dx, dy);
-    const reconstructionScale = state.reconstruction
-      ? (Math.abs(dx) >= Math.abs(dy)
-        ? state.reconstruction.scale.pixels_per_mm_x
-        : state.reconstruction.scale.pixels_per_mm_y)
-      : null;
-    const pixelsPerMm = reconstructionScale || state.calibration.applied?.pixels_per_mm;
-    $("#wallLength").textContent = pixelsPerMm
-      ? (lengthPx / pixelsPerMm / 1000).toFixed(3) + " m (" +
-        (reconstructionScale ? "confirmed-dimension draft scale; review required" : "user-supplied scale; not verified") + ")"
+    const lengthMm = getSegmentLengthMm(selectedWall);
+    $("#wallLength").textContent = Number.isFinite(lengthMm)
+      ? (lengthMm / 1000).toFixed(3) + " m (" +
+        (state.reconstruction ? "axis-corrected confirmed-dimension draft scale; review required" : "user-supplied scale; not verified") + ")"
       : lengthPx.toFixed(1) + " px · apply calibration for metric length";
   } else {
     $("#wallLength").textContent = "Select a wall to view its length.";
