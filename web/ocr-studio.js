@@ -5,7 +5,9 @@
     image: null, imageFile: null, cropBlob: null, cropRect: null,
     pointerStart: null, editingId: null, activeJobId: null, pollTimer: null,
     lastTrainedModel: null, busy: false, paddleReady: false, ocrReady: false,
-    pythonCompatible: false, paddleGpuAvailable: false, trainingAssets: null
+    pythonCompatible: false, paddleGpuAvailable: false, trainingAssets: null,
+    trainingAssetsRequestId: 0, datasetRequestId: 0,
+    pollInFlight: false, pollFailures: 0
   };
 
   const terminalStatuses = new Set(["completed", "completed_no_export", "failed", "cancelled", "interrupted"]);
@@ -74,6 +76,7 @@
     const splitCounts = summary?.split_counts || {};
     const splitReady = Boolean(summary?.splits_present && splitCounts.train > 0 && splitCounts.validation > 0 && splitCounts.test > 0);
     const hasJob = Boolean(state.activeJobId);
+    $("#modelVariant").disabled = state.busy || hasJob;
     $("#auditDatasetButton").disabled = state.busy || !state.dataset;
     const assetsReady = Boolean(state.trainingAssets?.ready);
     $("#trainButton").disabled = state.busy || hasJob || !splitReady || !state.paddleReady || !assetsReady || summary?.valid === false;
@@ -94,8 +97,10 @@
 
   async function loadTrainingAssets() {
     const variant = $("#modelVariant").value;
+    const requestId = ++state.trainingAssetsRequestId;
     try {
       const assets = await api(`/api/ocr/training-assets?model_variant=${encodeURIComponent(variant)}`);
+      if (requestId !== state.trainingAssetsRequestId || variant !== $("#modelVariant").value) return;
       state.trainingAssets = assets;
       $("#paddleSourcePath").value = assets.paddleocr_dir || "";
       $("#pretrainedPath").value = assets.pretrained_model || "";
@@ -104,6 +109,7 @@
         ? `Official PaddleOCR ${assets.source_version} source and ${variant} checkpoint are ready locally.`
         : "Training files are not downloaded yet. Prepare them once; subsequent training runs reuse the local files.";
     } catch (error) {
+      if (requestId !== state.trainingAssetsRequestId || variant !== $("#modelVariant").value) return;
       state.trainingAssets = null;
       $("#prepareTrainingAssetsButton").disabled = state.busy;
       $("#trainingAssetsStatus").textContent = error.message;
@@ -177,8 +183,12 @@
   }
 
   async function loadDataset() {
-    if (!state.datasetId) return;
-    state.dataset = await api(`/api/ocr/datasets/${encodeURIComponent(state.datasetId)}`);
+    const datasetId = state.datasetId;
+    if (!datasetId) return;
+    const requestId = ++state.datasetRequestId;
+    const dataset = await api(`/api/ocr/datasets/${encodeURIComponent(datasetId)}`);
+    if (requestId !== state.datasetRequestId || state.datasetId !== datasetId) return;
+    state.dataset = dataset;
     renderDataset();
   }
 
@@ -642,6 +652,7 @@
   function beginJob(job, title) {
     if (state.pollTimer) clearInterval(state.pollTimer);
     state.activeJobId = job.job_id;
+    state.pollFailures = 0;
     $("#jobPanel").classList.remove("hidden"); $("#jobTitle").textContent = title;
     $("#jobLog").textContent = job.logs || "Starting job…";
     $("#jobStatus").textContent = (job.status || "queued").toUpperCase();
@@ -651,9 +662,13 @@
   }
 
   async function pollJob() {
-    if (!state.activeJobId) return;
+    if (!state.activeJobId || state.pollInFlight) return;
+    const jobId = state.activeJobId;
+    state.pollInFlight = true;
     try {
-      const job = await api(`/api/ocr/jobs/${encodeURIComponent(state.activeJobId)}`);
+      const job = await api(`/api/ocr/jobs/${encodeURIComponent(jobId)}`);
+      if (state.activeJobId !== jobId) return;
+      state.pollFailures = 0;
       $("#jobStatus").textContent = (job.status || "unknown").replaceAll("_", " ").toUpperCase();
       $("#jobLog").textContent = job.logs || "";
       $("#jobLog").scrollTop = $("#jobLog").scrollHeight;
@@ -671,8 +686,14 @@
         message(job.status === "completed" ? "Job completed." : `Job ${job.status.replaceAll("_", " ")}. Check its log for details.`, job.status === "completed" ? "success" : "error");
       }
     } catch (error) {
-      $("#jobStatus").textContent = "STATUS ERROR";
-      $("#jobLog").textContent += `\n${error.message}`;
+      if (state.activeJobId !== jobId) return;
+      state.pollFailures += 1;
+      $("#jobStatus").textContent = "RECONNECTING";
+      if (state.pollFailures === 1) {
+        $("#jobLog").textContent += "\nConnection interrupted; retrying status updates…";
+      }
+    } finally {
+      state.pollInFlight = false;
     }
   }
 
