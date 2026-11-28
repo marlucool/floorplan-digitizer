@@ -61,6 +61,11 @@ def test_preview_contains_every_workspace_and_uses_one_stylesheet(tmp_path: Path
 
     architecture_notes = (output / "documentation" / "ARCHITECTURE.md.html").read_text(encoding="utf-8")
     assert 'href="PLANLINE_ARCHITECTURE.md.html"' in architecture_notes
+    assert 'class="documentation-file is-active"' in architecture_notes
+    stylesheet = (output / "styles.css").read_text(encoding="utf-8")
+    assert "minmax(320px,350px)" in stylesheet
+    assert ".documentation-toc{font-size:13px" in stylesheet
+    assert ".documentation-file-name strong{font-size:13px" in stylesheet
 
     for page in (output / "documentation").rglob("*.html"):
         page_html = page.read_text(encoding="utf-8")
