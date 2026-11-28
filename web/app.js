@@ -595,10 +595,6 @@ async function compareSelectedWallToDimension() {
     updateWallDimensionCheckControls();
     return;
   }
-  const wallLengthPx = Math.hypot(
-    selectedWall.end_px.x - selectedWall.start_px.x,
-    selectedWall.end_px.y - selectedWall.start_px.y
-  );
   const button = $("#checkWallDimension");
   button.disabled = true;
   button.textContent = "Comparing…";
