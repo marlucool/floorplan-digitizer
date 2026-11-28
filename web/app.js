@@ -676,7 +676,7 @@ function renderGeometryControls() {
   } else if (geometry.selectedId) {
     $("#geometryStatus").textContent = "Selected " + geometry.selectedId + ". Delete it or draw another wall.";
   } else if (state.reconstruction) {
-    $("#geometryStatus").textContent = "Measured wall-edge draft loaded. Inspect, delete or adjust every generated edge before using the drawing.";
+    $("#geometryStatus").textContent = "Dimension-scaled wall-edge draft loaded. Inspect, delete or adjust every generated edge before exporting.";
   } else if (manualCount > 0) {
     $("#geometryStatus").textContent = "Manual wall linework is editable. Add more walls or generate a separate measured draft.";
   } else {
@@ -1004,7 +1004,7 @@ async function reconstructWallDraft() {
   });
 
   button.disabled = true;
-  button.textContent = "Building wall draft…";
+  button.textContent = "Generating wall-edge draft…";
   output.dataset.state = "";
   output.textContent = "Checking verified dimensions and rebuilding the candidate wall edges…";
   try {
