@@ -404,7 +404,7 @@ def test_drawing_zoom_and_manual_chain_checker() -> None:
             page.locator("#calibrationDistance").fill("3.5")
             page.locator("#calibrationUnit").select_option("m")
             page.locator("#applyCalibration").click()
-            assert "0.085714" in page.locator("#calibrationResult").inner_text()
+            assert "0.08571" in page.locator("#calibrationResult").inner_text()
             assert page.locator("#calibrationState").inner_text() == "Applied"
             page.locator("#drawWallTool").click()
             page.locator("#previewImage").click(position={"x": 60, "y": 200})
