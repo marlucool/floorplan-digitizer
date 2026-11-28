@@ -1,6 +1,6 @@
 """Minimal, validated DXF export for Planline's editable 2D geometry.
 
-Manual wall segments and room outlines are exported separately from explicitly
+Manual wall segments, room outlines and reviewer-classified opening markers are exported on typed layers, separately from explicitly
 generated, review-required detected wall-face draft edges. Raw detector boxes,
 OCR suggestions and unverified dimensions are never converted to CAD.
 """
