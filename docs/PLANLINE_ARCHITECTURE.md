@@ -10,7 +10,7 @@ The central rule is:
 
 A dimension that is unreadable, unassociated, contradictory, or insufficient to constrain geometry must remain unresolved and be presented for review.
 
-## Implemented application state (reviewed 2026-11-26)
+## Implemented application state (reviewed 2026-11-28)
 
 Planline is no longer just a detector preview. The current application is a **local-first drawing review and OCR workbench**, with manual geometry authoring and conservative dimension-analysis tools. The implemented features below are distinct from the future goal of automatic, measured CAD reconstruction.
 
