@@ -1076,6 +1076,8 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
     reconstruction_payload = {
         "status":"draft","geometry_kind":"detected_wall_face_edges",
         "segments":segments,
+        "junction_candidates":[],
+        "junction_tolerance_px":2.0,
         "scale":{
             "pixels_per_mm_x":0.04,"pixels_per_mm_y":0.06,
             "source":"confirmed_dimension_to_wall_associations"
