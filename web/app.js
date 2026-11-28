@@ -2410,18 +2410,22 @@ async function openProjectFile(file) {
   }
   try {
     const project = JSON.parse(await file.text());
-    if (project.format !== "planline-project" || project.format_version !== 1 ||
-        !project.source?.filename || !project.source?.data_base64 ||
-        !project.analysis_result?.image || !Array.isArray(project.analysis_result.detections) ||
-        !project.analysis_result.preview_data_url || !project.review ||
-        !Array.isArray(project.review.manual_dimension_text_review) ||
-        !isValidProjectGeometry(project) ||
-        !isValidReconstructionState(project.reconstruction, project.geometry, project.analysis_result) ||
-        !/\\.(png|jpe?g|webp|tiff?|pdf)$/i.test(project.source.filename) ||
-        !Number.isInteger(project.source.size_bytes) || project.source.size_bytes < 1 || project.source.size_bytes > 25 * 1024 * 1024 ||
-        !Number.isFinite(project.analysis_result.image.width) || project.analysis_result.image.width < 1 ||
-        !Number.isFinite(project.analysis_result.image.height) || project.analysis_result.image.height < 1) {
-      throw new Error("This is not a supported Planline project file.");
+    const validationFailures = [];
+    if (project.format !== "planline-project" || project.format_version !== 1) validationFailures.push("unsupported format/version");
+    if (!project.source?.filename || !project.source?.data_base64) validationFailures.push("missing embedded source drawing");
+    if (!project.analysis_result?.image || !Array.isArray(project.analysis_result.detections) ||
+        !project.analysis_result.preview_data_url) validationFailures.push("missing analysis image, detections or preview");
+    if (!project.review || !Array.isArray(project.review.manual_dimension_text_review)) validationFailures.push("invalid review data");
+    if (project.analysis_result?.image && !isValidProjectGeometry(project)) validationFailures.push("invalid editable geometry");
+    if (project.analysis_result?.image &&
+        !isValidReconstructionState(project.reconstruction, project.geometry, project.analysis_result)) validationFailures.push("invalid reconstruction metadata");
+    if (!/\\.(png|jpe?g|webp|tiff?|pdf)$/i.test(project.source?.filename || "")) validationFailures.push("unsupported source filename");
+    if (!Number.isInteger(project.source?.size_bytes) || project.source.size_bytes < 1 ||
+        project.source.size_bytes > 25 * 1024 * 1024) validationFailures.push("invalid source file size");
+    if (!Number.isFinite(project.analysis_result?.image?.width) || project.analysis_result.image.width < 1 ||
+        !Number.isFinite(project.analysis_result?.image?.height) || project.analysis_result.image.height < 1) validationFailures.push("invalid image dimensions");
+    if (validationFailures.length) {
+      throw new Error("Unsupported Planline project file: " + validationFailures.join(", ") + ".");
     }
     const bytes = decodeFileBase64(project.source.data_base64);
     if (project.source.size_bytes && bytes.byteLength !== project.source.size_bytes) {
