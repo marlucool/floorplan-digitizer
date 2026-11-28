@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const PREVIEW_MODE = window.PLANLINE_PREVIEW === true;
-const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, ocrReady: false, ocrModels: [], ocrDatasets: [], ocrPredictions: {}, ocrRunning: false, ocrModelId: null, ocrDevice: null, ocrCapabilitiesLoaded: false, ocrCapabilitiesPromise: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, reconstruction: null, geometry: { segments: [], rooms: [], openings: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
+const state = { file: null, objectUrl: null, result: null, previewUrl: null, detections: [], selectedId: null, activeFilter: "all", searchQuery: "", sortMode: "original", overlayVisible: true, resizeObserver: null, resizeHandler: null, controller: null, ocrReady: false, ocrModels: [], ocrDatasets: [], ocrPredictions: {}, ocrRunning: false, ocrModelId: null, ocrDevice: null, ocrCapabilitiesLoaded: false, ocrCapabilitiesPromise: null, zoom: 1, calibration: { points: [], picking: false, applied: null }, reconstruction: null, geometry: { segments: [], rooms: [], openings: [], mode: "select", pendingPoint: null, pendingRoom: [], selectedId: null, selectedRoomId: null, nextId: 1, nextRoomId: 1, nextOpeningId: 1, drag: null, suppressNextClick: false, lastSnap: null } };
 
 function updateWorkflow(stage) {
   const order = ["upload", "analyse", "review", "draw"];
@@ -1598,7 +1598,7 @@ async function exportManualGeometryDxf() {
 
 
 function exportManualGeometrySvg() {
-  if (!state.result || (!state.geometry.segments.length && !state.geometry.rooms.length)) return;
+  if (!state.result || (!state.geometry.segments.length && !state.geometry.rooms.length && !state.geometry.openings.length)) return;
   const width = state.result.image.width;
   const height = state.result.image.height;
   const scaleX = state.reconstruction?.scale?.pixels_per_mm_x || state.calibration.applied?.pixels_per_mm;
@@ -1616,12 +1616,19 @@ function exportManualGeometrySvg() {
     '" stroke="' + (segment.created_by_reconstruction ? "#c47734" : "#172b4d") +
     '" stroke-width="6" stroke-linecap="round" />'
   );
-  const elements = [...polygons, ...lines].join("\n  ");
+  const openingLines = state.geometry.openings.map((opening) =>
+    '<line id="' + opening.id + '" data-opening-type="' + opening.opening_type +
+    '" x1="' + opening.start_px.x + '" y1="' + opening.start_px.y +
+    '" x2="' + opening.end_px.x + '" y2="' + opening.end_px.y +
+    '" stroke="' + (opening.opening_type === "door" ? "#c47734" : opening.opening_type === "window" ? "#4778a8" : "#7a6b91") +
+    '" stroke-width="5" />'
+  );
+  const elements = [...polygons, ...lines, ...openingLines].join("\n  ");
   const svg = '<?xml version="1.0" encoding="UTF-8"?>\n' +
     '<svg xmlns="http://www.w3.org/2000/svg" width="' + physicalWidth + '" height="' + physicalHeight +
     '" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">\n' +
-    '  <metadata>Planline editable linework: ' + state.geometry.segments.length + ' wall edges and ' +
-    state.geometry.rooms.length + ' room polygons. Coordinates are in original source-image pixels. ' +
+    '  <metadata>Planline editable linework: ' + state.geometry.segments.length + ' wall edges, ' +
+    state.geometry.rooms.length + ' room polygons and ' + state.geometry.openings.length + ' opening markers. Coordinates are in original source-image pixels. ' +
     (state.reconstruction ? 'Wall draft uses X/Y scales derived from confirmed dimensions and remains unverified.' :
       scaleX && scaleY ? 'Physical scale uses an explicit user reference; it is not verified geometry.' : 'No physical scale is embedded.') +
     '</metadata>\n  ' + elements + '\n</svg>';
@@ -2594,6 +2601,7 @@ function buildReviewObject() {
       .filter((segment) => segment.created_by_reconstruction === true)
       .map((segment) => ({ ...segment })),
     manual_rooms: state.geometry.rooms.map((room) => ({ ...room })),
+    manual_openings: state.geometry.openings.map((opening) => ({ ...opening })),
     reconstruction: state.reconstruction ? { ...state.reconstruction } : null,
     manual_dimension_text_review: (result.dimension_regions || []).map((region, index) => {
       const textInputs = document.querySelectorAll(".dimension-text-value");
@@ -2724,6 +2732,8 @@ async function saveProject() {
     geometry_next_id: state.geometry.nextId,
     rooms: state.geometry.rooms,
     room_next_id: state.geometry.nextRoomId,
+    openings: state.geometry.openings,
+    opening_next_id: state.geometry.nextOpeningId,
     review
   };
   const safeStem = (state.file.name || "drawing")
@@ -2842,6 +2852,21 @@ function isValidReconstructionState(reconstruction, segments, analysisResult) {
     Array.isArray(measurement.wall_ids) && measurement.wall_ids.length === 2 &&
     measurement.wall_ids.every((id) => wallIds.has(id))
   );
+  const validOpeningCandidates = (reconstruction.opening_candidates || []).every((candidate) =>
+    candidate && /^opening-candidate-[0-9]{3,}$/.test(candidate.id || "") &&
+    Array.isArray(candidate.wall_ids) && candidate.wall_ids.length === 2 &&
+    candidate.wall_ids.every((id) => wallIds.has(id)) &&
+    ["x", "y"].includes(candidate.axis) &&
+    Number.isFinite(candidate.width_mm) && candidate.width_mm >= 450 && candidate.width_mm <= 3000 &&
+    candidate.status === "candidate_requires_review" &&
+    ["pending", "added"].includes(candidate.review_status || "pending") &&
+    Number.isFinite(candidate.start_px?.x) && Number.isFinite(candidate.start_px?.y) &&
+    Number.isFinite(candidate.end_px?.x) && Number.isFinite(candidate.end_px?.y) &&
+    candidate.start_px.x >= 0 && candidate.start_px.y >= 0 &&
+    candidate.end_px.x >= 0 && candidate.end_px.y >= 0 &&
+    candidate.start_px.x <= analysisResult.image.width && candidate.end_px.x <= analysisResult.image.width &&
+    candidate.start_px.y <= analysisResult.image.height && candidate.end_px.y <= analysisResult.image.height
+  );
   const validJunctions = (reconstruction.junction_candidates || []).every((candidate) => {
     if (!candidate || !Array.isArray(candidate.source_detection_ids) ||
         candidate.source_detection_ids.length < 2 ||
@@ -2879,7 +2904,7 @@ function isValidReconstructionState(reconstruction, segments, analysisResult) {
     }
     return true;
   });
-  return validMeasurements && validJunctions && generated.every((segment) =>
+  return validMeasurements && validJunctions && validOpeningCandidates && generated.every((segment) =>
     wallIds.has(segment.source_detection_id) && draftIds.has(segment.id)
   );
 }
@@ -2887,11 +2912,14 @@ function isValidReconstructionState(reconstruction, segments, analysisResult) {
 function isValidProjectGeometry(project) {
   const segments = project.geometry ?? [];
   const rooms = project.rooms ?? [];
-  if (!Array.isArray(segments) || !Array.isArray(rooms)) return false;
+  const openings = project.openings ?? [];
+  if (!Array.isArray(segments) || !Array.isArray(rooms) || !Array.isArray(openings)) return false;
   if (project.geometry_next_id !== undefined &&
       (!Number.isInteger(project.geometry_next_id) || project.geometry_next_id < 1)) return false;
   if (project.room_next_id !== undefined &&
       (!Number.isInteger(project.room_next_id) || project.room_next_id < 1)) return false;
+  if (project.opening_next_id !== undefined &&
+      (!Number.isInteger(project.opening_next_id) || project.opening_next_id < 1)) return false;
   const ids = new Set();
   const pageIndex = project.analysis_result.source?.page_index ?? 0;
   const inBounds = (point) => point && Number.isFinite(point.x) && Number.isFinite(point.y) &&
@@ -2914,7 +2942,7 @@ function isValidProjectGeometry(project) {
       Math.hypot(segment.end_px.x - segment.start_px.x, segment.end_px.y - segment.start_px.y) >= 3;
   });
   if (!validSegments) return false;
-  return rooms.every((room) => {
+  const validRooms = rooms.every((room) => {
     if (!room || typeof room.id !== "string" || !/^manual-room-[0-9]{3,}$/.test(room.id) ||
         ids.has(room.id) || room.type !== "room_polygon" || room.created_by_user !== true ||
         !Number.isInteger(room.source_page_index) || room.source_page_index !== pageIndex ||
@@ -2922,6 +2950,22 @@ function isValidProjectGeometry(project) {
         !room.vertices_px.every(inBounds)) return false;
     ids.add(room.id);
     return isSimplePolygon(room.vertices_px) && polygonAreaPx2(room.vertices_px) >= 9;
+  });
+  if (!validRooms) return false;
+  return openings.every((opening) => {
+    if (!opening || typeof opening.id !== "string" || !/^manual-opening-[0-9]{3,}$/.test(opening.id) ||
+        ids.has(opening.id) || opening.type !== "opening_marker" || opening.created_by_user !== true ||
+        !["door", "window", "unknown"].includes(opening.opening_type) ||
+        !["x", "y"].includes(opening.axis) ||
+        !Number.isInteger(opening.source_page_index) || opening.source_page_index !== pageIndex ||
+        !Array.isArray(opening.source_detection_ids) || opening.source_detection_ids.length !== 2 ||
+        !opening.source_detection_ids.every((id) => project.analysis_result.detections.some((detection) =>
+          detection.id === id && detection.class_name === "wall")) ||
+        !Number.isFinite(opening.width_mm) || opening.width_mm <= 0 ||
+        (opening.candidate_id !== undefined && !/^opening-candidate-[0-9]{3,}$/.test(opening.candidate_id))) return false;
+    ids.add(opening.id);
+    return inBounds(opening.start_px) && inBounds(opening.end_px) &&
+      Math.hypot(opening.end_px.x - opening.start_px.x, opening.end_px.y - opening.start_px.y) >= 3;
   });
 }
 
@@ -2972,6 +3016,8 @@ async function openProjectFile(file) {
     state.geometry.nextId = Number.isInteger(project.geometry_next_id) ? project.geometry_next_id : state.geometry.segments.length + 1;
     state.geometry.rooms = Array.isArray(project.rooms) ? project.rooms : [];
     state.geometry.nextRoomId = Number.isInteger(project.room_next_id) ? project.room_next_id : state.geometry.rooms.length + 1;
+    state.geometry.openings = Array.isArray(project.openings) ? project.openings : [];
+    state.geometry.nextOpeningId = Number.isInteger(project.opening_next_id) ? project.opening_next_id : state.geometry.openings.length + 1;
     state.geometry.selectedId = null;
     state.geometry.pendingPoint = null;
     state.previewUrl = project.analysis_result.preview_data_url;
