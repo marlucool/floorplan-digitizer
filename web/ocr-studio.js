@@ -6,7 +6,7 @@
     pointerStart: null, editingId: null, activeJobId: null, pollTimer: null,
     lastTrainedModel: null, busy: false, paddleReady: false, ocrReady: false,
     pythonCompatible: false, paddleGpuAvailable: false, trainingAssets: null,
-    trainingAssetsRequestId: 0, datasetRequestId: 0,
+    trainingAssetsRequestId: 0, datasetRequestId: 0, datasetsRequestId: 0,
     pollInFlight: false, pollFailures: 0
   };
 
@@ -118,6 +118,7 @@
   }
 
   async function loadDatasets(preferredId) {
+    const requestId = ++state.datasetsRequestId;
     if (window.PLANLINE_PREVIEW === true) {
       $("#apiStatus").textContent = "Static OCR preview · backend disabled";
       $("#ocrDependencyNote").textContent = "Dataset storage, OCR inference and model training are disabled in the static preview. Run the desktop app to use OCR Studio.";
@@ -129,6 +130,7 @@
     }
     try {
       const status = await api("/api/ocr/status");
+      if (requestId !== state.datasetsRequestId) return;
       state.pythonCompatible = Boolean(status.python_compatible_for_paddle);
       state.paddleReady = Boolean(status.training_runtime_ready ?? (state.pythonCompatible && status.paddle_installed));
       state.ocrReady = Boolean(status.inference_runtime_ready ?? (state.pythonCompatible && status.paddle_installed && status.paddleocr_installed));
@@ -151,6 +153,7 @@
           ? status.training_note
           : status.training_note + " Dataset annotation and verified crop storage remain available without the OCR engine.";
     } catch (_) {
+      if (requestId !== state.datasetsRequestId) return;
       state.paddleGpuAvailable = false;
       $("#useGpu").checked = false;
       $("#useGpu").disabled = true;
@@ -158,15 +161,19 @@
       $("#apiStatus").textContent = "Local OCR workbench";
     }
     await loadTrainingAssets();
+    if (requestId !== state.datasetsRequestId) return;
     const payload = await api("/api/ocr/datasets");
+    if (requestId !== state.datasetsRequestId) return;
     state.datasets = payload.datasets || [];
     if (!state.datasets.length) {
       const created = await api("/api/ocr/datasets", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: "handwriting" })
       });
+      if (requestId !== state.datasetsRequestId) return;
       state.datasets = [{ dataset_id: created.dataset_id, summary: created.summary }];
     }
+    if (requestId !== state.datasetsRequestId) return;
     const select = $("#datasetSelect");
     select.replaceChildren();
     state.datasets.forEach((dataset) => {
@@ -179,6 +186,7 @@
     state.datasetId = state.datasets.some((item) => item.dataset_id === nextId) ? nextId : state.datasets[0].dataset_id;
     select.value = state.datasetId;
     await loadDataset();
+    if (requestId !== state.datasetsRequestId) return;
     $("#datasetState").textContent = "LOCAL";
   }
 
