@@ -18,6 +18,7 @@ class WallSegmentInput(BaseModel):
     id: str = Field(min_length=1, max_length=80)
     start_px: PointPx
     end_px: PointPx
+    source_detection_id: str | None = Field(default=None, max_length=100)
 
 
 class RoomPolygonInput(BaseModel):
@@ -31,6 +32,8 @@ class ManualGeometryDXFRequest(BaseModel):
     source_width: int = Field(ge=1, le=25_000_000)
     source_height: int = Field(ge=1, le=25_000_000)
     pixels_per_mm: float | None = Field(default=None, ge=1e-12, le=1_000_000)
+    pixels_per_mm_x: float | None = Field(default=None, ge=1e-12, le=1_000_000)
+    pixels_per_mm_y: float | None = Field(default=None, ge=1e-12, le=1_000_000)
     segments: list[WallSegmentInput] = Field(default_factory=list, max_length=10_000)
     rooms: list[RoomPolygonInput] = Field(default_factory=list, max_length=2_000)
 
@@ -40,10 +43,18 @@ class ManualGeometryDXFRequest(BaseModel):
             raise ValueError("Source image exceeds the 25-megapixel geometry limit.")
         if not self.segments and not self.rooms:
             raise ValueError("Draw at least one wall or room before exporting DXF.")
-        if self.pixels_per_mm is not None and (
-            not math.isfinite(self.pixels_per_mm) or self.pixels_per_mm <= 0
+        axis_scales_provided = self.pixels_per_mm_x is not None or self.pixels_per_mm_y is not None
+        if axis_scales_provided and (self.pixels_per_mm_x is None or self.pixels_per_mm_y is None):
+            raise ValueError("Both X and Y scales are required for axis-specific DXF export.")
+        if axis_scales_provided and self.pixels_per_mm is not None:
+            raise ValueError("Use either one uniform scale or separate X/Y scales, not both.")
+        for name, value in (
+            ("pixels_per_mm", self.pixels_per_mm),
+            ("pixels_per_mm_x", self.pixels_per_mm_x),
+            ("pixels_per_mm_y", self.pixels_per_mm_y),
         ):
-            raise ValueError("pixels_per_mm must be finite and greater than zero.")
+            if value is not None and (not math.isfinite(value) or value <= 0):
+                raise ValueError(f"{name} must be finite and greater than zero.")
 
         point_count = 2 * len(self.segments) + sum(len(room.vertices_px) for room in self.rooms)
         if point_count > 100_000:
@@ -138,18 +149,23 @@ def _pair(code: int, value: object) -> str:
 
 def export_manual_geometry_dxf(request: ManualGeometryDXFRequest) -> bytes:
     """Build an ASCII R2000 DXF; calibrated coordinates are millimetres."""
-    calibrated = request.pixels_per_mm is not None
-    scale = request.pixels_per_mm or 1.0
+    calibrated = (
+        request.pixels_per_mm is not None
+        or (request.pixels_per_mm_x is not None and request.pixels_per_mm_y is not None)
+    )
+    scale_x = request.pixels_per_mm_x or request.pixels_per_mm or 1.0
+    scale_y = request.pixels_per_mm_y or request.pixels_per_mm or 1.0
 
     def cad_point(point: PointPx) -> tuple[str, str]:
         # Source images use top-left origin and downward-positive Y. CAD uses
-        # bottom-left origin and upward-positive Y.
-        x = point.x / scale
-        y = (request.source_height - point.y) / scale
+        # bottom-left origin and upward-positive Y. Reconstructed drafts may use
+        # independent X/Y scales derived from confirmed dimensions.
+        x = point.x / scale_x
+        y = (request.source_height - point.y) / scale_y
         return _number(x), _number(y)
 
     chunks = [
-        _pair(999, "Planline user-authored 2D geometry; not inferred CAD."),
+        _pair(999, "Planline editable 2D linework; detected wall edges remain draft geometry."),
         _pair(0, "SECTION"), _pair(2, "HEADER"),
         _pair(9, "$ACADVER"), _pair(1, "AC1015"),
         _pair(9, "$INSUNITS"), _pair(70, 4 if calibrated else 0),
@@ -159,8 +175,9 @@ def export_manual_geometry_dxf(request: ManualGeometryDXFRequest) -> bytes:
         _pair(999, "Calibrated millimetres use a user-supplied two-point reference; it is not verified."),
         _pair(0, "ENDSEC"),
         _pair(0, "SECTION"), _pair(2, "TABLES"),
-        _pair(0, "TABLE"), _pair(2, "LAYER"), _pair(70, 2),
+        _pair(0, "TABLE"), _pair(2, "LAYER"), _pair(70, 3),
         _pair(0, "LAYER"), _pair(2, "WALLS"), _pair(70, 0), _pair(62, 7), _pair(6, "CONTINUOUS"),
+        _pair(0, "LAYER"), _pair(2, "DETECTED_WALL_DRAFT"), _pair(70, 0), _pair(62, 4), _pair(6, "CONTINUOUS"),
         _pair(0, "LAYER"), _pair(2, "ROOMS"), _pair(70, 0), _pair(62, 3), _pair(6, "CONTINUOUS"),
         _pair(0, "ENDTAB"), _pair(0, "ENDSEC"),
         _pair(0, "SECTION"), _pair(2, "ENTITIES"),
@@ -170,7 +187,7 @@ def export_manual_geometry_dxf(request: ManualGeometryDXFRequest) -> bytes:
         x1, y1 = cad_point(segment.start_px)
         x2, y2 = cad_point(segment.end_px)
         chunks.extend([
-            _pair(0, "LINE"), _pair(8, "WALLS"),
+            _pair(0, "LINE"), _pair(8, "DETECTED_WALL_DRAFT" if segment.source_detection_id else "WALLS"),
             _pair(10, x1), _pair(20, y1), _pair(30, "0"),
             _pair(11, x2), _pair(21, y2), _pair(31, "0"),
         ])
