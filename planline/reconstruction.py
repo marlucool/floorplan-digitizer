@@ -276,7 +276,7 @@ def _junction_candidates(
                                     "y": item["y"],
                                 },
                             }
-                            for item in (endpoint, other)
+                            for item in sorted((endpoint, other), key=lambda value: (value["segment_id"], value["endpoint"]))
                         ],
                         "endpoint_count": 2,
                         "status": "candidate_requires_review",
