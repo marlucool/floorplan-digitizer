@@ -293,6 +293,112 @@ def _junction_candidates(
     return candidates
 
 
+def _opening_candidates(
+    wall_detections: list[ReconstructionDetection],
+    pixels_per_mm_x: float,
+    pixels_per_mm_y: float,
+    minimum_width_mm: float = 450.0,
+    maximum_width_mm: float = 3000.0,
+    minimum_overlap_ratio: float = 0.65,
+) -> list[dict[str, Any]]:
+    """Suggest possible openings between aligned wall detections.
+
+    This is a deliberately conservative gap heuristic, not a door/window
+    classifier. It only reports candidates; it never changes wall geometry.
+    """
+    walls = [
+        (detection, _rect(detection), _axis(_rect(detection)))
+        for detection in wall_detections
+    ]
+    candidates: list[dict[str, Any]] = []
+    for index, (first_detection, first, orientation) in enumerate(walls):
+        if orientation is None:
+            continue
+        for second_detection, second, second_orientation in walls[index + 1:]:
+            if second_orientation != orientation:
+                continue
+            if orientation == "horizontal":
+                left_detection, left, right_detection, right = (
+                    (first_detection, first, second_detection, second)
+                    if first["x1"] <= second["x1"]
+                    else (second_detection, second, first_detection, first)
+                )
+                overlap_start = max(left["y1"], right["y1"])
+                overlap_end = min(left["y2"], right["y2"])
+                overlap = overlap_end - overlap_start
+                overlap_ratio = overlap / min(left["height"], right["height"])
+                gap_px = right["x1"] - left["x2"]
+                scale = pixels_per_mm_x
+                start = {"x": left["x2"], "y": (overlap_start + overlap_end) / 2}
+                end = {"x": right["x1"], "y": (overlap_start + overlap_end) / 2}
+                gap_bbox = {
+                    "x1": left["x2"], "y1": overlap_start,
+                    "x2": right["x1"], "y2": overlap_end,
+                }
+                axis = "x"
+            else:
+                top_detection, top, bottom_detection, bottom = (
+                    (first_detection, first, second_detection, second)
+                    if first["y1"] <= second["y1"]
+                    else (second_detection, second, first_detection, first)
+                )
+                overlap_start = max(top["x1"], bottom["x1"])
+                overlap_end = min(top["x2"], bottom["x2"])
+                overlap = overlap_end - overlap_start
+                overlap_ratio = overlap / min(top["width"], bottom["width"])
+                gap_px = bottom["y1"] - top["y2"]
+                scale = pixels_per_mm_y
+                start = {"x": (overlap_start + overlap_end) / 2, "y": top["y2"]}
+                end = {"x": (overlap_start + overlap_end) / 2, "y": bottom["y1"]}
+                gap_bbox = {
+                    "x1": overlap_start, "y1": top["y2"],
+                    "x2": overlap_end, "y2": bottom["y1"],
+                }
+                axis = "y"
+
+            if overlap <= 0 or overlap_ratio < minimum_overlap_ratio or gap_px <= 0:
+                continue
+            width_mm = gap_px / scale
+            if not minimum_width_mm <= width_mm <= maximum_width_mm:
+                continue
+
+            pair_ids = {first_detection.id, second_detection.id}
+            blocked = False
+            for other_detection, other, other_orientation in walls:
+                if other_detection.id in pair_ids or other_orientation != orientation:
+                    continue
+                if orientation == "horizontal":
+                    crosses_gap = other["x1"] < gap_bbox["x2"] and other["x2"] > gap_bbox["x1"]
+                    overlaps_wall = min(other["y2"], gap_bbox["y2"]) > max(other["y1"], gap_bbox["y1"])
+                else:
+                    crosses_gap = other["y1"] < gap_bbox["y2"] and other["y2"] > gap_bbox["y1"]
+                    overlaps_wall = min(other["x2"], gap_bbox["x2"]) > max(other["x1"], gap_bbox["x1"])
+                if crosses_gap and overlaps_wall:
+                    blocked = True
+                    break
+            if blocked:
+                continue
+
+            wall_ids = sorted(pair_ids)
+            candidates.append({
+                "id": f"opening-candidate-{len(candidates) + 1:03d}",
+                "wall_ids": wall_ids,
+                "axis": axis,
+                "start_px": {key: round(value, 2) for key, value in start.items()},
+                "end_px": {key: round(value, 2) for key, value in end.items()},
+                "gap_bbox": {key: round(value, 2) for key, value in gap_bbox.items()},
+                "width_mm": round(width_mm, 2),
+                "status": "candidate_requires_review",
+                "review_status": "pending",
+            })
+    candidates.sort(key=lambda item: (
+        item["gap_bbox"]["y1"], item["gap_bbox"]["x1"], item["wall_ids"]
+    ))
+    for index, candidate in enumerate(candidates, start=1):
+        candidate["id"] = f"opening-candidate-{index:03d}"
+    return candidates
+
+
 def reconstruct_wall_edges(
     request: WallReconstructionRequest,
 ) -> dict[str, Any]:
@@ -347,11 +453,13 @@ def reconstruct_wall_edges(
         )
 
     junction_candidates = _junction_candidates(segments)
+    opening_candidates = _opening_candidates(wall_detections, px_per_mm_x, px_per_mm_y)
     return {
         "status": "draft",
         "geometry_kind": "detected_wall_face_edges",
         "segments": segments,
         "junction_candidates": junction_candidates,
+        "opening_candidates": opening_candidates,
         "junction_tolerance_px": 2.0,
         "scale": {
             "pixels_per_mm_x": round(px_per_mm_x, 9),
@@ -368,7 +476,7 @@ def reconstruct_wall_edges(
         "warnings": [
             "This is editable draft wall-face linework, not a verified construction drawing.",
             "Each detected wall bounding box becomes two parallel face lines. Near-coincident endpoints include source endpoint references and can be joined only after explicit review; closed cycles can then be offered as room outlines, but no automatic topology repair or room creation is applied.",
-            "Doors, windows, room boundaries, diagonal walls and missing wall regions are not inferred.",
+            "Possible openings are heuristic gap candidates only; the reviewer must classify them. Doors, windows, room boundaries, diagonal walls and missing wall regions are not inferred automatically.",
             "X and Y scales are derived independently from confirmed dimensions. Local perspective, skew and paper distortion are not rectified.",
             "Inspect every generated edge against the source scan before relying on the DXF.",
         ],
