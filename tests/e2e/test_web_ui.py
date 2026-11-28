@@ -1086,16 +1086,16 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
                 "wall_orientation":orientation,"wall_face_index":face_index
             })
     # Build four reviewable corner joins that close a rectangular room outline.
-    segments[3]["start_px"] = {"x": 61.5, "y": 50}
+    segments[5]["start_px"] = {"x": 61.5, "y": 50}
     junction_candidates = [
         {
             "point_px": {"x": 60.75, "y": 50},
             "source_detection_ids": ["det-001", "det-005"],
-            "segment_ids": ["reconstructed-wall-0002", "reconstructed-wall-0004"],
+            "segment_ids": ["reconstructed-wall-0002", "reconstructed-wall-0006"],
             "endpoints": [
                 {"segment_id": "reconstructed-wall-0002", "endpoint": "start_px",
                  "original_point_px": {"x": 60, "y": 50}},
-                {"segment_id": "reconstructed-wall-0004", "endpoint": "start_px",
+                {"segment_id": "reconstructed-wall-0006", "endpoint": "start_px",
                  "original_point_px": {"x": 61.5, "y": 50}}
             ],
             "endpoint_count": 2, "status": "candidate_requires_review", "review_status": "pending"
@@ -1103,11 +1103,11 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
         {
             "point_px": {"x": 220, "y": 50},
             "source_detection_ids": ["det-002", "det-005"],
-            "segment_ids": ["reconstructed-wall-0004", "reconstructed-wall-0005"],
+            "segment_ids": ["reconstructed-wall-0003", "reconstructed-wall-0006"],
             "endpoints": [
-                {"segment_id": "reconstructed-wall-0004", "endpoint": "end_px",
+                {"segment_id": "reconstructed-wall-0003", "endpoint": "start_px",
                  "original_point_px": {"x": 220, "y": 50}},
-                {"segment_id": "reconstructed-wall-0005", "endpoint": "start_px",
+                {"segment_id": "reconstructed-wall-0006", "endpoint": "end_px",
                  "original_point_px": {"x": 220, "y": 50}}
             ],
             "endpoint_count": 2, "status": "candidate_requires_review", "review_status": "pending"
@@ -1115,9 +1115,9 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
         {
             "point_px": {"x": 220, "y": 250},
             "source_detection_ids": ["det-002", "det-006"],
-            "segment_ids": ["reconstructed-wall-0005", "reconstructed-wall-0007"],
+            "segment_ids": ["reconstructed-wall-0003", "reconstructed-wall-0007"],
             "endpoints": [
-                {"segment_id": "reconstructed-wall-0005", "endpoint": "end_px",
+                {"segment_id": "reconstructed-wall-0003", "endpoint": "end_px",
                  "original_point_px": {"x": 220, "y": 250}},
                 {"segment_id": "reconstructed-wall-0007", "endpoint": "end_px",
                  "original_point_px": {"x": 220, "y": 250}}
