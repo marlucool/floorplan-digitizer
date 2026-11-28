@@ -2419,7 +2419,7 @@ async function openProjectFile(file) {
     if (project.analysis_result?.image && !isValidProjectGeometry(project)) validationFailures.push("invalid editable geometry");
     if (project.analysis_result?.image &&
         !isValidReconstructionState(project.reconstruction, project.geometry, project.analysis_result)) validationFailures.push("invalid reconstruction metadata");
-    if (!/\\.(png|jpe?g|webp|tiff?|pdf)$/i.test(project.source?.filename || "")) validationFailures.push("unsupported source filename");
+    if (!/\.(png|jpe?g|webp|tiff?|pdf)$/i.test(project.source?.filename || "")) validationFailures.push("unsupported source filename");
     if (!Number.isInteger(project.source?.size_bytes) || project.source.size_bytes < 1 ||
         project.source.size_bytes > 25 * 1024 * 1024) validationFailures.push("invalid source file size");
     if (!Number.isFinite(project.analysis_result?.image?.width) || project.analysis_result.image.width < 1 ||
