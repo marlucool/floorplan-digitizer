@@ -1142,6 +1142,17 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
         "segments":segments,
         "junction_candidates":junction_candidates,
         "junction_tolerance_px":2.0,
+        "opening_candidates":[{
+            "id":"opening-candidate-001",
+            "wall_ids":["det-001","det-002"],
+            "axis":"x",
+            "start_px":{"x":120,"y":45},
+            "end_px":{"x":150,"y":45},
+            "gap_bbox":{"x1":120,"y1":40,"x2":150,"y2":50},
+            "width_mm":600,
+            "status":"candidate_requires_review",
+            "review_status":"pending"
+        }],
         "scale":{
             "pixels_per_mm_x":0.04,"pixels_per_mm_y":0.06,
             "source":"confirmed_dimension_to_wall_associations"
@@ -1279,6 +1290,10 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             assert room_candidate_button.inner_text() == "Add room outline"
             room_candidate_button.click()
             assert page.locator("#roomCount").inner_text() == "1 room"
+            opening_select = page.locator("#openingCandidateList .opening-type-select").first
+            opening_select.select_option("door")
+            page.locator("#openingCandidateList button").first.click()
+            assert page.locator("#openingReviewSummary").inner_text() == "1 added · 0 to review"
 
             with page.expect_download() as dxf_download_info:
                 page.locator("#exportDxf").click()
@@ -1292,6 +1307,9 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             joined_edges = {item["id"]: item for item in requests["dxf"]["segments"]}
             assert joined_edges["reconstructed-wall-0002"]["start_px"] == {"x": 60.75, "y": 50}
             assert joined_edges["reconstructed-wall-0006"]["start_px"] == {"x": 60.75, "y": 50}
+            assert len(requests["dxf"]["openings"]) == 1
+            assert requests["dxf"]["openings"][0]["opening_type"] == "door"
+            assert requests["dxf"]["openings"][0]["source_detection_ids"] == ["det-001", "det-002"]
 
             with page.expect_download() as review_download_info:
                 page.locator("#exportReview").click()
@@ -1303,6 +1321,7 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             assert review_payload["analysis"]["status"]=="dimension_constrained_wall_edge_draft"
             assert len(review_payload["dimension_driven_wall_draft"])==8
             assert review_payload["reconstruction"]["scale"]["pixels_per_mm_y"]==0.06
+            assert review_payload["manual_openings"][0]["opening_type"] == "door"
 
             with page.expect_download() as project_download_info:
                 page.locator("#saveProject").click()
@@ -1314,8 +1333,10 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             assert len(project_payload["geometry"])==8
             assert project_payload["reconstruction"]["scale"]["pixels_per_mm_x"]==0.04
             assert all(item["review_status"] == "joined" for item in project_payload["reconstruction"]["junction_candidates"])
+            assert project_payload["reconstruction"]["opening_candidates"][0]["review_status"] == "added"
             assert len(project_payload["rooms"]) == 1
             assert len(project_payload["rooms"][0]["vertices_px"]) == 4
+            assert project_payload["openings"][0]["opening_type"] == "door"
 
             page.locator("#projectInput").set_input_files({
                 "name":"survey.planline",
@@ -1333,6 +1354,13 @@ def test_dimension_driven_wall_draft_exports_and_roundtrips_as_project() -> None
             restored_junction_button = page.locator("#junctionCandidateList button").first
             assert restored_junction_button.inner_text() == "Undo join"
             assert page.locator("#roomCount").inner_text() == "1 room"
+            assert page.locator("#openingReviewSummary").inner_text() == "1 added · 0 to review"
+            assert page.locator("#openingCandidateList button").first.inner_text() == "Remove marker"
+            page.locator("#openingCandidateList button").first.click()
+            assert page.locator("#openingCandidateList button").first.inner_text() == "Add marker"
+            page.locator("#openingCandidateList .opening-type-select").first.select_option("window")
+            page.locator("#openingCandidateList button").first.click()
+            assert page.locator("#openingReviewSummary").inner_text() == "1 added · 0 to review"
             restored_junction_button.click()
             assert restored_junction_button.inner_text() == "Join endpoints"
 
