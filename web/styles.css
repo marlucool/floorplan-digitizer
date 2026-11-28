@@ -2234,11 +2234,11 @@ body{overflow-x:clip}
 .junction-review-heading span{font:10px 'DM Mono',monospace;color:var(--muted)}
 .junction-review>p{margin:8px 0 12px;color:var(--muted);font-size:12px;line-height:1.5}
 .junction-candidate-list{display:grid;gap:8px}
-.junction-candidate{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.junction-candidate{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--paper)}
 .junction-candidate-copy{min-width:0;display:grid;gap:4px}
 .junction-candidate-copy strong{font:600 11px Manrope,sans-serif;color:var(--ink);overflow-wrap:anywhere}
 .junction-candidate-copy small{font:10px 'DM Mono',monospace;color:var(--muted)}
 .junction-candidate button{flex:none}
-.junction-candidate[data-state="joined"]{border-color:#8aaa8c;background:#f4f8f3}
+.junction-candidate[data-state="joined"]{border-color:var(--green);background:var(--paper)}
 .junction-candidate[data-state="blocked"]{opacity:.75}
 @media(max-width:620px){.junction-candidate{align-items:flex-start;flex-direction:column}.junction-candidate button{width:100%}.junction-review-heading{align-items:flex-start;flex-direction:column}}
