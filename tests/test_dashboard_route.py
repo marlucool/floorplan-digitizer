@@ -97,3 +97,14 @@ def test_document_catalog_does_not_follow_symlinks_outside_docs(tmp_path) -> Non
         pytest.skip("Symlinks are not available in this environment")
 
     assert discover_documents(docs_root) == []
+
+
+def test_documentation_source_assets_download_instead_of_rendering() -> None:
+    client = TestClient(app)
+    source = client.get("/docs/archive/planline-webui-prototype/backend/app.py")
+    assert source.status_code == 200
+    assert source.headers["content-disposition"].startswith("attachment;")
+    assert source.headers["content-type"].startswith("text/x-python") or source.headers["content-type"].startswith("text/plain")
+
+    hidden = client.get("/docs/.hidden-secret.txt")
+    assert hidden.status_code == 404
