@@ -686,6 +686,124 @@
                   }
                 }
               }
+            },
+            "opening_candidates": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "wall_ids",
+                  "axis",
+                  "start_px",
+                  "end_px",
+                  "gap_bbox",
+                  "width_mm",
+                  "status"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^opening-candidate-[0-9]{3,}$"
+                  },
+                  "wall_ids": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^det-[0-9]{3,}$"
+                    }
+                  },
+                  "axis": {
+                    "type": "string",
+                    "enum": [
+                      "x",
+                      "y"
+                    ]
+                  },
+                  "start_px": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "x",
+                      "y"
+                    ],
+                    "properties": {
+                      "x": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "y": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
+                  },
+                  "end_px": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "x",
+                      "y"
+                    ],
+                    "properties": {
+                      "x": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "y": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
+                  },
+                  "gap_bbox": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "x1",
+                      "y1",
+                      "x2",
+                      "y2"
+                    ],
+                    "properties": {
+                      "x1": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "y1": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "x2": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "y2": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
+                  },
+                  "width_mm": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "status": {
+                    "const": "candidate_requires_review"
+                  },
+                  "review_status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "added"
+                    ]
+                  }
+                }
+              }
             }
           }
         }
