@@ -643,7 +643,9 @@ function renderGeometryControls() {
   const roomCount = geometry?.rooms?.length || 0;
   if (!$("#geometryCount")) return;
   $("#geometryCount").textContent = wallCount
-    ? wallCount + " wall edges" + (reconstructedCount ? " · " + reconstructedCount + " detected draft" : "")
+    ? (manualCount ? manualCount + " manual wall" + (manualCount === 1 ? "" : "s") : "") +
+      (manualCount && reconstructedCount ? " · " : "") +
+      (reconstructedCount ? reconstructedCount + " detected draft" : "")
     : "No wall edges yet";
   $("#reconstructWalls").disabled = !state.result || PREVIEW_MODE;
   $("#roomCount").textContent = roomCount + (roomCount === 1 ? " room" : " rooms");
@@ -1092,7 +1094,7 @@ async function exportManualGeometryDxf() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = ((state.file?.name || "drawing").replace(/\\.[^.]+$/, "") || "drawing") +
+    link.download = ((state.file?.name || "drawing").replace(/\.[^.]+$/, "") || "drawing") +
       (hasReconstructionScale ? "-measured-wall-draft.dxf" : "-manual-geometry.dxf");
     document.body.append(link);
     link.click();
