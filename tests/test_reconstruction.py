@@ -115,7 +115,7 @@ def test_rejects_ambiguous_or_unreadable_verified_dimension_text() -> None:
     dimensions = sample_request().dimensions
     dimensions[0].raw_text = "4000"
     request = sample_request(dimensions=[item.model_dump() for item in dimensions])
-    with pytest.raises(ValueError, match="explicit unit"):
+    with pytest.raises(ValueError, match="unit is not written"):
         reconstruct_wall_edges(request)
 
 
@@ -151,7 +151,7 @@ def test_conflicting_confirmed_dimensions_on_same_axis_block_reconstruction() ->
         detection("wall-right-2", "wall", (180, 60, 190, 180)),
     ])
     request = sample_request(
-        detections=[item.model_dump() for item in detections],
+        detections=[item.model_dump() if hasattr(item, "model_dump") else item for item in detections],
         dimensions=[
             {
                 "detection_id": "value-x",
