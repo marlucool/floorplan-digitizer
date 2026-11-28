@@ -139,6 +139,7 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     page.locator(".nav-menu-toggle").click()
                     expect(page.locator("#primaryNavigation")).to_be_visible()
                     expect(page.locator('#primaryNavigation a[aria-current="page"]')).to_have_text("Documentation")
+                    expect(page.locator('#primaryNavigation a[href="../architecture.html"]')).to_be_visible()
                     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), "Documentation overflows at 390px"
                     page.locator(".nav-menu-toggle").click()
                     expect(page.locator("#primaryNavigation")).to_be_hidden()
