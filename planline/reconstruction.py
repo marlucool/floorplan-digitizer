@@ -42,6 +42,7 @@ class ConfirmedDimensionInput(BaseModel):
 class WallReconstructionRequest(BaseModel):
     source_width: int = Field(ge=1, le=25_000_000)
     source_height: int = Field(ge=1, le=25_000_000)
+    source_page_index: int = Field(default=0, ge=0, le=10_000)
     detections: list[ReconstructionDetection] = Field(min_length=1, max_length=5_000)
     dimensions: list[ConfirmedDimensionInput] = Field(default_factory=list, max_length=500)
     scale_consistency_percent: float = Field(default=5.0, gt=0, le=15)
@@ -245,7 +246,7 @@ def reconstruct_wall_edges(
                 "type": "wall_segment",
                 "start_px": start,
                 "end_px": end,
-                "source_page_index": 0,
+                "source_page_index": request.source_page_index,
                 "created_by_reconstruction": True,
                 "source_detection_id": wall.id,
                 "detector_confidence": wall.confidence,
