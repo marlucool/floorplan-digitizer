@@ -2161,3 +2161,18 @@ body{overflow-x:clip}
   .documentation-page .documentation-file-list{max-height:260px;overflow:auto}
   .documentation-page .documentation-toc{max-height:220px;overflow:auto}
 }
+
+
+/* Settings headings and status badges must wrap on narrow phone screens. */
+@media (max-width: 520px) {
+  .settings-card-heading { align-items: flex-start; flex-wrap: wrap; gap: 10px 14px; }
+  .settings-card-heading > div { min-width: 0; }
+  .settings-version, .update-indicator { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+  .settings-card, .settings-card > *, .settings-card-heading, .settings-meta-grid,
+  .auto-check-row, .update-status, .update-actions, .workspace-links, .workspace-links a,
+  .settings-main footer { min-width: 0; }
+  .auto-check-row { align-items: flex-start; line-height: 1.5; }
+  .auto-check-row input { flex: 0 0 15px; margin-top: 2px; }
+  .update-actions > * { max-width: 100%; }
+  .settings-main footer { flex-wrap: wrap; gap: 10px; line-height: 1.6; }
+}
