@@ -294,3 +294,35 @@ def test_junction_candidates_report_nearby_endpoints_without_snapping_geometry()
     ]
     assert reconstruction._junction_candidates(same_wall, tolerance_px=2.0) == []
 
+
+
+def test_junction_candidates_do_not_merge_transitive_endpoint_chains() -> None:
+    segments = [
+        {
+            "id": "edge-a",
+            "source_detection_id": "wall-a",
+            "start_px": {"x": 0, "y": 0},
+            "end_px": {"x": 0, "y": 100},
+        },
+        {
+            "id": "edge-b",
+            "source_detection_id": "wall-b",
+            "start_px": {"x": 1, "y": 0},
+            "end_px": {"x": 100, "y": 100},
+        },
+        {
+            "id": "edge-c",
+            "source_detection_id": "wall-c",
+            "start_px": {"x": 2, "y": 0},
+            "end_px": {"x": 200, "y": 100},
+        },
+    ]
+
+    candidates = reconstruction._junction_candidates(segments, tolerance_px=1.1)
+
+    assert len(candidates) == 2
+    assert [item["source_detection_ids"] for item in candidates] == [
+        ["wall-a", "wall-b"],
+        ["wall-b", "wall-c"],
+    ]
+    assert all(item["endpoint_count"] == 2 for item in candidates)
