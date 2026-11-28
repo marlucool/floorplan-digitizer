@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from planline.api import app
-from planline.documentation import discover_documents
+from planline.documentation import discover_documents, safe_document_path
 
 
 def test_application_root_and_dashboard_route_open_dashboard() -> None:
@@ -119,3 +119,13 @@ def test_workspace_footers_link_to_the_documentation_hub() -> None:
         response = client.get(path)
         assert response.status_code == 200
         assert response.text.count('href="/documentation">Documentation</a>') >= 2
+
+
+def test_documentation_routes_treat_nul_paths_as_not_found(tmp_path) -> None:
+    docs_root = tmp_path / "docs"
+    docs_root.mkdir()
+    with pytest.raises(FileNotFoundError):
+        safe_document_path(docs_root, "invalid\\x00name.md")
+
+    response = TestClient(app).get("/docs/%00")
+    assert response.status_code == 404
