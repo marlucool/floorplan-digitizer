@@ -75,6 +75,7 @@ def test_static_preview_starts_at_dashboard_and_keeps_workspaces_available() -> 
                     expect(page.locator("#healthDetails")).to_contain_text("Backend services are disabled")
                     expect(page.locator("#healthDot")).to_be_visible()
                     expect(page.locator("#healthLabel")).to_have_text("Static UI preview")
+                    expect(page.locator(".health-mark")).to_have_css("color", "rgb(139, 139, 125)")
                     expect(page.locator("#refreshHealth")).to_be_hidden()
                     expect(page.locator('.workspace-card.drawing-card[href="drawing.html"]')).to_be_visible()
                     expect(page.locator('.utility-link[href="ocr.html"]')).to_be_visible()
