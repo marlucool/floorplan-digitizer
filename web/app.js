@@ -1031,14 +1031,13 @@ function renderOpeningReview() {
       option.textContent = label;
       select.append(option);
     });
-    if (marker) {
-      select.value = marker.opening_type;
-      select.disabled = true;
-    }
+    if (marker) select.value = marker.opening_type;
+    select.disabled = PREVIEW_MODE || Boolean(marker);
     const button = document.createElement("button");
     button.type = "button";
     button.className = "toolbar-button";
     button.textContent = marker ? "Remove marker" : "Add marker";
+    button.disabled = PREVIEW_MODE;
     button.addEventListener("click", () => {
       if (marker) removeOpeningMarker(marker.id);
       else addOpeningCandidate(candidate.id, select.value);
@@ -1064,6 +1063,7 @@ function renderOpeningReview() {
       button.type = "button";
       button.className = "toolbar-button";
       button.textContent = "Remove marker";
+      button.disabled = PREVIEW_MODE;
       button.addEventListener("click", () => removeOpeningMarker(marker.id));
       card.append(copy, button);
       list.append(card);
@@ -1071,6 +1071,7 @@ function renderOpeningReview() {
 }
 
 function addOpeningCandidate(candidateId, openingType) {
+  if (PREVIEW_MODE) return;
   const candidate = state.reconstruction?.opening_candidates?.find((item) => item.id === candidateId);
   if (!candidate || state.geometry.openings.some((item) => item.candidate_id === candidateId)) return;
   let nextId = Math.max(1, state.geometry.nextOpeningId || 1);
@@ -1100,6 +1101,7 @@ function addOpeningCandidate(candidateId, openingType) {
 }
 
 function removeOpeningMarker(openingId) {
+  if (PREVIEW_MODE) return;
   const marker = state.geometry.openings.find((item) => item.id === openingId);
   if (!marker) return;
   state.geometry.openings = state.geometry.openings.filter((item) => item.id !== openingId);
