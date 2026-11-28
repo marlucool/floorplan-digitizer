@@ -70,7 +70,7 @@ def test_reconstructs_editable_wall_faces_from_both_confirmed_axes() -> None:
     assert {item["source_detection_id"] for item in result["segments"]} == {
         "wall-left", "wall-right", "wall-top", "wall-bottom"
     }
-    assert "doors" in " ".join(result["warnings"])
+    assert "doors" in " ".join(result["warnings"]).lower()
 
 
 def test_unverified_or_unassociated_dimensions_do_not_constrain_geometry() -> None:
