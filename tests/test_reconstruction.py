@@ -222,6 +222,8 @@ def test_reconstruction_endpoint_returns_a_reviewable_wall_draft() -> None:
     payload = response.json()
     assert payload["status"] == "draft"
     assert payload["scale"]["pixels_per_mm_x"] == pytest.approx(0.04)
+    assert payload["junction_tolerance_px"] == 2.0
+    assert isinstance(payload["junction_candidates"], list)
     assert len(payload["segments"]) == 8
 
 
